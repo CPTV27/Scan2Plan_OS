@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Lead, CpqQuote } from "@shared/schema";
 import {
   calculatePricing,
+  calculateTravelCost,
   BUILDING_TYPES,
   LANDSCAPE_TYPES,
   DISCIPLINES,
@@ -124,6 +125,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   
   // Distance calculation loading state
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+  
+  // Price adjustment for margin gate compliance
+  const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState<number>(0);
 
   // Internal cost tracking / Tier A Pricing
   const [tierAScanningCost, setTierAScanningCost] = useState<string>("");
@@ -272,6 +276,10 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
           setProfitabilityCaveats(quote.internalCosts.profitabilityCaveats);
         }
       }
+      // Load price adjustment
+      if (quote.priceAdjustmentPercent != null) {
+        setPriceAdjustmentPercent(quote.priceAdjustmentPercent);
+      }
     }
   }, [existingQuote]);
 
@@ -310,14 +318,15 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         origin: originAddress,
       });
       
-      if (result.distanceMiles) {
+      const distanceResult = result as { distanceMiles?: number; durationText?: string };
+      if (distanceResult.distanceMiles) {
         setTravel({
           dispatchLocation: locationCode,
-          distance: Math.round(result.distanceMiles),
+          distance: Math.round(distanceResult.distanceMiles),
         });
         toast({
           title: "Distance calculated",
-          description: `${Math.round(result.distanceMiles)} miles from ${locationCode} (${result.durationText})`,
+          description: `${Math.round(distanceResult.distanceMiles)} miles from ${locationCode} (${distanceResult.durationText || ""})`,
         });
       }
     } catch (error: any) {
@@ -332,15 +341,64 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
   };
 
-  // Calculate pricing in real-time
-  const pricing: PricingResult = useMemo(() => {
+  // Calculate base pricing in real-time (before adjustment)
+  const basePricing: PricingResult = useMemo(() => {
     return calculatePricing(areas, services, travel, risks, paymentTerms);
   }, [areas, services, travel, risks, paymentTerms]);
+
+  // Calculate adjusted pricing with markup percentage
+  const pricing: PricingResult = useMemo(() => {
+    if (priceAdjustmentPercent === 0) return basePricing;
+    
+    const adjustmentAmount = Math.round(basePricing.totalClientPrice * (priceAdjustmentPercent / 100) * 100) / 100;
+    const adjustedTotal = Math.round((basePricing.totalClientPrice + adjustmentAmount) * 100) / 100;
+    const adjustedProfit = Math.round((adjustedTotal - basePricing.totalUpteamCost) * 100) / 100;
+    
+    // Add adjustment as a visible line item
+    const adjustmentLineItem = {
+      label: `Price Adjustment (+${priceAdjustmentPercent}%)`,
+      value: adjustmentAmount,
+      upteamCost: 0, // Adjustment is pure margin
+    };
+    
+    return {
+      ...basePricing,
+      items: [...basePricing.items, adjustmentLineItem],
+      subtotal: Math.round((basePricing.subtotal + adjustmentAmount) * 100) / 100,
+      totalClientPrice: adjustedTotal,
+      profitMargin: adjustedProfit,
+    };
+  }, [basePricing, priceAdjustmentPercent]);
 
   // Calculate margin status for GM Hard Gate
   const marginPercent = useMemo(() => calculateMarginPercent(pricing), [pricing]);
   const marginGateError = useMemo(() => getMarginGateError(pricing), [pricing]);
   const isMarginBelowGate = !passesMarginGate(pricing);
+  
+  // Calculate the minimum adjustment needed to reach 40% margin
+  const requiredAdjustmentPercent = useMemo(() => {
+    if (!isMarginBelowGate || priceAdjustmentPercent > 0) return 0;
+    // To achieve 40% margin: (price - cost) / price = 0.4
+    // price = cost / 0.6
+    const targetPrice = basePricing.totalUpteamCost / (1 - FY26_GOALS.MARGIN_FLOOR);
+    const requiredIncrease = ((targetPrice / basePricing.totalClientPrice) - 1) * 100;
+    return Math.ceil(requiredIncrease * 10) / 10; // Round up to 1 decimal place
+  }, [basePricing, isMarginBelowGate, priceAdjustmentPercent]);
+
+  // Preview travel cost based on current settings
+  const travelCostPreview = useMemo(() => {
+    if (!travel || travel.dispatchLocation === "FLY_OUT") return null;
+    if (customTravelCost && !isNaN(parseFloat(customTravelCost))) {
+      return { cost: parseFloat(customTravelCost), isCustom: true };
+    }
+    const projectTotalSqft = calculateTotalSqft(areas);
+    const cost = calculateTravelCost(
+      travel.distance || 0,
+      travel.dispatchLocation,
+      projectTotalSqft
+    );
+    return { cost, isCustom: false };
+  }, [travel, customTravelCost, areas]);
 
   // RFI (Request for Information) detection - "I don't know" selections
   const rfiFields = useMemo(() => {
@@ -455,6 +513,7 @@ Thanks!`.trim();
           assumedMargin,
           profitabilityCaveats,
         },
+        priceAdjustmentPercent: priceAdjustmentPercent > 0 ? priceAdjustmentPercent : null,
         // Full pricing result stored in pricingBreakdown field for QBO estimate sync
         pricingBreakdown: {
           items: pricing.items,
@@ -546,6 +605,7 @@ Thanks!`.trim();
         scanningOnly,
         siteStatus,
         mepScope,
+        priceAdjustmentPercent: priceAdjustmentPercent > 0 ? priceAdjustmentPercent : null,
         pricingBreakdown: {
           items: pricing.items,
           subtotal: pricing.subtotal,
@@ -1175,6 +1235,30 @@ Thanks!`.trim();
                       }
                     </p>
                   </div>
+                  {travelCostPreview && (
+                    <div className="p-3 bg-muted/50 rounded-md border" data-testid="travel-cost-preview">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Calculated Travel Cost: </span>
+                          <span className="font-semibold text-foreground">
+                            ${travelCostPreview.cost.toLocaleString()}
+                          </span>
+                          {travelCostPreview.isCustom && (
+                            <Badge variant="outline" className="ml-2 text-xs">Custom</Badge>
+                          )}
+                        </div>
+                        {travel?.dispatchLocation?.toLowerCase().includes("brooklyn") && (travel?.distance || 0) > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {calculateTotalSqft(areas) >= 50000 ? "Tier A (No base)" : 
+                             calculateTotalSqft(areas) >= 10000 ? "Tier B ($300 base)" : "Tier C ($150 base)"}
+                          </Badge>
+                        )}
+                      </div>
+                      {!travelCostPreview.isCustom && travel?.distance === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">Enter distance to calculate travel cost</p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1505,6 +1589,50 @@ Thanks!`.trim();
             {isMarginBelowGate && (
               <div className="text-xs text-red-600 mt-1" data-testid="text-margin-gate-error">
                 Margin must be at least {(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% to save quote
+              </div>
+            )}
+            {/* Price Adjustment Control */}
+            {(isMarginBelowGate || priceAdjustmentPercent > 0) && (
+              <div className="mt-4 p-3 border rounded-md bg-muted/30 space-y-3" data-testid="price-adjustment-section">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Price Adjustment</Label>
+                  {requiredAdjustmentPercent > 0 && priceAdjustmentPercent === 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPriceAdjustmentPercent(requiredAdjustmentPercent)}
+                      data-testid="button-apply-min-adjustment"
+                    >
+                      Apply +{requiredAdjustmentPercent}% (minimum)
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    value={priceAdjustmentPercent || ""}
+                    onChange={(e) => setPriceAdjustmentPercent(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-24"
+                    data-testid="input-price-adjustment"
+                  />
+                  <span className="text-sm text-muted-foreground">% markup</span>
+                  {priceAdjustmentPercent > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPriceAdjustmentPercent(0)}
+                      data-testid="button-clear-adjustment"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                {priceAdjustmentPercent > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    Base price: ${basePricing.totalClientPrice.toLocaleString()} + ${(pricing.totalClientPrice - basePricing.totalClientPrice).toLocaleString()} adjustment
+                  </div>
+                )}
               </div>
             )}
           </div>
