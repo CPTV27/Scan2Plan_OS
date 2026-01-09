@@ -9,11 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-type BuyerType = "A_Principal" | "B_OwnerDev" | "C_Unknown";
+type BuyerType = "BP1" | "BP2" | "BP3" | "BP4" | "BP5" | "BP6" | "BP7" | "BP8";
 type PainPoint = "Rework_RFI" | "ScheduleVolatility" | "Inconsistency" | "Terms_Risk";
 type AuthorMode = "Twain" | "Fuller";
 
@@ -59,9 +59,14 @@ interface RedLine {
 }
 
 const BUYER_TYPE_OPTIONS: { value: BuyerType; label: string; description: string }[] = [
-  { value: "A_Principal", label: "Architecture Principal", description: "Firm-level gatekeeper focused on standardization and delivery variance" },
-  { value: "B_OwnerDev", label: "Owner / Developer", description: "Focused on defensibility: schedule, cost, and escalation risk" },
-  { value: "C_Unknown", label: "Unknown Buyer", description: "Default context for unqualified leads" },
+  { value: "BP1", label: "The Engineer", description: "Technical detail-focused, wants accuracy and methodology" },
+  { value: "BP2", label: "The GC / Contractor", description: "Schedule and coordination-driven, values speed and reliability" },
+  { value: "BP3", label: "The Owner's Rep", description: "Risk management focused, needs defensibility and documentation" },
+  { value: "BP4", label: "The PM", description: "Process-oriented, values efficiency and clear deliverables" },
+  { value: "BP5", label: "The Architect", description: "Design vision focused, cares about accuracy for design development" },
+  { value: "BP6", label: "The Developer / Owner", description: "ROI and investment-focused, values cost certainty and schedule" },
+  { value: "BP7", label: "The Sustainability Lead", description: "Energy and compliance focused, needs data for certifications" },
+  { value: "BP8", label: "The Tech Leader / Influencer", description: "Innovation-focused, interested in digital twin and tech capabilities" },
 ];
 
 const PAIN_POINT_OPTIONS: { value: PainPoint; label: string; icon: string }[] = [
@@ -78,7 +83,7 @@ const AUTHOR_MODE_OPTIONS: { value: AuthorMode; label: string; description: stri
 
 export default function BrandGenerator() {
   const { toast } = useToast();
-  const [buyerType, setBuyerType] = useState<BuyerType>("A_Principal");
+  const [buyerType, setBuyerType] = useState<BuyerType>("BP5");
   const [painPoint, setPainPoint] = useState<PainPoint>("Rework_RFI");
   const [authorMode, setAuthorMode] = useState<AuthorMode>("Twain");
   const [projectContext, setProjectContext] = useState("");
@@ -135,24 +140,65 @@ export default function BrandGenerator() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Sparkles className="h-6 w-6 text-primary" />
+    <div className="flex h-full">
+      <Tabs defaultValue="generate" className="flex flex-1" orientation="vertical">
+        <div className="w-56 border-r bg-muted/30 flex flex-col">
+          <div className="p-4 border-b">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-primary/10">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold">Brand Engine</h2>
+                <p className="text-xs text-muted-foreground">AI Writing Assistant</p>
+              </div>
+            </div>
+          </div>
+          <TabsList className="flex flex-col h-auto bg-transparent p-2 gap-1">
+            <TabsTrigger 
+              value="generate" 
+              data-testid="tab-generate"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Sparkles className="h-4 w-4" />
+              Generate
+            </TabsTrigger>
+            <TabsTrigger 
+              value="personas" 
+              data-testid="tab-personas"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Users className="h-4 w-4" />
+              Buyer Personas
+            </TabsTrigger>
+            <TabsTrigger 
+              value="standards" 
+              data-testid="tab-standards"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <FileText className="h-4 w-4" />
+              Standards
+            </TabsTrigger>
+            <TabsTrigger 
+              value="governance" 
+              data-testid="tab-governance"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Governance
+            </TabsTrigger>
+            <TabsTrigger 
+              value="audit" 
+              data-testid="tab-audit"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <History className="h-4 w-4" />
+              Audit Log
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">Cognitive Brand Engine</h1>
-          <p className="text-muted-foreground">AI-powered executive communications with brand governance</p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="generate" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="generate" data-testid="tab-generate">Generate</TabsTrigger>
-          <TabsTrigger value="standards" data-testid="tab-standards">Standards</TabsTrigger>
-          <TabsTrigger value="governance" data-testid="tab-governance">Governance</TabsTrigger>
-          <TabsTrigger value="audit" data-testid="tab-audit">Audit Log</TabsTrigger>
-        </TabsList>
+        
+        <div className="flex-1 overflow-auto p-6">
 
         <TabsContent value="generate" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -449,6 +495,31 @@ export default function BrandGenerator() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="personas" className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Buyer Personas</h2>
+            <p className="text-muted-foreground mb-6">
+              8 distinct buyer types with tailored messaging strategies
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {BUYER_TYPE_OPTIONS.map((persona) => (
+              <Card key={persona.value} className="hover-elevate">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Badge variant="outline">{persona.value}</Badge>
+                    {persona.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{persona.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+        </div>
       </Tabs>
     </div>
   );
