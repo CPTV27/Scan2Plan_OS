@@ -14,6 +14,7 @@ import {
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import { createRequire } from "module";
+import { extractProposalData, convertVisionToExtractedData } from "./proposal-vision";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
@@ -727,20 +728,41 @@ Return ONLY valid JSON.`;
         1000
       );
 
-      let pdfText = "";
+      let extracted: ExtractedQuoteData;
+      
       try {
+        console.log(`Starting GPT-4o Vision extraction for document ${documentId}...`);
         const pdfBuffer = await this.fetchWithRetry(
           () => this.downloadPdf(doc.pandaDocId),
           2,
           2000
         );
-        pdfText = await this.extractTextFromPdf(pdfBuffer);
-        console.log(`PDF text extracted: ${pdfText.length} chars`);
-      } catch (pdfError) {
-        console.error("PDF extraction failed, continuing without:", pdfError);
+        
+        const visionData = await extractProposalData(pdfBuffer);
+        extracted = convertVisionToExtractedData(visionData);
+        
+        if (details.recipients?.length) {
+          extracted.contacts = details.recipients.map((r: any) => ({
+            name: `${r.first_name || ""} ${r.last_name || ""}`.trim(),
+            email: r.email,
+            company: r.company,
+          }));
+        }
+        
+        console.log(`Vision extraction successful: ${extracted.services?.length || 0} services found`);
+      } catch (visionError) {
+        console.error("Vision extraction failed, falling back to text extraction:", visionError);
+        
+        let pdfText = "";
+        try {
+          const pdfBuffer = await this.downloadPdf(doc.pandaDocId);
+          pdfText = await this.extractTextFromPdf(pdfBuffer);
+        } catch (textError) {
+          console.error("Text extraction also failed:", textError);
+        }
+        
+        extracted = await this.extractQuoteData(details, pdfText);
       }
-
-      const extracted = await this.extractQuoteData(details, pdfText);
 
       const pdfUrl = await this.getDocumentPdfUrl(doc.pandaDocId);
 
