@@ -193,6 +193,12 @@ FY26_GOALS = {
    - Gate module: `server/lib/profitabilityGates.ts`
    - Error codes: GM_GATE_BLOCKED, ATTRIBUTION_REQUIRED, ESTIMATOR_CARD_RECOMMENDED
 
+6. **S2P Academy Expansion** - New "AI & Tools" documentation tab
+   - Profitability Gates guide with step-by-step fix instructions
+   - All 6 AI features documented with use cases and best practices
+   - CPQ Calculator guide (areas, pricing modes, travel, disciplines)
+   - Location: `client/src/pages/HelpCenter.tsx`
+
 ---
 
 ## Areas Needing Attention
