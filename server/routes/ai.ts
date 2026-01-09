@@ -18,6 +18,7 @@ import {
   type ChatMessage,
   type ExtractedCPQData,
 } from "../services/ai";
+import { checkProposalGates, calculateMarginFromQuote } from "../lib/profitabilityGates";
 
 export function registerAIRoutes(app: Express) {
   // Check if AI is configured
@@ -261,6 +262,33 @@ export function registerAIRoutes(app: Express) {
       return res.status(404).json({ error: "Lead not found" });
     }
 
+    // Get latest CPQ quote to check margin
+    const quotes = await storage.getCpqQuotesByLead(Number(leadId));
+    const latestQuote = quotes.length > 0 ? quotes[quotes.length - 1] : null;
+    const quotePricing = latestQuote?.pricingBreakdown as { totalClientPrice?: number; totalUpteamCost?: number } | null;
+
+    // Check profitability gates
+    const gateResults = checkProposalGates(lead, quotePricing ? { pricingBreakdown: quotePricing } : null);
+
+    // Hard gates - block proposal generation
+    if (!gateResults.gmGate.passed) {
+      log(`[Proposal Gate] GM gate blocked for lead ${leadId}: ${gateResults.gmGate.message}`);
+      return res.status(403).json({
+        error: gateResults.gmGate.code,
+        message: gateResults.gmGate.message,
+        details: gateResults.gmGate.details,
+      });
+    }
+
+    if (!gateResults.estimatorCardGate.passed) {
+      log(`[Proposal Gate] Estimator card required for Tier A lead ${leadId}`);
+      return res.status(403).json({
+        error: gateResults.estimatorCardGate.code,
+        message: gateResults.estimatorCardGate.message,
+        details: gateResults.estimatorCardGate.details,
+      });
+    }
+
     const validTemplates = ["technical", "executive", "standard"];
     const templateType = validTemplates.includes(template) ? template : "standard";
 
@@ -270,6 +298,11 @@ export function registerAIRoutes(app: Express) {
       caseStudies,
       persona,
     });
+
+    // Include any soft warnings in response
+    if (gateResults.warnings.length > 0) {
+      (result as any).warnings = gateResults.warnings;
+    }
 
     // Track analytics
     await db.insert(aiAnalytics).values({

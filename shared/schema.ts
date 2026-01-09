@@ -636,6 +636,9 @@ export const leads = pgTable("leads", {
   firmSize: text("firm_size"), // 1-10, 11-50, 50-100, 100+
   discipline: text("discipline"), // Architecture, GC, Owner, MEP
   focusSector: text("focus_sector"), // e.g., "Historic Preservation"
+  // Estimator Card (Required for Tier A deals before proposal)
+  estimatorCardId: text("estimator_card_id"), // Google Drive file ID for estimator card PDF
+  estimatorCardUrl: text("estimator_card_url"), // Direct URL to estimator card in Drive
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

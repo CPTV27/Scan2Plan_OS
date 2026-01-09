@@ -8,6 +8,8 @@ import { generateUniversalProjectId, generateClientCode, generateUPID } from "@s
 import { enrichLeadWithGoogleIntel } from "../google-intel";
 import { isGoogleDriveConnected, createProjectFolder } from "../googleDrive";
 import { log } from "../lib/logger";
+import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
+import { TIER_A_THRESHOLD } from "@shared/schema";
 import multer from "multer";
 import fs from "fs";
 
@@ -66,11 +68,19 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       log("[Lead Create] Request body: " + JSON.stringify(req.body, null, 2).slice(0, 1000));
       const input = api.leads.create.input.parse(req.body);
       
+      // Auto Tier A flagging based on sqft
+      const tierAUpdate = getAutoTierAUpdate(input.sqft);
+      
       const leadData = {
         ...input,
         ownerId: input.ownerId || (req.user as any)?.id || null,
         leadScore: 0,
+        ...(tierAUpdate || {}),
       };
+      
+      if (tierAUpdate) {
+        log(`[Auto Tier A] Lead flagged as Tier A (${input.sqft?.toLocaleString()} sqft >= ${TIER_A_THRESHOLD.toLocaleString()})`);
+      }
       
       const lead = await storage.createLead(leadData);
       log("[Lead Create] Success, lead ID: " + lead.id);
@@ -124,11 +134,39 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       const input = api.leads.update.input.parse(req.body);
       
       const previousLead = await storage.getLead(leadId);
-      const isClosingWon = input.dealStage === "Closed Won" && previousLead?.dealStage !== "Closed Won";
-      const isEnteringProposal = input.dealStage === "Proposal" && previousLead?.dealStage !== "Proposal";
-      const addressChanged = input.projectAddress && input.projectAddress !== previousLead?.projectAddress;
+      if (!previousLead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      const isClosingWon = input.dealStage === "Closed Won" && previousLead.dealStage !== "Closed Won";
+      const isEnteringProposal = input.dealStage === "Proposal" && previousLead.dealStage !== "Proposal";
+      const addressChanged = input.projectAddress && input.projectAddress !== previousLead.projectAddress;
+      
+      // Attribution gate - required for Closed Won
+      if (isClosingWon) {
+        const leadWithUpdates = { ...previousLead, ...input } as any;
+        const attributionCheck = checkAttributionGate(leadWithUpdates, true);
+        if (!attributionCheck.passed) {
+          log(`[Attribution Gate] Blocked Closed Won for lead ${leadId}: ${attributionCheck.message}`);
+          return res.status(403).json({
+            error: attributionCheck.code,
+            message: attributionCheck.message,
+            details: attributionCheck.details,
+          });
+        }
+      }
       
       const updateData: any = { ...input };
+      
+      // Auto Tier A flagging based on sqft change
+      const newSqft = input.sqft ?? previousLead.sqft;
+      const wasNotTierA = previousLead.abmTier !== "Tier A";
+      const tierAUpdate = getAutoTierAUpdate(newSqft);
+      if (tierAUpdate && wasNotTierA) {
+        updateData.abmTier = tierAUpdate.abmTier;
+        updateData.leadPriority = tierAUpdate.leadPriority;
+        log(`[Auto Tier A] Lead ${leadId} upgraded to Tier A (${newSqft?.toLocaleString()} sqft)`);
+      }
       if (isEnteringProposal && !previousLead?.projectCode) {
         const allLeads = await storage.getLeads();
         const currentYear = new Date().getFullYear();
