@@ -25,6 +25,8 @@ interface IntegrationStatus {
 interface QuickBooksStatus {
   configured: boolean;
   connected: boolean;
+  redirectUri?: string;
+  error?: string;
 }
 
 interface QBAccount {
@@ -238,6 +240,14 @@ export default function Settings() {
                           ? "Credentials configured, click Connect to authorize"
                           : "Add QUICKBOOKS_CLIENT_ID, QUICKBOOKS_CLIENT_SECRET, and QUICKBOOKS_REDIRECT_URI to secrets"}
                     </p>
+                    {qbStatus?.error && (
+                      <p className="text-xs text-destructive mt-1">{qbStatus.error}</p>
+                    )}
+                    {qbStatus?.redirectUri && !qbStatus?.connected && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Redirect URI: {qbStatus.redirectUri}
+                      </p>
+                    )}
                   </div>
                   <Badge variant={qbStatus?.connected ? "default" : "secondary"}>
                     {qbStatus?.connected ? "Connected" : qbStatus?.configured ? "Ready" : "Not Configured"}
@@ -286,7 +296,11 @@ export default function Settings() {
                       )}
                       Connect QuickBooks
                     </Button>
-                  ) : null}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Please add the QuickBooks credentials to secrets to enable connection.
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

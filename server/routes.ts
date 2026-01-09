@@ -4754,9 +4754,22 @@ Projects: ${JSON.stringify(projects.map(p => ({
       const connected = configured ? await quickbooksClient.isConnected() : false;
       const config = quickbooksClient.getConfig();
       const realmId = connected ? await quickbooksClient.getRealmId() : null;
-      res.json({ configured, connected, ...config, realmId });
+      const redirectUri = process.env.QUICKBOOKS_REDIRECT_URI || "";
+      
+      // Debug logging for QuickBooks configuration
+      console.log("[QuickBooks] Status check:", {
+        configured,
+        connected,
+        hasClientId: !!process.env.QUICKBOOKS_CLIENT_ID,
+        hasClientSecret: !!process.env.QUICKBOOKS_CLIENT_SECRET,
+        hasRedirectUri: !!process.env.QUICKBOOKS_REDIRECT_URI,
+        redirectUri,
+      });
+      
+      res.json({ configured, connected, ...config, realmId, redirectUri });
     } catch (error: any) {
-      res.json({ configured: quickbooksClient.isConfigured(), connected: false });
+      console.error("[QuickBooks] Status error:", error.message);
+      res.json({ configured: quickbooksClient.isConfigured(), connected: false, error: error.message });
     }
   });
 
