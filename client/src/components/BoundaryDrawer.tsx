@@ -16,7 +16,7 @@ interface BoundaryDrawerProps {
   coordinates: { lat: number; lng: number };
   address: string;
   initialBoundary?: Coordinate[];
-  onSave: (boundary: Coordinate[], areaAcres: number) => void;
+  onSave: (boundary: Coordinate[], areaAcres: number, boundaryImageUrl: string) => void;
 }
 
 declare global {
@@ -27,6 +27,22 @@ declare global {
 }
 
 const SQFT_PER_ACRE = 43560;
+
+function generateBoundaryImageUrl(coords: Coordinate[]): string {
+  if (coords.length < 3) return "";
+  
+  // Close the polygon by repeating the first coordinate at the end
+  const closedCoords = [...coords, coords[0]];
+  const pathCoords = closedCoords.map(c => `${c.lat.toFixed(6)},${c.lng.toFixed(6)}`).join("|");
+  const center = coords.reduce(
+    (acc, c) => ({ lat: acc.lat + c.lat / coords.length, lng: acc.lng + c.lng / coords.length }),
+    { lat: 0, lng: 0 }
+  );
+  
+  const pathParam = `fillcolor:0x4285F466|color:0x4285F4FF|weight:2|${pathCoords}`;
+  
+  return `/api/maps/static?center=${center.lat.toFixed(6)},${center.lng.toFixed(6)}&zoom=18&size=400x300&maptype=satellite&path=${encodeURIComponent(pathParam)}`;
+}
 
 function calculatePolygonArea(coords: Coordinate[]): number {
   if (coords.length < 3) return 0;
@@ -267,7 +283,8 @@ export function BoundaryDrawer({
   };
 
   const handleSave = () => {
-    onSave(boundary, calculatedAcres);
+    const boundaryImageUrl = generateBoundaryImageUrl(boundary);
+    onSave(boundary, calculatedAcres, boundaryImageUrl);
     onOpenChange(false);
   };
 

@@ -5915,6 +5915,72 @@ Scan2Plan Accounting`;
     res.redirect(scriptUrl);
   });
 
+  // Google Static Maps API proxy for boundary images
+  app.get("/api/maps/static", async (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: "Google Maps API key not configured" });
+    }
+    
+    const { center, zoom, size, maptype, path } = req.query;
+    
+    if (!center || !zoom || !size) {
+      return res.status(400).json({ error: "center, zoom, and size are required" });
+    }
+    
+    // Validate and sanitize inputs
+    const centerStr = String(center);
+    const zoomStr = String(zoom);
+    const sizeStr = String(size);
+    const maptypeStr = String(maptype || "satellite");
+    
+    // Validate center format (lat,lng)
+    if (!/^-?\d+\.?\d*,-?\d+\.?\d*$/.test(centerStr)) {
+      return res.status(400).json({ error: "Invalid center format" });
+    }
+    
+    // Validate zoom (1-21)
+    const zoomNum = parseInt(zoomStr, 10);
+    if (isNaN(zoomNum) || zoomNum < 1 || zoomNum > 21) {
+      return res.status(400).json({ error: "Invalid zoom level" });
+    }
+    
+    // Validate size format (WxH)
+    if (!/^\d+x\d+$/.test(sizeStr)) {
+      return res.status(400).json({ error: "Invalid size format" });
+    }
+    
+    // Limit path length to prevent oversized URLs (max 100 points ~ 3000 chars)
+    const pathStr = path ? String(path) : "";
+    if (pathStr.length > 5000) {
+      return res.status(400).json({ error: "Path too long, max 100 points" });
+    }
+    
+    try {
+      let url = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(centerStr)}&zoom=${zoomNum}&size=${encodeURIComponent(sizeStr)}&maptype=${encodeURIComponent(maptypeStr)}&key=${apiKey}`;
+      
+      if (pathStr) {
+        url += `&path=${encodeURIComponent(pathStr)}`;
+      }
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch static map" });
+      }
+      
+      const contentType = response.headers.get("content-type");
+      res.setHeader("Content-Type", contentType || "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error("Static map error:", error);
+      res.status(500).json({ error: "Failed to generate static map" });
+    }
+  });
+
   // Google Maps Geocoding and Embed API endpoint
   app.get("/api/location/preview", async (req, res) => {
     try {

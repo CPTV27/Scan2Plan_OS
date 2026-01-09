@@ -707,12 +707,13 @@ Thanks!`.trim();
   };
 
   // Update boundary for a landscape area and auto-set acres from calculated area
-  const updateAreaBoundary = useCallback((areaId: string, boundary: BoundaryCoordinate[], calculatedAcres: number) => {
+  const updateAreaBoundary = useCallback((areaId: string, boundary: BoundaryCoordinate[], calculatedAcres: number, boundaryImageUrl: string) => {
     setAreas(areas.map(a => {
       if (a.id !== areaId) return a;
       return {
         ...a,
         boundary,
+        boundaryImageUrl,
         squareFeet: calculatedAcres.toFixed(2), // Store acres in squareFeet field for landscape areas
       };
     }));
@@ -1037,6 +1038,20 @@ Thanks!`.trim();
                               )}
                             </div>
                           </div>
+                          {/* Boundary Preview and Controls */}
+                          {area.boundaryImageUrl && area.boundary && area.boundary.length >= 3 && (
+                            <div className="rounded-md overflow-hidden border bg-muted">
+                              <img
+                                src={area.boundaryImageUrl}
+                                alt="Boundary preview"
+                                className="w-full h-32 object-cover"
+                                data-testid={`img-boundary-preview-${kindIndex}`}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            </div>
+                          )}
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div className="flex items-center gap-2">
                               <Badge variant="secondary">Site Discipline</Badge>
@@ -1681,7 +1696,7 @@ Thanks!`.trim();
           coordinates={projectCoordinates}
           address={lead?.projectAddress || ""}
           initialBoundary={boundaryDrawerArea.boundary}
-          onSave={(boundary, acres) => updateAreaBoundary(boundaryDrawerAreaId!, boundary, acres)}
+          onSave={(boundary, acres, imageUrl) => updateAreaBoundary(boundaryDrawerAreaId!, boundary, acres, imageUrl)}
         />
       )}
     </div>

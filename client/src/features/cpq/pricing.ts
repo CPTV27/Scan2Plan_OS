@@ -33,6 +33,7 @@ export interface Area {
   interiorLod?: string;
   exteriorLod?: string;
   boundary?: BoundaryCoordinate[]; // Landscape area boundary coordinates
+  boundaryImageUrl?: string; // Static map image of the boundary for proposals
 }
 
 // Landscape area types (measured in acres)
