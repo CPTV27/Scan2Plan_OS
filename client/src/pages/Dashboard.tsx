@@ -9,6 +9,7 @@ import { Users, FolderKanban, TrendingUp, AlertTriangle, Target, Trophy, DollarS
 import { differenceInDays } from "date-fns";
 import { AIAssistant, AIInsightsWidget } from "@/components/AIAssistant";
 import { GoogleWorkspaceWidget } from "@/components/GoogleWorkspaceWidget";
+import { CalendarDayWidget } from "@/components/CalendarDayWidget";
 import { useQuery } from "@tanstack/react-query";
 
 interface ProfitabilityStats {
@@ -138,6 +139,12 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Google Workspace & Calendar - High Visibility Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <CalendarDayWidget />
+          <GoogleWorkspaceWidget />
+        </div>
+
         {/* Rotting Deal Tracker - Sales Velocity */}
         <RottenDealTracker leads={leads || []} />
 
@@ -226,11 +233,6 @@ export default function Dashboard() {
           {/* AI Insights */}
           <div className="lg:col-span-2">
             <AIInsightsWidget />
-          </div>
-
-          {/* Google Workspace */}
-          <div className="lg:col-span-1">
-            <GoogleWorkspaceWidget />
           </div>
 
           {/* ABM Target Account Penetration */}

@@ -383,8 +383,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   useEffect(() => {
     // Dispatch location addresses (defined inline to avoid hoisting issues)
     const dispatchAddresses: Record<string, string> = {
-      WOODSTOCK: "Woodstock, NY 12498",
-      BROOKLYN: "Brooklyn, NY 11201",
+      WOODSTOCK: "3272 Rt 212, Bearsville, NY 12409",
+      BROOKLYN: "176 Borinquen Place, Brooklyn, NY 11211",
+      TROY: "188 1st St, Troy, NY 12180",
     };
     
     // Only run if we have a lead with address, travel dispatch but no distance
@@ -503,8 +504,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Dispatch location addresses for distance calculation
   const DISPATCH_LOCATIONS: Record<string, string> = {
-    WOODSTOCK: "Woodstock, NY 12498",
-    BROOKLYN: "Brooklyn, NY 11201",
+    WOODSTOCK: "3272 Rt 212, Bearsville, NY 12409",
+    BROOKLYN: "176 Borinquen Place, Brooklyn, NY 11211",
+    TROY: "188 1st St, Troy, NY 12180",
   };
 
   // Calculate distance when dispatch location changes
@@ -1527,8 +1529,9 @@ Thanks!`.trim();
                           <SelectValue placeholder="Select dispatch origin" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="WOODSTOCK">Woodstock, NY</SelectItem>
-                          <SelectItem value="BROOKLYN">Brooklyn, NY</SelectItem>
+                          <SelectItem value="WOODSTOCK">Woodstock (3272 Rt 212, Bearsville)</SelectItem>
+                          <SelectItem value="BROOKLYN">Brooklyn (176 Borinquen Pl)</SelectItem>
+                          <SelectItem value="TROY">Troy (188 1st St)</SelectItem>
                           <SelectItem value="FLY_OUT">Out of State (Fly-out)</SelectItem>
                         </SelectContent>
                       </Select>
