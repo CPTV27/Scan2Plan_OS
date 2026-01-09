@@ -5,7 +5,7 @@
  * All calculations happen in the browser for instant feedback.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,8 +34,10 @@ import {
   AlertCircle,
   Link,
   Loader2,
+  PenTool,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { BoundaryDrawer } from "@/components/BoundaryDrawer";
 import type { Lead, CpqQuote } from "@shared/schema";
 import {
   calculatePricing,
@@ -62,6 +64,7 @@ import {
   type AreaKind,
   type TravelConfig,
   type PricingResult,
+  type BoundaryCoordinate,
 } from "./pricing";
 
 // Pricing mode type
@@ -125,6 +128,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   
   // Distance calculation loading state
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+  
+  // Boundary drawing state for landscape areas
+  const [boundaryDrawerAreaId, setBoundaryDrawerAreaId] = useState<string | null>(null);
   
   // Price adjustment for margin gate compliance
   const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState<number>(0);
@@ -700,6 +706,33 @@ Thanks!`.trim();
     setServices({ ...services, [serviceId]: quantity });
   };
 
+  // Update boundary for a landscape area and auto-set acres from calculated area
+  const updateAreaBoundary = useCallback((areaId: string, boundary: BoundaryCoordinate[], calculatedAcres: number) => {
+    setAreas(areas.map(a => {
+      if (a.id !== areaId) return a;
+      return {
+        ...a,
+        boundary,
+        squareFeet: calculatedAcres.toFixed(2), // Store acres in squareFeet field for landscape areas
+      };
+    }));
+    setBoundaryDrawerAreaId(null);
+  }, [areas]);
+
+  // Get the area being edited for boundary drawing
+  const boundaryDrawerArea = boundaryDrawerAreaId 
+    ? areas.find(a => a.id === boundaryDrawerAreaId)
+    : null;
+
+  // Get project coordinates from lead data for boundary drawing
+  const projectCoordinates = useMemo(() => {
+    const googleIntel = lead?.googleIntel as any;
+    if (googleIntel?.travelInsights?.coordinates) {
+      return googleIntel.travelInsights.coordinates;
+    }
+    return null;
+  }, [lead]);
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -1000,11 +1033,33 @@ Thanks!`.trim();
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">Site Discipline</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              Landscape areas use site discipline only
-                            </span>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">Site Discipline</Badge>
+                              <span className="text-xs text-muted-foreground">
+                                Landscape areas use site discipline only
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {area.boundary && area.boundary.length >= 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  <MapPin className="w-3 h-3 mr-1" />
+                                  {area.boundary.length} points
+                                </Badge>
+                              )}
+                              {projectCoordinates && (
+                                <Button
+                                  type="button"
+                                  variant={area.boundary && area.boundary.length >= 3 ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => setBoundaryDrawerAreaId(area.id)}
+                                  data-testid={`button-draw-boundary-${kindIndex}`}
+                                >
+                                  <PenTool className="w-3 h-3 mr-1" />
+                                  {area.boundary && area.boundary.length >= 3 ? "Edit Boundary" : "Draw Boundary"}
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </>
                       )}
@@ -1611,6 +1666,20 @@ Thanks!`.trim();
           </div>
         </div>
       </div>
+
+      {/* Boundary Drawer Modal for Landscape Areas */}
+      {boundaryDrawerArea && projectCoordinates && (
+        <BoundaryDrawer
+          open={!!boundaryDrawerAreaId}
+          onOpenChange={(open) => {
+            if (!open) setBoundaryDrawerAreaId(null);
+          }}
+          coordinates={projectCoordinates}
+          address={lead?.projectAddress || ""}
+          initialBoundary={boundaryDrawerArea.boundary}
+          onSave={(boundary, acres) => updateAreaBoundary(boundaryDrawerAreaId!, boundary, acres)}
+        />
+      )}
     </div>
   );
 }

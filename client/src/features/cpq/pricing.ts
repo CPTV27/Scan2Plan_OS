@@ -11,6 +11,12 @@ import { FY26_GOALS, validateMarginGate, getMarginStatus } from '@shared/busines
 // Area Kind - distinguishes between standard building areas and landscape areas
 export type AreaKind = "standard" | "landscape";
 
+// Boundary coordinate for landscape areas
+export interface BoundaryCoordinate {
+  lat: number;
+  lng: number;
+}
+
 // Types for pricing calculations
 export interface Area {
   id: string;
@@ -26,6 +32,7 @@ export interface Area {
   facades?: Array<{ id: string; label: string }>;
   interiorLod?: string;
   exteriorLod?: string;
+  boundary?: BoundaryCoordinate[]; // Landscape area boundary coordinates
 }
 
 // Landscape area types (measured in acres)
