@@ -32,6 +32,7 @@ import { registerAirtableRoutes } from "./routes/airtable";
 import { registerAIRoutes } from "./routes/ai";
 import pandaDocRoutes from "./routes/pandadoc";
 import brandEngineRoutes from "./routes/brandEngine";
+import intelligenceRoutes from "./routes/intelligence";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -221,6 +222,7 @@ export async function registerRoutes(
   registerAIRoutes(app);
   app.use("/api/pandadoc", pandaDocRoutes);
   app.use("/api/brand", brandEngineRoutes);
+  app.use("/api/intelligence", intelligenceRoutes);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {

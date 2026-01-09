@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings } from "lucide-react";
+import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings, Target, Shield, Megaphone } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ProposalGenerator, NegotiationConsole, MarketingGenerator } from "@/components/intelligence";
 
 type BuyerType = "BP1" | "BP2" | "BP3" | "BP4" | "BP5" | "BP6" | "BP7" | "BP8";
 type PainPoint = "Rework_RFI" | "ScheduleVolatility" | "Inconsistency" | "Terms_Risk";
@@ -194,6 +195,34 @@ export default function BrandGenerator() {
             >
               <History className="h-4 w-4" />
               Audit Log
+            </TabsTrigger>
+            <Separator className="my-2" />
+            <div className="px-2 py-1">
+              <span className="text-xs font-medium text-muted-foreground">Intelligence Engine</span>
+            </div>
+            <TabsTrigger 
+              value="proposals" 
+              data-testid="tab-proposals"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Target className="h-4 w-4" />
+              Proposals
+            </TabsTrigger>
+            <TabsTrigger 
+              value="negotiation" 
+              data-testid="tab-negotiation"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Shield className="h-4 w-4" />
+              Negotiation
+            </TabsTrigger>
+            <TabsTrigger 
+              value="marketing" 
+              data-testid="tab-marketing"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Megaphone className="h-4 w-4" />
+              Marketing
             </TabsTrigger>
           </TabsList>
         </div>
@@ -518,6 +547,36 @@ export default function BrandGenerator() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="proposals" className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">AI Proposal Generator</h2>
+            <p className="text-muted-foreground mb-6">
+              Generate persona-targeted proposals with advanced buyer psychology
+            </p>
+          </div>
+          <ProposalGenerator />
+        </TabsContent>
+
+        <TabsContent value="negotiation" className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Negotiation Console</h2>
+            <p className="text-muted-foreground mb-6">
+              AI-powered objection handling and response strategies
+            </p>
+          </div>
+          <NegotiationConsole />
+        </TabsContent>
+
+        <TabsContent value="marketing" className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold mb-2">Marketing Content Generator</h2>
+            <p className="text-muted-foreground mb-6">
+              Create persona-targeted marketing content across multiple formats
+            </p>
+          </div>
+          <MarketingGenerator />
         </TabsContent>
         </div>
       </Tabs>

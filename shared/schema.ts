@@ -2012,3 +2012,131 @@ export const insertGenerationAuditLogSchema = createInsertSchema(generationAudit
 });
 export type GenerationAuditLog = typeof generationAuditLogs.$inferSelect;
 export type InsertGenerationAuditLog = z.infer<typeof insertGenerationAuditLogSchema>;
+
+// === BUYER PERSONA INTELLIGENCE ENGINE ===
+
+// Enhanced Buyer Personas - Detailed psychological profiles for targeted content
+export const buyerPersonas = pgTable("buyer_personas", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // BP-A, BP-B, BP-C, BP-D
+  roleTitle: text("role_title").notNull(),
+  roleVariants: jsonb("role_variants").$type<string[]>(),
+  organizationType: text("organization_type"),
+  primaryPain: text("primary_pain").notNull(),
+  secondaryPain: text("secondary_pain"),
+  hiddenFear: text("hidden_fear"),
+  valueDriver: text("value_driver").notNull(),
+  decisionCriteria: jsonb("decision_criteria").$type<string[]>(),
+  dealbreakers: jsonb("dealbreakers").$type<string[]>(),
+  projectPhases: jsonb("project_phases").$type<string[]>(),
+  budgetAuthority: text("budget_authority"),
+  typicalBudgetRange: text("typical_budget_range"),
+  influenceChain: jsonb("influence_chain").$type<{
+    reportsTo: string;
+    needsApprovalFrom: string[];
+    influencedBy: string[];
+  }>(),
+  tonePreference: text("tone_preference").notNull(),
+  communicationStyle: text("communication_style"),
+  attentionSpan: text("attention_span"),
+  technicalTriggers: jsonb("technical_triggers").$type<string[]>(),
+  emotionalTriggers: jsonb("emotional_triggers").$type<string[]>(),
+  avoidWords: jsonb("avoid_words").$type<string[]>(),
+  disqualifiers: jsonb("disqualifiers").$type<string[]>(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBuyerPersonaSchema = createInsertSchema(buyerPersonas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BuyerPersona = typeof buyerPersonas.$inferSelect;
+export type InsertBuyerPersona = z.infer<typeof insertBuyerPersonaSchema>;
+
+// Brand Voices - Communication style profiles for different content types
+export const brandVoices = pgTable("brand_voices", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  purpose: text("purpose").notNull(),
+  baseInstruction: text("base_instruction").notNull(),
+  toneMarkers: jsonb("tone_markers").$type<string[]>(),
+  prohibitions: jsonb("prohibitions").$type<string[]>(),
+  exampleOutput: text("example_output"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertBrandVoiceSchema = createInsertSchema(brandVoices).omit({
+  id: true,
+  createdAt: true,
+});
+export type BrandVoice = typeof brandVoices.$inferSelect;
+export type InsertBrandVoice = z.infer<typeof insertBrandVoiceSchema>;
+
+// Solution Mappings - Pain → Solution translation per persona
+export const solutionMappings = pgTable("solution_mappings", {
+  id: serial("id").primaryKey(),
+  buyerCode: text("buyer_code").notNull(),
+  painPoint: text("pain_point").notNull(),
+  solutionMechanism: text("solution_mechanism").notNull(),
+  proofPoint: text("proof_point"),
+  argumentFrame: text("argument_frame").notNull(),
+  objectionPreempt: text("objection_preempt"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSolutionMappingSchema = createInsertSchema(solutionMappings).omit({
+  id: true,
+  createdAt: true,
+});
+export type SolutionMapping = typeof solutionMappings.$inferSelect;
+export type InsertSolutionMapping = z.infer<typeof insertSolutionMappingSchema>;
+
+// Negotiation Playbook - Objection patterns and response strategies
+export const negotiationPlaybook = pgTable("negotiation_playbook", {
+  id: serial("id").primaryKey(),
+  buyerCode: text("buyer_code").notNull(),
+  objectionPattern: text("objection_pattern").notNull(),
+  underlyingConcern: text("underlying_concern"),
+  responseStrategy: text("response_strategy").notNull(),
+  reframeLanguage: text("reframe_language"),
+  walkAwaySignal: text("walk_away_signal"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertNegotiationPlaybookSchema = createInsertSchema(negotiationPlaybook).omit({
+  id: true,
+  createdAt: true,
+});
+export type NegotiationPlaybookEntry = typeof negotiationPlaybook.$inferSelect;
+export type InsertNegotiationPlaybookEntry = z.infer<typeof insertNegotiationPlaybookSchema>;
+
+// Generated Content - Tracks all AI-generated content for feedback loop
+export const intelligenceGeneratedContent = pgTable("intelligence_generated_content", {
+  id: serial("id").primaryKey(),
+  contentType: text("content_type").notNull(), // proposal, negotiation_brief, email, ad_copy, etc.
+  targetPersona: text("target_persona"),
+  projectContext: jsonb("project_context").$type<{
+    projectName?: string;
+    projectType?: string;
+    squareFootage?: string;
+    timeline?: string;
+    specialConditions?: string[];
+  }>(),
+  inputPrompt: text("input_prompt"),
+  generatedOutput: text("generated_output").notNull(),
+  voiceUsed: text("voice_used"),
+  qualityScore: integer("quality_score"),
+  wasUsed: boolean("was_used").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertIntelligenceGeneratedContentSchema = createInsertSchema(intelligenceGeneratedContent).omit({
+  id: true,
+  createdAt: true,
+});
+export type IntelligenceGeneratedContent = typeof intelligenceGeneratedContent.$inferSelect;
+export type InsertIntelligenceGeneratedContent = z.infer<typeof insertIntelligenceGeneratedContentSchema>;

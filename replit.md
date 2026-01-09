@@ -222,6 +222,20 @@ FY26_GOALS = {
    - API: `server/lib/brand_engine.ts`, `server/routes/brandEngine.ts`
    - UI: `client/src/pages/BrandGenerator.tsx` (accessible via sidebar)
 
+9. **Buyer Persona Intelligence Engine** - Advanced AI content generation with detailed buyer psychology
+   - **4 Buyer Personas (BP-A through BP-D):** Design Principal, Project Architect, Owner Rep, GC/CM
+   - **Psychological Profiles:** Primary/secondary pain, hidden fears, value drivers, dealbreakers
+   - **Communication Profiles:** Tone preferences, attention span, technical/emotional triggers, avoid words
+   - **4 Brand Voices:** Executive Signal Mapper, Technical Translator, Negotiation Strategist, Campaign Architect
+   - **Solution Mappings:** Pain → solution translation with proof points and argument frames
+   - **Negotiation Playbook:** Objection patterns, underlying concerns, reframe language, walk-away signals
+   - **AI Proposal Generator:** Persona-targeted proposals with project context
+   - **Negotiation Console:** Objection handling with strategic response generation
+   - **Marketing Generator:** Email sequences, ad copy, social posts, case studies, landing pages
+   - Database: `buyer_personas`, `brand_voices`, `solution_mappings`, `negotiation_playbook`, `intelligence_generated_content`
+   - API: `server/lib/intelligence_engine.ts`, `server/routes/intelligence.ts`
+   - UI Components: `client/src/components/intelligence/` (integrated into Brand Generator)
+
 ---
 
 ## Areas Needing Attention
