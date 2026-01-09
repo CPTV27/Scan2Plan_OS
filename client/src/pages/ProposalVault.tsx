@@ -9,7 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { 
   FileText, 
   RefreshCw, 
@@ -23,10 +27,36 @@ import {
   Loader2,
   FileCheck,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Building2,
+  MapPin,
+  DollarSign,
+  Layers,
+  Plus,
+  Trash2,
+  Sparkles
 } from "lucide-react";
 import { format } from "date-fns";
 import type { PandaDocDocument, PandaDocImportBatch } from "@shared/schema";
+
+interface AreaData {
+  name: string;
+  sqft?: number;
+  kind?: "building" | "landscape";
+  buildingType?: string;
+  lod?: string;
+  scope?: string;
+  disciplines?: string[];
+  price?: number;
+}
+
+interface ServiceData {
+  name: string;
+  description?: string;
+  price?: number;
+  quantity?: number;
+  rate?: number;
+}
 
 interface ExtractedData {
   projectName?: string;
@@ -34,12 +64,19 @@ interface ExtractedData {
   projectAddress?: string;
   totalPrice?: number;
   currency?: string;
-  areas?: Array<{ name: string; sqft?: number; buildingType?: string; price?: number }>;
-  services?: Array<{ name: string; description?: string; price?: number; quantity?: number }>;
-  contacts?: Array<{ name: string; email: string; company?: string }>;
+  areas?: AreaData[];
+  services?: ServiceData[];
+  contacts?: Array<{ name: string; email: string; company?: string; phone?: string }>;
   variables?: Record<string, string>;
   confidence: number;
   unmappedFields?: string[];
+  pricingBreakdown?: Array<{ label: string; value: number }>;
+  travelDistance?: number;
+  travelCost?: number;
+  scanningCost?: number;
+  modelingCost?: number;
+  targetMargin?: number;
+  pricingMode?: "standard" | "tierA";
 }
 
 interface PandaDocStats {
@@ -106,21 +143,30 @@ function DocumentReviewDialog({
   const [editedData, setEditedData] = useState<Partial<ExtractedData>>({});
   const [reviewNotes, setReviewNotes] = useState("");
   const [lastDocId, setLastDocId] = useState<number | null>(null);
+  const [editedAreas, setEditedAreas] = useState<AreaData[]>([]);
+  const [editedServices, setEditedServices] = useState<ServiceData[]>([]);
 
   const extracted = document?.extractedData as ExtractedData | null;
 
   if (document && document.id !== lastDocId) {
     setEditedData({});
     setReviewNotes("");
+    setEditedAreas(extracted?.areas || []);
+    setEditedServices(extracted?.services || []);
     setLastDocId(document.id);
   }
 
   const approveMutation = useMutation({
     mutationFn: async () => {
+      const finalData = {
+        ...editedData,
+        areas: editedAreas.length > 0 ? editedAreas : undefined,
+        services: editedServices.length > 0 ? editedServices : undefined,
+      };
       return apiRequest(
         "POST",
         `/api/pandadoc/documents/${document?.id}/approve`,
-        { editedData: Object.keys(editedData).length ? editedData : undefined, reviewNotes }
+        { editedData: Object.keys(finalData).length ? finalData : undefined, reviewNotes }
       );
     },
     onSuccess: (data: any) => {
@@ -152,139 +198,410 @@ function DocumentReviewDialog({
     },
   });
 
+  const addArea = () => {
+    setEditedAreas([...editedAreas, { name: `Area ${editedAreas.length + 1}`, sqft: 5000, kind: "building", buildingType: "Commercial" }]);
+  };
+
+  const updateArea = (index: number, updates: Partial<AreaData>) => {
+    setEditedAreas(editedAreas.map((a, i) => i === index ? { ...a, ...updates } : a));
+  };
+
+  const removeArea = (index: number) => {
+    setEditedAreas(editedAreas.filter((_, i) => i !== index));
+  };
+
+  const addService = () => {
+    setEditedServices([...editedServices, { name: "New Service", price: 0, quantity: 1 }]);
+  };
+
+  const updateService = (index: number, updates: Partial<ServiceData>) => {
+    setEditedServices(editedServices.map((s, i) => i === index ? { ...s, ...updates } : s));
+  };
+
+  const removeService = (index: number) => {
+    setEditedServices(editedServices.filter((_, i) => i !== index));
+  };
+
+  const totalSqft = editedAreas.reduce((sum, a) => sum + (a.sqft || 0), 0);
+  const calculatedTotal = editedServices.reduce((sum, s) => sum + ((s.price || 0) * (s.quantity || 1)), 0);
+  const displayTotal = editedData.totalPrice ?? extracted?.totalPrice ?? calculatedTotal;
+
   if (!document || !extracted) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Review: {document.pandaDocName}
-          </DialogTitle>
-          <DialogDescription>
-            Review the AI-extracted data before creating a CPQ quote. Confidence: {extracted.confidence}%
-          </DialogDescription>
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-4 pb-2 border-b">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Review: {document.pandaDocName}
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-4 mt-1">
+                <span>AI-extracted data ready for review</span>
+                <Badge variant={extracted.confidence >= 80 ? "default" : extracted.confidence >= 50 ? "secondary" : "destructive"}>
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  {extracted.confidence}% confidence
+                </Badge>
+                <StageBadge stage={document.pandaDocStage} />
+              </DialogDescription>
+            </div>
+            {document.pandaDocPdfUrl && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={document.pandaDocPdfUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Original PDF
+                </a>
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground">Extracted Data</h4>
-            
-            <div className="space-y-3">
+        <div className="flex-1 flex overflow-hidden">
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-6 max-w-3xl">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Project Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Project Name</Label>
+                    <Input 
+                      value={editedData.projectName ?? extracted.projectName ?? ""} 
+                      onChange={(e) => setEditedData(prev => ({ ...prev, projectName: e.target.value }))}
+                      data-testid="input-project-name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Client Name</Label>
+                    <Input 
+                      value={editedData.clientName ?? extracted.clientName ?? ""} 
+                      onChange={(e) => setEditedData(prev => ({ ...prev, clientName: e.target.value }))}
+                      data-testid="input-client-name"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Project Address</Label>
+                    <Input 
+                      value={editedData.projectAddress ?? extracted.projectAddress ?? ""} 
+                      onChange={(e) => setEditedData(prev => ({ ...prev, projectAddress: e.target.value }))}
+                      data-testid="input-project-address"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Project Areas
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{totalSqft.toLocaleString()} sqft total</Badge>
+                      <Button size="sm" variant="outline" onClick={addArea} data-testid="button-add-area">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Area
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {editedAreas.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No areas extracted</p>
+                      <Button size="sm" variant="ghost" onClick={addArea} className="mt-2" data-testid="button-add-area-empty">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Building Area
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {editedAreas.map((area, index) => (
+                        <div key={index} className="p-3 rounded-lg border bg-muted/20 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={area.kind === "landscape" ? "secondary" : "default"}>
+                                {area.kind === "landscape" ? "Landscape" : "Building"}
+                              </Badge>
+                              <Input 
+                                value={area.name}
+                                onChange={(e) => updateArea(index, { name: e.target.value })}
+                                className="h-8 w-40"
+                                data-testid={`input-area-name-${index}`}
+                              />
+                            </div>
+                            <Button size="icon" variant="ghost" onClick={() => removeArea(index)} data-testid={`button-remove-area-${index}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <Label className="text-xs">Square Feet</Label>
+                              <Input 
+                                type="number"
+                                value={area.sqft || ""}
+                                onChange={(e) => updateArea(index, { sqft: parseInt(e.target.value) || 0 })}
+                                data-testid={`input-area-sqft-${index}`}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Building Type</Label>
+                              <Select 
+                                value={area.buildingType || undefined} 
+                                onValueChange={(v) => updateArea(index, { buildingType: v })}
+                              >
+                                <SelectTrigger data-testid={`select-building-type-${index}`}>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Commercial">Commercial</SelectItem>
+                                  <SelectItem value="Industrial">Industrial</SelectItem>
+                                  <SelectItem value="Residential">Residential</SelectItem>
+                                  <SelectItem value="Healthcare">Healthcare</SelectItem>
+                                  <SelectItem value="Education">Education</SelectItem>
+                                  <SelectItem value="Retail">Retail</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">LOD</Label>
+                              <Select 
+                                value={area.lod || undefined} 
+                                onValueChange={(v) => updateArea(index, { lod: v })}
+                              >
+                                <SelectTrigger data-testid={`select-lod-${index}`}>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="100">LOD 100</SelectItem>
+                                  <SelectItem value="200">LOD 200</SelectItem>
+                                  <SelectItem value="300">LOD 300</SelectItem>
+                                  <SelectItem value="350">LOD 350</SelectItem>
+                                  <SelectItem value="400">LOD 400</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Scope</Label>
+                              <Select 
+                                value={area.scope || undefined} 
+                                onValueChange={(v) => updateArea(index, { scope: v })}
+                              >
+                                <SelectTrigger data-testid={`select-scope-${index}`}>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Full">Full</SelectItem>
+                                  <SelectItem value="Shell">Shell</SelectItem>
+                                  <SelectItem value="Exterior">Exterior</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Services & Line Items
+                    </CardTitle>
+                    <Button size="sm" variant="outline" onClick={addService} data-testid="button-add-service">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Service
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {editedServices.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No services extracted from proposal</p>
+                      <Button size="sm" variant="ghost" onClick={addService} className="mt-2" data-testid="button-add-service-empty">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Service
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {editedServices.map((service, index) => (
+                        <div key={index} className="flex items-center gap-3 p-2 rounded border">
+                          <div className="flex-1">
+                            <Input 
+                              value={service.name}
+                              onChange={(e) => updateService(index, { name: e.target.value })}
+                              placeholder="Service name"
+                              className="h-8"
+                              data-testid={`input-service-name-${index}`}
+                            />
+                          </div>
+                          <div className="w-20">
+                            <Input 
+                              type="number"
+                              value={service.quantity || 1}
+                              onChange={(e) => updateService(index, { quantity: parseInt(e.target.value) || 1 })}
+                              className="h-8 text-center"
+                              data-testid={`input-service-qty-${index}`}
+                            />
+                          </div>
+                          <div className="w-32">
+                            <div className="relative">
+                              <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                              <Input 
+                                type="number"
+                                value={service.price || ""}
+                                onChange={(e) => updateService(index, { price: parseFloat(e.target.value) || 0 })}
+                                className="h-8 pl-6"
+                                data-testid={`input-service-price-${index}`}
+                              />
+                            </div>
+                          </div>
+                          <div className="w-28 text-right font-mono text-sm">
+                            ${((service.price || 0) * (service.quantity || 1)).toLocaleString()}
+                          </div>
+                          <Button size="icon" variant="ghost" onClick={() => removeService(index)} data-testid={`button-remove-service-${index}`}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Contacts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {extracted.contacts && extracted.contacts.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {extracted.contacts.map((contact, i) => (
+                        <div key={i} className="p-3 rounded border">
+                          <div className="font-medium">{contact.name}</div>
+                          <div className="text-sm text-muted-foreground">{contact.email}</div>
+                          {contact.phone && <div className="text-sm text-muted-foreground">{contact.phone}</div>}
+                          {contact.company && <div className="text-xs text-muted-foreground">{contact.company}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No contacts extracted</p>
+                  )}
+                </CardContent>
+              </Card>
+
               <div>
-                <Label>Project Name</Label>
-                <Input 
-                  value={editedData.projectName ?? extracted.projectName ?? ""} 
-                  onChange={(e) => setEditedData(prev => ({ ...prev, projectName: e.target.value }))}
-                  data-testid="input-project-name"
-                />
-              </div>
-              
-              <div>
-                <Label>Client Name</Label>
-                <Input 
-                  value={editedData.clientName ?? extracted.clientName ?? ""} 
-                  onChange={(e) => setEditedData(prev => ({ ...prev, clientName: e.target.value }))}
-                  data-testid="input-client-name"
-                />
-              </div>
-              
-              <div>
-                <Label>Project Address</Label>
-                <Input 
-                  value={editedData.projectAddress ?? extracted.projectAddress ?? ""} 
-                  onChange={(e) => setEditedData(prev => ({ ...prev, projectAddress: e.target.value }))}
-                  data-testid="input-project-address"
-                />
-              </div>
-              
-              <div>
-                <Label>Total Price</Label>
-                <Input 
-                  type="number"
-                  value={editedData.totalPrice ?? extracted.totalPrice ?? ""} 
-                  onChange={(e) => setEditedData(prev => ({ ...prev, totalPrice: parseFloat(e.target.value) }))}
-                  data-testid="input-total-price"
+                <Label>Review Notes</Label>
+                <Textarea 
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  placeholder="Add any notes about this review..."
+                  data-testid="input-review-notes"
                 />
               </div>
             </div>
-          </div>
+          </ScrollArea>
 
-          <div className="space-y-4">
-            <h4 className="font-medium text-sm text-muted-foreground">Services & Pricing</h4>
-            
-            {extracted.services && extracted.services.length > 0 ? (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {extracted.services.map((service, i) => (
-                  <div key={i} className="p-2 rounded border text-sm">
-                    <div className="font-medium">{service.name}</div>
-                    {service.description && <div className="text-muted-foreground text-xs">{service.description}</div>}
-                    {service.price && <div className="text-primary">${service.price.toLocaleString()}</div>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No services extracted</p>
-            )}
+          <div className="w-80 border-l bg-muted/20 flex flex-col">
+            <div className="p-4 border-b">
+              <h2 className="font-semibold flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Pricing Summary
+              </h2>
+            </div>
 
-            <h4 className="font-medium text-sm text-muted-foreground mt-4">Contacts</h4>
-            {extracted.contacts && extracted.contacts.length > 0 ? (
+            <ScrollArea className="flex-1 p-4">
               <div className="space-y-2">
-                {extracted.contacts.map((contact, i) => (
-                  <div key={i} className="text-sm">
-                    <div className="font-medium">{contact.name}</div>
-                    <div className="text-muted-foreground">{contact.email}</div>
-                    {contact.company && <div className="text-xs">{contact.company}</div>}
+                {editedServices.map((service, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="truncate flex-1 mr-2">{service.name}</span>
+                    <span className="font-mono">${((service.price || 0) * (service.quantity || 1)).toLocaleString()}</span>
+                  </div>
+                ))}
+                {editedServices.length === 0 && extracted.pricingBreakdown?.map((item, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="truncate flex-1 mr-2">{item.label}</span>
+                    <span className="font-mono">${item.value.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No contacts extracted</p>
-            )}
+            </ScrollArea>
 
-            {extracted.unmappedFields && extracted.unmappedFields.length > 0 && (
-              <>
-                <h4 className="font-medium text-sm text-muted-foreground mt-4">Unmapped Fields</h4>
-                <div className="text-xs text-amber-600 space-y-1">
-                  {extracted.unmappedFields.map((field, i) => (
-                    <div key={i}>{field}</div>
-                  ))}
+            <Separator />
+
+            <div className="p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total</span>
+                <div className="text-right">
+                  <Input 
+                    type="number"
+                    value={displayTotal}
+                    onChange={(e) => setEditedData(prev => ({ ...prev, totalPrice: parseFloat(e.target.value) }))}
+                    className="h-8 w-32 text-right font-bold"
+                    data-testid="input-total-price"
+                  />
                 </div>
-              </>
-            )}
+              </div>
+
+              {totalSqft > 0 && (
+                <div className="text-xs text-muted-foreground text-right">
+                  ${(displayTotal / totalSqft).toFixed(2)}/sqft
+                </div>
+              )}
+
+              {extracted.unmappedFields && extracted.unmappedFields.length > 0 && (
+                <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20">
+                  <div className="text-xs font-medium text-amber-600 mb-1">Unmapped Fields</div>
+                  <div className="text-xs text-amber-600/80 space-y-0.5">
+                    {extracted.unmappedFields.slice(0, 5).map((field, i) => (
+                      <div key={i} className="truncate">{field}</div>
+                    ))}
+                    {extracted.unmappedFields.length > 5 && (
+                      <div>+{extracted.unmappedFields.length - 5} more...</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t space-y-2">
+              <Button 
+                className="w-full"
+                onClick={() => approveMutation.mutate()}
+                disabled={approveMutation.isPending}
+                data-testid="button-approve-document"
+              >
+                {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                Approve & Create Quote
+              </Button>
+              <Button 
+                className="w-full"
+                variant="outline" 
+                onClick={() => rejectMutation.mutate()}
+                disabled={rejectMutation.isPending}
+                data-testid="button-reject-document"
+              >
+                {rejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+                Reject
+              </Button>
+            </div>
           </div>
         </div>
-
-        <div className="mt-4">
-          <Label>Review Notes</Label>
-          <Textarea 
-            value={reviewNotes}
-            onChange={(e) => setReviewNotes(e.target.value)}
-            placeholder="Add any notes about this review..."
-            data-testid="input-review-notes"
-          />
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => rejectMutation.mutate()}
-            disabled={rejectMutation.isPending}
-            data-testid="button-reject-document"
-          >
-            {rejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
-            Reject
-          </Button>
-          <Button 
-            onClick={() => approveMutation.mutate()}
-            disabled={approveMutation.isPending}
-            data-testid="button-approve-document"
-          >
-            {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-            Approve & Create Quote
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -354,122 +671,135 @@ export default function ProposalVault() {
 
   if (!stats?.configured) {
     return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
-              PandaDoc Not Configured
-            </CardTitle>
-            <CardDescription>
-              Add your PANDADOC_API_KEY in the Secrets tab to enable proposal imports from PandaDoc.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Once configured, you'll be able to:
-            </p>
-            <ul className="list-disc list-inside mt-2 text-sm text-muted-foreground space-y-1">
-              <li>Import all proposals from your PandaDoc account</li>
-              <li>AI extracts pricing, scope, and client data automatically</li>
-              <li>Review and approve to create CPQ quotes</li>
-              <li>Track all imported proposals in one place</li>
-            </ul>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen bg-background text-foreground">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <MobileHeader />
+          <main className="flex-1 p-4 md:p-8 overflow-auto">
+            <div className="max-w-2xl mx-auto">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-500" />
+                    PandaDoc Not Configured
+                  </CardTitle>
+                  <CardDescription>
+                    Add your PANDADOC_API_KEY in the Secrets tab to enable proposal imports from PandaDoc.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Once configured, you'll be able to:
+                  </p>
+                  <ul className="list-disc list-inside mt-2 text-sm text-muted-foreground space-y-1">
+                    <li>Import all proposals from your PandaDoc account</li>
+                    <li>AI extracts pricing, scope, and client data automatically</li>
+                    <li>Review and approve to create CPQ quotes</li>
+                    <li>Track all imported proposals in one place</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Proposal Vault</h1>
-          <p className="text-muted-foreground">Import and manage proposals from PandaDoc</p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            data-testid="button-sync-pandadoc"
-          >
-            {syncMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-            Sync from PandaDoc
-          </Button>
-          {pendingCount > 0 && (
-            <Button 
-              onClick={() => processAllMutation.mutate()}
-              disabled={processAllMutation.isPending}
-              data-testid="button-process-all"
-            >
-              {processAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
-              Process All ({pendingCount})
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="flex min-h-screen bg-background text-foreground">
+      <Sidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileHeader />
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h1 className="text-2xl font-bold">Proposal Vault</h1>
+                <p className="text-muted-foreground">Import and manage proposals from PandaDoc</p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  data-testid="button-sync-pandadoc"
+                >
+                  {syncMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Sync from PandaDoc
+                </Button>
+                {pendingCount > 0 && (
+                  <Button 
+                    onClick={() => processAllMutation.mutate()}
+                    disabled={processAllMutation.isPending}
+                    data-testid="button-process-all"
+                  >
+                    {processAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
+                    Process All ({pendingCount})
+                  </Button>
+                )}
+              </div>
+            </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Imported</p>
-                <p className="text-2xl font-bold">{stats?.totalDocuments || 0}</p>
-              </div>
-              <FileText className="h-8 w-8 text-muted-foreground" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Imported</p>
+                      <p className="text-2xl font-bold">{stats?.totalDocuments || 0}</p>
+                    </div>
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Pending Processing</p>
+                      <p className="text-2xl font-bold">{pendingCount}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-amber-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Ready for Review</p>
+                      <p className="text-2xl font-bold">{reviewCount}</p>
+                    </div>
+                    <Eye className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Approved</p>
+                      <p className="text-2xl font-bold">{approvedCount}</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pending Processing</p>
-                <p className="text-2xl font-bold">{pendingCount}</p>
-              </div>
-              <Clock className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Ready for Review</p>
-                <p className="text-2xl font-bold">{reviewCount}</p>
-              </div>
-              <Eye className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Approved</p>
-                <p className="text-2xl font-bold">{approvedCount}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="documents" data-testid="tab-documents">
-            Documents ({documents.length})
-          </TabsTrigger>
-          <TabsTrigger value="review" data-testid="tab-review">
-            Review Queue ({reviewCount})
-          </TabsTrigger>
-          <TabsTrigger value="batches" data-testid="tab-batches">
-            Import History ({batches.length})
-          </TabsTrigger>
-        </TabsList>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="documents" data-testid="tab-documents">
+                  Documents ({documents.length})
+                </TabsTrigger>
+                <TabsTrigger value="review" data-testid="tab-review">
+                  Review Queue ({reviewCount})
+                </TabsTrigger>
+                <TabsTrigger value="batches" data-testid="tab-batches">
+                  Import History ({batches.length})
+                </TabsTrigger>
+              </TabsList>
 
         <TabsContent value="documents" className="mt-4">
           <Card>
@@ -664,11 +994,14 @@ export default function ProposalVault() {
         </TabsContent>
       </Tabs>
 
-      <DocumentReviewDialog 
-        document={selectedDocument}
-        open={reviewDialogOpen}
-        onOpenChange={setReviewDialogOpen}
-      />
+          <DocumentReviewDialog 
+            document={selectedDocument}
+            open={reviewDialogOpen}
+            onOpenChange={setReviewDialogOpen}
+          />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
+import pdfParse from "pdf-parse";
 
 const PANDADOC_STATUS_TO_CODE: Record<string, number> = {
   "document.draft": 0,
@@ -95,6 +96,14 @@ interface PandaDocDetailsResponse {
   };
 }
 
+interface ExtractedLineItem {
+  name: string;
+  description?: string;
+  quantity?: number;
+  rate?: number;
+  amount?: number;
+}
+
 interface ExtractedQuoteData {
   projectName?: string;
   clientName?: string;
@@ -112,7 +121,9 @@ interface ExtractedQuoteData {
     description?: string;
     price?: number;
     quantity?: number;
+    rate?: number;
   }>;
+  lineItems?: ExtractedLineItem[];
   contacts?: Array<{
     name: string;
     email: string;
@@ -121,6 +132,9 @@ interface ExtractedQuoteData {
   variables?: Record<string, string>;
   confidence: number;
   unmappedFields?: string[];
+  rawPdfText?: string;
+  estimateNumber?: string;
+  estimateDate?: string;
 }
 
 export class PandaDocClient {
@@ -185,7 +199,112 @@ export class PandaDocClient {
     return `${PANDADOC_API_BASE}/documents/${documentId}/download`;
   }
 
-  async extractQuoteData(details: PandaDocDetailsResponse): Promise<ExtractedQuoteData> {
+  async downloadPdf(documentId: string): Promise<Buffer> {
+    if (!this.apiKey) {
+      throw new Error("PandaDoc API key not configured");
+    }
+
+    const response = await fetch(`${PANDADOC_API_BASE}/documents/${documentId}/download`, {
+      headers: {
+        "Authorization": `API-Key ${this.apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`PDF download failed: ${response.status}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
+  async extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
+    try {
+      const data = await pdfParse(pdfBuffer);
+      return data.text;
+    } catch (error) {
+      console.error("PDF text extraction failed:", error);
+      return "";
+    }
+  }
+
+  parsePricingFromText(text: string): { 
+    lineItems: ExtractedLineItem[]; 
+    total: number; 
+    estimateNumber?: string;
+    estimateDate?: string;
+  } {
+    const lineItems: ExtractedLineItem[] = [];
+    let total = 0;
+    let estimateNumber: string | undefined;
+    let estimateDate: string | undefined;
+
+    const estimateMatch = text.match(/ESTIMATE\s+(\d+)/i);
+    if (estimateMatch) {
+      estimateNumber = estimateMatch[1];
+    }
+
+    const dateMatch = text.match(/DATE\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    if (dateMatch) {
+      estimateDate = dateMatch[1];
+    }
+
+    const totalMatch = text.match(/TOTAL\s+\$?([\d,]+\.?\d*)/i);
+    if (totalMatch) {
+      total = parseFloat(totalMatch[1].replace(/,/g, ""));
+    }
+
+    const servicePatterns = [
+      /Scan2Plan\s+(Residential|Commercial)\s*[-–]?\s*(LoD\s*\d+)?/gi,
+      /MEPF\s+LoD\s*\d+/gi,
+      /Structural\s+Modeling\s*[-–]?\s*LoD\s*\d+/gi,
+      /CAD\s+Standard\s+Package/gi,
+    ];
+
+    const lines = text.split("\n");
+    let currentService: Partial<ExtractedLineItem> | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      for (const pattern of servicePatterns) {
+        pattern.lastIndex = 0;
+        const match = pattern.exec(line);
+        if (match) {
+          if (currentService && currentService.name) {
+            lineItems.push(currentService as ExtractedLineItem);
+          }
+          currentService = { name: match[0].trim() };
+          break;
+        }
+      }
+
+      const priceLineMatch = line.match(/([\d,]+)\s+([\d.]+)\s+\$?([\d,]+\.?\d*)/);
+      if (priceLineMatch && currentService) {
+        currentService.quantity = parseFloat(priceLineMatch[1].replace(/,/g, ""));
+        currentService.rate = parseFloat(priceLineMatch[2]);
+        currentService.amount = parseFloat(priceLineMatch[3].replace(/,/g, ""));
+      }
+
+      const sqftMatch = line.match(/([\d,]+)\s*(?:sqft|sq\s*ft|square\s*feet)/i);
+      if (sqftMatch && currentService) {
+        currentService.quantity = parseFloat(sqftMatch[1].replace(/,/g, ""));
+      }
+
+      const amountMatch = line.match(/\$\s*([\d,]+\.?\d*)\s*$/);
+      if (amountMatch && currentService && !currentService.amount) {
+        currentService.amount = parseFloat(amountMatch[1].replace(/,/g, ""));
+      }
+    }
+
+    if (currentService && currentService.name) {
+      lineItems.push(currentService as ExtractedLineItem);
+    }
+
+    return { lineItems, total, estimateNumber, estimateDate };
+  }
+
+  async extractQuoteData(details: PandaDocDetailsResponse, pdfText?: string): Promise<ExtractedQuoteData> {
     const extracted: ExtractedQuoteData = {
       confidence: 0,
       unmappedFields: [],
@@ -285,13 +404,50 @@ export class PandaDocClient {
     }
     totalPoints += 20;
 
-    if (this.openai && (extracted.services?.length || Object.keys(extracted.variables || {}).length)) {
+    if (pdfText) {
+      extracted.rawPdfText = pdfText;
+      const pdfPricing = this.parsePricingFromText(pdfText);
+      
+      if (pdfPricing.total > 0 && !extracted.totalPrice) {
+        extracted.totalPrice = pdfPricing.total;
+        extracted.currency = "USD";
+        confidencePoints += 20;
+      }
+      
+      if (pdfPricing.lineItems.length > 0) {
+        extracted.lineItems = pdfPricing.lineItems;
+        if (!extracted.services || extracted.services.length === 0) {
+          extracted.services = pdfPricing.lineItems.map(item => ({
+            name: item.name,
+            description: item.description,
+            price: item.amount,
+            quantity: item.quantity,
+            rate: item.rate,
+          }));
+        }
+        confidencePoints += 15;
+      }
+      
+      if (pdfPricing.estimateNumber) {
+        extracted.estimateNumber = pdfPricing.estimateNumber;
+      }
+      if (pdfPricing.estimateDate) {
+        extracted.estimateDate = pdfPricing.estimateDate;
+      }
+    }
+    totalPoints += 35;
+
+    if (this.openai && pdfText) {
       try {
-        const aiExtraction = await this.aiEnhanceExtraction(details, extracted);
+        const aiExtraction = await this.aiEnhanceExtraction(details, extracted, pdfText);
         if (aiExtraction) {
           if (aiExtraction.projectAddress && !extracted.projectAddress) {
             extracted.projectAddress = aiExtraction.projectAddress;
             confidencePoints += 10;
+          }
+          if (aiExtraction.totalPrice && !extracted.totalPrice) {
+            extracted.totalPrice = aiExtraction.totalPrice;
+            confidencePoints += 20;
           }
           if (aiExtraction.areas && aiExtraction.areas.length > 0) {
             extracted.areas = aiExtraction.areas;
@@ -299,6 +455,17 @@ export class PandaDocClient {
           }
           if (aiExtraction.unmappedFields) {
             extracted.unmappedFields = aiExtraction.unmappedFields;
+          }
+          if (aiExtraction.lineItems && aiExtraction.lineItems.length > 0) {
+            extracted.lineItems = aiExtraction.lineItems;
+            extracted.services = aiExtraction.lineItems.map((item: ExtractedLineItem) => ({
+              name: item.name,
+              description: item.description,
+              price: item.amount,
+              quantity: item.quantity,
+              rate: item.rate,
+            }));
+            confidencePoints += 20;
           }
         }
       } catch (error) {
@@ -313,32 +480,41 @@ export class PandaDocClient {
 
   private async aiEnhanceExtraction(
     details: PandaDocDetailsResponse,
-    current: ExtractedQuoteData
-  ): Promise<Partial<ExtractedQuoteData> | null> {
+    current: ExtractedQuoteData,
+    pdfText?: string
+  ): Promise<Partial<ExtractedQuoteData & { lineItems?: ExtractedLineItem[] }> | null> {
     if (!this.openai) return null;
 
-    const allPricingItems = details.pricing?.tables?.flatMap(t => t.items) || [];
+    const estimateSection = pdfText 
+      ? this.extractEstimateSection(pdfText)
+      : "";
     
-    const prompt = `You are analyzing a Scan2Plan (S2P) laser scanning proposal. S2P proposals follow this format:
-- Document title: "S2P Proposal - [ADDRESS]" or "S2P Proposal - [ADDRESS], [details]"
-- The address after "S2P Proposal - " is the PROJECT ADDRESS (street, city, state, zip)
-- Pricing table has line items with QTY (square footage), RATE ($/sqft), AMOUNT (total)
-- Common services: "Scan2Plan Residential", "Scan2Plan Commercial", "MEPF LoD 300", "Structural Modeling", "CAD Standard Package"
+    const prompt = `You are analyzing a Scan2Plan (S2P) laser scanning proposal PDF. Extract ALL pricing and service information.
 
-Document Name: ${details.name}
-Recipients: ${JSON.stringify(details.recipients?.map(r => ({ name: `${r.first_name} ${r.last_name}`, company: r.company, email: r.email })) || [], null, 2)}
-Pricing Items: ${JSON.stringify(allPricingItems.slice(0, 15), null, 2)}
-Current Extraction: ${JSON.stringify({ projectName: current.projectName, projectAddress: current.projectAddress, totalPrice: current.totalPrice, clientName: current.clientName }, null, 2)}
+DOCUMENT NAME: ${details.name}
 
-Extract and return JSON with:
+${estimateSection ? `ESTIMATE SECTION FROM PDF:
+${estimateSection}` : ""}
+
+RECIPIENTS: ${JSON.stringify(details.recipients?.map(r => ({ name: `${r.first_name} ${r.last_name}`, company: r.company, email: r.email })) || [], null, 2)}
+
+INSTRUCTIONS:
+1. Parse the project address from the document name (text after "S2P Proposal - ")
+2. Find ALL line items in the Estimate section with their QTY (sqft), RATE ($/sqft), AMOUNT ($)
+3. Find the TOTAL amount
+4. Common S2P services: "Scan2Plan Residential/Commercial - LoD XXX", "MEPF LoD XXX", "Structural Modeling", "CAD Standard Package", "Discount"
+
+Return JSON:
 {
-  "projectAddress": "Full street address (parse from document name after 'S2P Proposal - ')",
-  "totalPrice": number (sum of all AMOUNT values from pricing, ignore discounts if negative),
-  "areas": [{"name": "area description", "sqft": number, "buildingType": "residential|commercial|industrial"}],
-  "unmappedFields": ["list of fields that couldn't be mapped"],
-  "sqft": number (primary square footage from QTY column),
-  "buildingType": "residential" | "commercial" | "industrial" | "mixed",
-  "lod": "200" | "300" | "350" (Level of Detail from service names)
+  "projectAddress": "street address, city, state zip",
+  "totalPrice": number,
+  "lineItems": [
+    {"name": "service name", "description": "optional description", "quantity": sqft_number, "rate": rate_per_sqft, "amount": total_amount}
+  ],
+  "areas": [{"name": "area name", "sqft": number, "buildingType": "residential|commercial"}],
+  "unmappedFields": [],
+  "buildingType": "residential" | "commercial",
+  "lod": "200" | "300" | "350"
 }
 
 Return ONLY valid JSON.`;
@@ -348,24 +524,44 @@ Return ONLY valid JSON.`;
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        max_tokens: 600,
+        max_tokens: 1500,
       });
 
       const content = response.choices[0].message.content;
       if (content) {
         const parsed = JSON.parse(content);
-        if (parsed.projectAddress && !current.projectAddress) {
-          current.projectAddress = parsed.projectAddress;
-        }
-        if (parsed.totalPrice && !current.totalPrice) {
-          current.totalPrice = parsed.totalPrice;
-        }
         return parsed;
       }
     } catch (error) {
       console.error("AI extraction error:", error);
     }
     return null;
+  }
+
+  private extractEstimateSection(pdfText: string): string {
+    const lines = pdfText.split("\n");
+    let inEstimate = false;
+    let estimateLines: string[] = [];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      if (trimmed.match(/^Estimate$/i) || trimmed.match(/^ESTIMATE\s+\d+/i)) {
+        inEstimate = true;
+      }
+      
+      if (inEstimate) {
+        estimateLines.push(trimmed);
+        
+        if (trimmed.match(/^TOTAL\s+\$?[\d,]+/i) || 
+            trimmed.match(/^Accepted\s+By/i) ||
+            trimmed.match(/^Payment\s+Terms/i)) {
+          break;
+        }
+      }
+    }
+    
+    return estimateLines.slice(0, 100).join("\n");
   }
 
   async createImportBatch(name?: string, createdBy?: string): Promise<PandaDocImportBatch> {
@@ -524,7 +720,21 @@ Return ONLY valid JSON.`;
         3,
         1000
       );
-      const extracted = await this.extractQuoteData(details);
+
+      let pdfText = "";
+      try {
+        const pdfBuffer = await this.fetchWithRetry(
+          () => this.downloadPdf(doc.pandaDocId),
+          2,
+          2000
+        );
+        pdfText = await this.extractTextFromPdf(pdfBuffer);
+        console.log(`PDF text extracted: ${pdfText.length} chars`);
+      } catch (pdfError) {
+        console.error("PDF extraction failed, continuing without:", pdfError);
+      }
+
+      const extracted = await this.extractQuoteData(details, pdfText);
 
       const pdfUrl = await this.getDocumentPdfUrl(doc.pandaDocId);
 
