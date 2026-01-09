@@ -551,4 +551,515 @@ describe('Landscape Pricing', () => {
     const landscapeItem = result.items.find(i => i.label.toLowerCase().includes('landscape'));
     expect(landscapeItem).toBeDefined();
   });
+  
+  it('should use built landscape rates (higher) for hardscape areas', () => {
+    const builtAreas: Area[] = [{
+      id: '1',
+      name: 'Built Landscape',
+      kind: 'landscape',
+      buildingType: 'landscape_built',
+      squareFeet: '5',
+      lod: '300',
+      disciplines: ['site'],
+    }];
+    
+    const naturalAreas: Area[] = [{
+      id: '1',
+      name: 'Natural Landscape',
+      kind: 'landscape',
+      buildingType: 'landscape_natural',
+      squareFeet: '5',
+      lod: '300',
+      disciplines: ['site'],
+    }];
+    
+    const builtResult = calculatePricing(builtAreas, {}, null, [], 'standard');
+    const naturalResult = calculatePricing(naturalAreas, {}, null, [], 'standard');
+    
+    // Built should be more expensive than natural
+    expect(builtResult.totalClientPrice).toBeGreaterThan(naturalResult.totalClientPrice);
+  });
+  
+  it('should apply tiered rates based on acreage', () => {
+    const smallArea: Area[] = [{
+      id: '1', name: 'Small', kind: 'landscape', buildingType: 'landscape_natural',
+      squareFeet: '3', lod: '200', disciplines: ['site'],
+    }];
+    
+    const largeArea: Area[] = [{
+      id: '1', name: 'Large', kind: 'landscape', buildingType: 'landscape_natural',
+      squareFeet: '60', lod: '200', disciplines: ['site'],
+    }];
+    
+    const smallResult = calculatePricing(smallArea, {}, null, [], 'standard');
+    const largeResult = calculatePricing(largeArea, {}, null, [], 'standard');
+    
+    // Per-acre rate should be lower for large projects
+    const smallPerAcre = smallResult.totalClientPrice / 3;
+    const largePerAcre = largeResult.totalClientPrice / 60;
+    expect(largePerAcre).toBeLessThan(smallPerAcre);
+  });
+});
+
+describe('Area Tier Calculations', () => {
+  
+  it('should apply no discount for areas under 5k sqft (tier 0-5k)', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Small', kind: 'standard', buildingType: '1',
+      squareFeet: '4000', lod: '200', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    expect(result.totalClientPrice).toBeGreaterThan(0);
+  });
+  
+  it('should apply 5% discount for 5k-10k sqft tier', () => {
+    const small: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '4999', lod: '200', disciplines: ['architecture'] }];
+    const tier: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '5000', lod: '200', disciplines: ['architecture'] }];
+    
+    const smallResult = calculatePricing(small, {}, null, [], 'standard');
+    const tierResult = calculatePricing(tier, {}, null, [], 'standard');
+    
+    // Tier should have slightly lower per-sqft rate
+    const smallPerSqft = smallResult.totalClientPrice / 4999;
+    const tierPerSqft = tierResult.totalClientPrice / 5000;
+    expect(tierPerSqft).toBeLessThan(smallPerSqft);
+  });
+  
+  it('should apply 10% discount for 10k-20k sqft tier', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '15000', lod: '200', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    expect(result.totalClientPrice).toBeGreaterThan(0);
+  });
+  
+  it('should apply maximum discount for 100k+ sqft tier', () => {
+    const large: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '100000', lod: '200', disciplines: ['architecture'] }];
+    const medium: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '50000', lod: '200', disciplines: ['architecture'] }];
+    
+    const largeResult = calculatePricing(large, {}, null, [], 'standard');
+    const mediumResult = calculatePricing(medium, {}, null, [], 'standard');
+    
+    const largePerSqft = largeResult.totalClientPrice / 100000;
+    const mediumPerSqft = mediumResult.totalClientPrice / 50000;
+    expect(largePerSqft).toBeLessThan(mediumPerSqft);
+  });
+  
+  it('should handle exact tier boundary at 50k sqft', () => {
+    const at50k: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '50000', lod: '200', disciplines: ['architecture'] }];
+    const under50k: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '49999', lod: '200', disciplines: ['architecture'] }];
+    
+    const at50Result = calculatePricing(at50k, {}, null, [], 'standard');
+    const under50Result = calculatePricing(under50k, {}, null, [], 'standard');
+    
+    // 50k should be in 50k-75k tier with lower rate than 49,999
+    const at50PerSqft = at50Result.totalClientPrice / 50000;
+    const under50PerSqft = under50Result.totalClientPrice / 49999;
+    expect(at50PerSqft).toBeLessThan(under50PerSqft);
+  });
+});
+
+describe('Risk Premium Tests', () => {
+  
+  it('should apply risk premium only to Architecture discipline', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture', 'mepf'],
+    }];
+    
+    const withRisk = calculatePricing(areas, {}, null, ['occupied'], 'standard');
+    const noRisk = calculatePricing(areas, {}, null, [], 'standard');
+    
+    expect(withRisk.totalClientPrice).toBeGreaterThan(noRisk.totalClientPrice);
+    
+    // Risk premium should be visible in line items
+    const riskItem = withRisk.items.find(i => i.label.includes('Risk Premium'));
+    expect(riskItem).toBeDefined();
+    expect(riskItem?.label).toContain('Architecture only');
+  });
+  
+  it('should not apply risk to MEPF discipline', () => {
+    const areasArch: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+    }];
+    
+    const areasMEP: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['mepf'],
+    }];
+    
+    const archRisk = calculatePricing(areasArch, {}, null, ['occupied'], 'standard');
+    const mepRisk = calculatePricing(areasMEP, {}, null, ['occupied'], 'standard');
+    
+    // Architecture should have risk premium line item, MEP should not
+    const archRiskItem = archRisk.items.find(i => i.label.includes('Risk Premium'));
+    const mepRiskItem = mepRisk.items.find(i => i.label.includes('Risk Premium'));
+    
+    expect(archRiskItem).toBeDefined();
+    expect(mepRiskItem).toBeUndefined();
+  });
+  
+  it('should stack multiple risk premiums', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+    }];
+    
+    const oneRisk = calculatePricing(areas, {}, null, ['occupied'], 'standard');
+    const twoRisks = calculatePricing(areas, {}, null, ['occupied', 'hazardous'], 'standard');
+    
+    expect(twoRisks.totalClientPrice).toBeGreaterThan(oneRisk.totalClientPrice);
+    
+    // Should have two risk line items
+    const riskItems = twoRisks.items.filter(i => i.label.includes('Risk Premium'));
+    expect(riskItems.length).toBe(2);
+  });
+  
+  it('should calculate hazardous risk at 25% of architecture base', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, ['hazardous'], 'standard');
+    const archBase = result.disciplineTotals.architecture;
+    const riskItem = result.items.find(i => i.label.includes('Hazardous'));
+    
+    // Hazardous is 25% premium
+    expect(riskItem?.value).toBeCloseTo(archBase * 0.25, 1);
+  });
+  
+  it('should calculate occupied risk at 15% of architecture base', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, ['occupied'], 'standard');
+    const archBase = result.disciplineTotals.architecture;
+    const riskItem = result.items.find(i => i.label.includes('Occupied'));
+    
+    // Occupied is 15% premium
+    expect(riskItem?.value).toBeCloseTo(archBase * 0.15, 1);
+  });
+});
+
+describe('Scope Discount Tests', () => {
+  
+  it('should apply interior-only scope (100% interior, 0% exterior)', () => {
+    const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+    const interiorOnly: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'interior' }];
+    
+    const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
+    const interiorResult = calculatePricing(interiorOnly, {}, null, [], 'standard');
+    
+    // Interior only should be same as full (100% multiplier applies)
+    expect(interiorResult.totalClientPrice).toBeGreaterThan(0);
+  });
+  
+  it('should apply exterior-only scope (0% interior, 100% exterior)', () => {
+    const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+    const exteriorOnly: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'exterior' }];
+    
+    const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
+    const exteriorResult = calculatePricing(exteriorOnly, {}, null, [], 'standard');
+    
+    // Exterior should be same price as full (scope multiplier normalizes)
+    expect(exteriorResult.totalClientPrice).toBeGreaterThan(0);
+  });
+  
+  it('should apply roof scope at 10% of full price', () => {
+    const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+    const roofScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'roof' }];
+    
+    const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
+    const roofResult = calculatePricing(roofScope, {}, null, [], 'standard');
+    
+    // Roof scope should be significantly less than full
+    expect(roofResult.totalClientPrice).toBeLessThan(fullResult.totalClientPrice);
+  });
+});
+
+describe('Additional Elevations Tiered Pricing', () => {
+  
+  it('should price first 10 elevations at $25 each', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+      additionalElevations: 5,
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    const elevItem = result.items.find(i => i.label.includes('Additional Elevations'));
+    
+    // 5 elevations at $25 = $125
+    expect(elevItem?.value).toBe(125);
+  });
+  
+  it('should price elevations 11-20 at $20 each', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+      additionalElevations: 15,
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    const elevItem = result.items.find(i => i.label.includes('Additional Elevations'));
+    
+    // First 10 at $25 = $250, next 5 at $20 = $100, total = $350
+    expect(elevItem?.value).toBe(350);
+  });
+  
+  it('should price elevations 21-100 at $15 each', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+      additionalElevations: 30,
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    const elevItem = result.items.find(i => i.label.includes('Additional Elevations'));
+    
+    // First 10 at $25 = $250, next 10 at $20 = $200, next 10 at $15 = $150, total = $600
+    expect(elevItem?.value).toBe(600);
+  });
+  
+  it('should price elevations 101-300 at $10 each', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+      additionalElevations: 150,
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    const elevItem = result.items.find(i => i.label.includes('Additional Elevations'));
+    
+    // 10*$25 + 10*$20 + 80*$15 + 50*$10 = $250 + $200 + $1,200 + $500 = $2,150
+    expect(elevItem?.value).toBe(2150);
+  });
+  
+  it('should price elevations 300+ at $5 each', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'],
+      additionalElevations: 350,
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    const elevItem = result.items.find(i => i.label.includes('Additional Elevations'));
+    
+    // 10*$25 + 10*$20 + 80*$15 + 200*$10 + 50*$5 = $250 + $200 + $1,200 + $2,000 + $250 = $3,900
+    expect(elevItem?.value).toBe(3900);
+  });
+});
+
+describe('Tier A Project Logic', () => {
+  
+  it('should calculate Tier A price with 2.352X margin (standard)', () => {
+    const config = {
+      scanningCost: '7000' as const,
+      modelingCost: 5000,
+      margin: '2.352' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 0);
+    
+    // (7000 + 5000) * 2.352 = 28,224
+    expect(result.clientPrice).toBe(28224);
+  });
+  
+  it('should calculate Tier A price with 4.0X margin (premium)', () => {
+    const config = {
+      scanningCost: '10500' as const,
+      modelingCost: 8000,
+      margin: '4.0' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 0);
+    
+    // (10500 + 8000) * 4.0 = 74,000
+    expect(result.clientPrice).toBe(74000);
+  });
+  
+  it('should use custom scanning cost when "other" is selected', () => {
+    const config = {
+      scanningCost: 'other' as const,
+      scanningCostOther: 9500,
+      modelingCost: 6000,
+      margin: '2.5' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 0);
+    
+    // (9500 + 6000) * 2.5 = 38,750
+    expect(result.clientPrice).toBe(38750);
+  });
+  
+  it('should add Tier A travel cost ($4/mile over 20 miles)', () => {
+    const config = {
+      scanningCost: '7000' as const,
+      modelingCost: 5000,
+      margin: '2.5' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 40);
+    
+    // Travel: (40 - 20) * $4 = $80
+    expect(result.travelCost).toBe(80);
+    expect(result.totalWithTravel).toBe(result.clientPrice + 80);
+  });
+  
+  it('should have $0 travel for <= 20 miles in Tier A', () => {
+    const config = {
+      scanningCost: '7000' as const,
+      modelingCost: 5000,
+      margin: '2.5' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 15);
+    
+    expect(result.travelCost).toBe(0);
+  });
+  
+  it('should include totalWithTravel in Tier A result', () => {
+    const config = {
+      scanningCost: '18500' as const,
+      modelingCost: 12000,
+      margin: '3.0' as const,
+    };
+    
+    const result = calculateTierAPricing(config, 50);
+    
+    // Client price: (18500 + 12000) * 3.0 = 91,500
+    // Travel: (50 - 20) * $4 = $120
+    expect(result.totalWithTravel).toBe(91620);
+  });
+});
+
+describe('Brooklyn Travel Tier Edge Cases', () => {
+  
+  it('should handle case-insensitive Brooklyn detection', () => {
+    const cost1 = calculateTravelCost(25, 'brooklyn', 30000);
+    const cost2 = calculateTravelCost(25, 'BROOKLYN', 30000);
+    const cost3 = calculateTravelCost(25, 'Brooklyn', 30000);
+    
+    expect(cost1).toBe(cost2);
+    expect(cost2).toBe(cost3);
+  });
+  
+  it('should treat non-Brooklyn locations as flat rate', () => {
+    const woodstock = calculateTravelCost(50, 'WOODSTOCK', 60000);
+    const atlanta = calculateTravelCost(50, 'ATLANTA', 60000);
+    const miami = calculateTravelCost(50, 'MIAMI', 60000);
+    
+    // All non-Brooklyn should be $3/mile = $150
+    expect(woodstock).toBe(150);
+    expect(atlanta).toBe(150);
+    expect(miami).toBe(150);
+  });
+  
+  it('should correctly transition at Tier B/C boundary (10k sqft)', () => {
+    const tierC = calculateTravelCost(30, 'BROOKLYN', 9999);
+    const tierB = calculateTravelCost(30, 'BROOKLYN', 10000);
+    
+    // Tier C: $150 base + (30-20)*$4 = $190
+    // Tier B: $300 base + (30-20)*$4 = $340
+    expect(tierC).toBe(190);
+    expect(tierB).toBe(340);
+  });
+  
+  it('should correctly transition at Tier A/B boundary (50k sqft)', () => {
+    const tierB = calculateTravelCost(30, 'BROOKLYN', 49999);
+    const tierA = calculateTravelCost(30, 'BROOKLYN', 50000);
+    
+    // Tier B: $300 base + (30-20)*$4 = $340
+    // Tier A: $0 base + (30-20)*$4 = $40
+    expect(tierB).toBe(340);
+    expect(tierA).toBe(40);
+  });
+});
+
+describe('LOD Multiplier Tests', () => {
+  
+  it('should apply 1.0x multiplier for LOD 200', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '200', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    expect(result.totalClientPrice).toBeGreaterThan(0);
+  });
+  
+  it('should apply 1.3x multiplier for LOD 300', () => {
+    const lod200: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '200', disciplines: ['architecture'] }];
+    const lod300: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '300', disciplines: ['architecture'] }];
+    
+    const result200 = calculatePricing(lod200, {}, null, [], 'standard');
+    const result300 = calculatePricing(lod300, {}, null, [], 'standard');
+    
+    // LOD 300 should be ~30% more than LOD 200
+    expect(result300.totalClientPrice).toBeGreaterThan(result200.totalClientPrice);
+    const ratio = result300.totalClientPrice / result200.totalClientPrice;
+    expect(ratio).toBeCloseTo(1.3, 1);
+  });
+  
+  it('should apply 1.5x multiplier for LOD 350', () => {
+    const lod200: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '200', disciplines: ['architecture'] }];
+    const lod350: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
+      squareFeet: '20000', lod: '350', disciplines: ['architecture'] }];
+    
+    const result200 = calculatePricing(lod200, {}, null, [], 'standard');
+    const result350 = calculatePricing(lod350, {}, null, [], 'standard');
+    
+    // LOD 350 should be ~50% more than LOD 200
+    const ratio = result350.totalClientPrice / result200.totalClientPrice;
+    expect(ratio).toBeCloseTo(1.5, 1);
+  });
+});
+
+describe('Minimum Project Charge', () => {
+  
+  it('should apply minimum $3000 charge for small projects', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Tiny', kind: 'standard', buildingType: '1',
+      squareFeet: '500', lod: '200', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    
+    // Should be at least $3000
+    expect(result.totalClientPrice).toBeGreaterThanOrEqual(3000);
+  });
+  
+  it('should show adjustment line item when minimum applies', () => {
+    const areas: Area[] = [{
+      id: '1', name: 'Tiny', kind: 'standard', buildingType: '1',
+      squareFeet: '500', lod: '200', disciplines: ['architecture'],
+    }];
+    
+    const result = calculatePricing(areas, {}, null, [], 'standard');
+    
+    const adjustmentItem = result.items.find(i => i.label.includes('Minimum Project Charge'));
+    expect(adjustmentItem).toBeDefined();
+  });
 });

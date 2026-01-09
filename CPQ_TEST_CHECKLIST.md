@@ -2,6 +2,27 @@
 
 This document contains manual test cases for validating CPQ pricing logic and field persistence.
 
+## Running Automated Tests
+
+Run the full 72-test pricing engine suite with:
+
+```bash
+npx vitest run client/src/features/cpq/pricing.test.ts
+```
+
+The automated tests cover:
+- Area tier calculations (0-5k, 5k-10k, 10k-20k, 20k-30k, 30k-40k, 40k-50k, 50k-75k, 75k-100k, 100k+)
+- Brooklyn travel tiers ($0/$150/$300 base fees, mileage over 20)
+- Landscape pricing (acres → sqft conversion, built vs natural rates)
+- Risk premiums (Architecture only, 15-25% rates, stacking)
+- Tier A project logic (50k+ sqft, margin multipliers, scanning costs)
+- Scope discounts (interior/exterior/roof)
+- Payment term premiums (prepaid -5%, net60 +3%)
+- Additional elevations tiered pricing (5 tiers: $25/$20/$15/$10/$5)
+- LOD multipliers (1.0x/1.3x/1.5x)
+- Minimum project charge ($3,000)
+- Margin gate (40% floor)
+
 ---
 
 ## 1. Standard Pricing Tests
