@@ -99,14 +99,23 @@ async function geocodeAddress(address: string, apiKey: string): Promise<string |
       url.searchParams.set("address", variation);
       url.searchParams.set("key", apiKey);
       
-      const response = await fetch(url.toString());
-      const data = await response.json();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
-      console.log("[Geocode] Attempt for:", variation, "Status:", data.status);
-      
-      if (data.status === "OK" && data.results?.[0]?.formatted_address) {
-        console.log("[Geocode] Resolved:", variation, "->", data.results[0].formatted_address);
-        return data.results[0].formatted_address;
+      try {
+        const response = await fetch(url.toString(), { signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json();
+        
+        console.log("[Geocode] Attempt for:", variation, "Status:", data.status);
+        
+        if (data.status === "OK" && data.results?.[0]?.formatted_address) {
+          console.log("[Geocode] Resolved:", variation, "->", data.results[0].formatted_address);
+          return data.results[0].formatted_address;
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        console.error("[Geocode] Fetch error for", variation, ":", error.message);
       }
     }
     
@@ -126,23 +135,39 @@ async function tryDistanceMatrix(from: string, destination: string, apiKey: stri
   url.searchParams.set("units", "imperial");
   url.searchParams.set("key", apiKey);
 
-  const response = await fetch(url.toString());
-  const data = await response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (data.status !== "OK" || !data.rows?.[0]?.elements?.[0]) {
+  try {
+    const response = await fetch(url.toString(), { signal: controller.signal });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+
+    if (data.status !== "OK" || !data.rows?.[0]?.elements?.[0]) {
+      console.log("[Distance Matrix] API status:", data.status, "Element status:", data.rows?.[0]?.elements?.[0]?.status);
+      return null;
+    }
+
+    const element = data.rows[0].elements[0];
+    if (element.status !== "OK") {
+      console.log("[Distance Matrix] Element status not OK:", element.status);
+      return null;
+    }
+
+    return {
+      distanceMeters: element.distance.value,
+      durationSeconds: element.duration.value,
+      durationText: element.duration.text,
+    };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      console.error("[Distance Matrix] Request timed out after 10 seconds");
+    } else {
+      console.error("[Distance Matrix] Fetch error:", error.message);
+    }
     return null;
   }
-
-  const element = data.rows[0].elements[0];
-  if (element.status !== "OK") {
-    return null;
-  }
-
-  return {
-    distanceMeters: element.distance.value,
-    durationSeconds: element.duration.value,
-    durationText: element.duration.text,
-  };
 }
 
 export async function calculateTravelDistance(destination: string, origin?: string): Promise<DistanceResult | null> {
@@ -157,18 +182,40 @@ export async function calculateTravelDistance(destination: string, origin?: stri
   console.log("[Distance Matrix] Calculating:", { from, destination });
   
   try {
-    // First attempt with original address
+    // First attempt with original addresses
     let result = await tryDistanceMatrix(from, destination, apiKey);
     
     // If NOT_FOUND, try to geocode the destination first
     if (!result) {
-      console.log("[Distance Matrix] First attempt failed, trying geocoded address...");
+      console.log("[Distance Matrix] First attempt failed, trying geocoded destination...");
       const formattedDestination = await geocodeAddress(destination, apiKey);
       
       if (formattedDestination && formattedDestination !== destination) {
         result = await tryDistanceMatrix(from, formattedDestination, apiKey);
         if (result) {
-          console.log("[Distance Matrix] Success with geocoded address");
+          console.log("[Distance Matrix] Success with geocoded destination");
+        }
+      }
+    }
+    
+    // If still no result, try geocoding the origin (e.g., "Brooklyn, NY 11201")
+    if (!result) {
+      console.log("[Distance Matrix] Still failed, trying geocoded origin...");
+      const formattedOrigin = await geocodeAddress(from, apiKey);
+      
+      if (formattedOrigin && formattedOrigin !== from) {
+        result = await tryDistanceMatrix(formattedOrigin, destination, apiKey);
+        if (result) {
+          console.log("[Distance Matrix] Success with geocoded origin");
+        } else {
+          // Try both geocoded
+          const formattedDest = await geocodeAddress(destination, apiKey);
+          if (formattedDest) {
+            result = await tryDistanceMatrix(formattedOrigin, formattedDest, apiKey);
+            if (result) {
+              console.log("[Distance Matrix] Success with both addresses geocoded");
+            }
+          }
         }
       }
     }

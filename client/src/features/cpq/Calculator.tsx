@@ -319,12 +319,12 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
     setIsCalculatingDistance(true);
     try {
-      const result = await apiRequest("POST", "/api/travel/calculate", {
+      const response = await apiRequest("POST", "/api/travel/calculate", {
         destination: lead.projectAddress,
         origin: originAddress,
       });
       
-      const distanceResult = result as { distanceMiles?: number; durationText?: string };
+      const distanceResult = await response.json() as { distanceMiles?: number; durationText?: string; message?: string };
       if (distanceResult.distanceMiles) {
         setTravel({
           dispatchLocation: locationCode,
@@ -334,12 +334,20 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
           title: "Distance calculated",
           description: `${Math.round(distanceResult.distanceMiles)} miles from ${locationCode} (${distanceResult.durationText || ""})`,
         });
+      } else if (distanceResult.message) {
+        toast({
+          title: "Distance not available",
+          description: distanceResult.message + ". You can enter distance manually.",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
       console.error("Failed to calculate distance:", error);
       toast({
         title: "Distance calculation failed",
-        description: "Could not calculate distance. You can enter it manually.",
+        description: error?.message?.includes("400") 
+          ? "Could not find a route. Please enter the distance manually."
+          : "Could not calculate distance. You can enter it manually.",
         variant: "destructive",
       });
     } finally {
