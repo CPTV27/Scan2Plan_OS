@@ -56,13 +56,21 @@ function getOpenAI(): OpenAI {
 }
 
 // Phase 1: Find the estimate/pricing page
-const PAGE_FINDER_PROMPT = `You are analyzing proposal document pages to find the ESTIMATE or PRICING page.
+const PAGE_FINDER_PROMPT = `You are analyzing PandaDoc proposal pages to find the ESTIMATE page.
 
-Look for pages that contain:
-- A pricing table with columns like: Item, Description, Qty, Rate, Amount/Total
-- Line items with dollar amounts
-- Subtotal or Grand Total rows
-- The word "ESTIMATE", "PROPOSAL", "QUOTE", or "PRICING" as a header
+LOOK FOR THIS SPECIFIC LAYOUT:
+- Blue "Estimate" header text at the top
+- "ADDRESS" section with client name and property/location name
+- "ESTIMATE" number and "DATE" fields on the right
+- A table with column headers: DESCRIPTION, QTY, RATE, AMOUNT
+- Line items with service names, quantities (often sqft), rates, and amounts
+- "TOTAL" row at the bottom with a dollar amount
+
+IGNORE these pages:
+- Cover pages with just logos/company info
+- Terms & conditions pages
+- Signature/acceptance pages
+- Pages without a pricing table
 
 For each page, respond with:
 - page_number (1-indexed)
@@ -74,81 +82,76 @@ Return JSON array:
 [{"page_number": 1, "is_estimate_page": false, "confidence": 95, "reason": "Cover page only"}]`;
 
 // Phase 2: Extract data from estimate page with enhanced prompting
-const EXTRACTION_PROMPT = `You are a specialized Data Entry Clerk extracting structured data from a laser scanning/BIM proposal's pricing table.
+const EXTRACTION_PROMPT = `You are extracting data from a Scan2Plan PandaDoc proposal estimate page.
 
-CRITICAL INSTRUCTIONS FOR ACCURACY:
+THE ESTIMATE PAGE HAS THIS EXACT LAYOUT:
 
-1. TABLE COLUMN IDENTIFICATION:
-   - First, identify the column headers in the pricing table
-   - Common columns: Item/SKU, Description/Service, Qty/Quantity, Rate/Unit Price, Amount/Total
-   - Some tables use "sqft" as quantity, others use counts or hours
-   
-2. LINE ITEM EXTRACTION RULES:
-   - Extract EVERY row that has a price/amount
-   - If checkboxes exist, only include checked items
-   - The "qty" field should be the numeric quantity (could be sqft, count, hours)
-   - The "unit" field describes what qty represents (e.g., "sqft", "each", "hours")
-   - The "rate" is price per unit
-   - The "total" is qty × rate, or the Amount column value
-   
-3. PRICE VALIDATION:
-   - Grand total should approximately equal sum of line item totals
-   - If they don't match, note this in extractionNotes
-   - Watch for subtotals that might be duplicated as line items
+1. HEADER SECTION:
+   - Blue "Estimate" text
+   - "ADDRESS" label with client name on first line, property/project name on second line
+   - "ESTIMATE" number (e.g., "2122") and "DATE" (e.g., "12/02/2025") on the right
 
-4. COMMON ERRORS TO AVOID:
-   - Don't confuse sqft quantities with dollar amounts
-   - Don't include subtotal/total rows as line items
-   - Don't miss multi-line descriptions
-   - Watch for hidden fees or optional items
+2. PRICING TABLE:
+   - Column headers: DESCRIPTION | QTY | RATE | AMOUNT
+   - Each row has:
+     * Service name in bold (e.g., "Scan2Plan Residential - LoD 200")
+     * Description text below (property address, sqft, deliverables)
+     * QTY = square footage (e.g., 5,500)
+     * RATE = price per sqft (e.g., 0.746)
+     * AMOUNT = line total (e.g., 4,103.00)
 
-5. CONFIDENCE SCORING (0-100):
-   - 90-100: Crystal clear, easy to read
-   - 70-89: Readable but some ambiguity
-   - 50-69: Difficult to read, making educated guesses
-   - Below 50: Very uncertain, may be wrong
+3. TOTAL ROW:
+   - "TOTAL" label with final dollar amount (e.g., "$4,598.00")
 
-CLIENT INFORMATION:
-- Look for "PROPOSAL FOR", "PREPARED FOR", "CLIENT:", "TO:", or address blocks
-- Company name often appears before or after contact name
-- Email may be on cover page or in header/footer
+EXTRACTION RULES:
 
-PROJECT INFORMATION:
-- Look for the specific site/building address
-- This is usually different from the client's business address
-- May be labeled "PROJECT:", "SITE:", "LOCATION:"
+1. CLIENT INFO:
+   - Name = first line under "ADDRESS" (e.g., "Jackson Lehr")
+   - Project = second line under "ADDRESS" (e.g., "Dotori Ranch")
 
-Return ONLY valid JSON (no markdown, no extra text):
+2. LINE ITEMS:
+   - Title = bold service name (e.g., "Scan2Plan Residential - LoD 200")
+   - Description = the paragraph below describing the service
+   - QTY = the sqft value in QTY column (always a number, often 4-6 digits)
+   - RATE = price per sqft (small decimal like 0.09, 0.15, 0.746)
+   - AMOUNT = the total for that line item
+
+3. VALIDATION:
+   - QTY × RATE should approximately equal AMOUNT
+   - Sum of all AMOUNT values should equal TOTAL
+   - If numbers don't match, use the AMOUNT column as truth
+
+Return ONLY valid JSON:
 {
   "client": {
-    "name": "Contact Name",
-    "company": "Company Name or null",
-    "email": "email@example.com or null",
-    "confidence": 85
+    "name": "Client Name from ADDRESS section",
+    "company": "Property/Project name from ADDRESS section",
+    "email": null,
+    "confidence": 90
   },
   "project": {
-    "address": "123 Project Site Address, City, State",
-    "date": "2024-01-15 or null",
+    "address": "Full property address from description",
+    "date": "Date from ESTIMATE DATE field",
     "confidence": 90
   },
   "lineItems": [
     {
-      "sku": "SKU-001 or null",
-      "title": "Service Name",
-      "description": "Detailed description or null",
-      "qty": 5000,
+      "sku": null,
+      "title": "Service Name (bold text)",
+      "description": "Full description paragraph",
+      "qty": 5500,
       "unit": "sqft",
-      "rate": 0.15,
-      "total": 750.00,
+      "rate": 0.746,
+      "total": 4103.00,
       "confidence": 95
     }
   ],
-  "grandTotal": 15000.00,
-  "subtotal": 14500.00,
-  "tax": 500.00,
+  "grandTotal": 4598.00,
+  "subtotal": null,
+  "tax": null,
   "discount": null,
-  "estimatePageNumber": 3,
-  "extractionNotes": ["Note any issues or uncertainties here"]
+  "estimatePageNumber": 1,
+  "extractionNotes": []
 }`;
 
 export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 10): Promise<string[]> {
