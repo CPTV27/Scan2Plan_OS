@@ -508,7 +508,7 @@ export function LocationPreview({
                   <div className="text-lg font-semibold">
                     {buildingInsights.buildingArea?.squareFeet?.toLocaleString() || "-"}
                   </div>
-                  <div className="text-xs text-muted-foreground">Est. SQFT</div>
+                  <div className="text-xs text-muted-foreground">Footprint (sqft)</div>
                 </div>
                 <div className="p-2 rounded bg-background">
                   <div className="text-lg font-semibold">
