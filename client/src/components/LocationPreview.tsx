@@ -514,7 +514,7 @@ export function LocationPreview({
                   <div className="text-lg font-semibold">
                     {buildingInsights.height?.maxRoofHeightFeet || "-"}
                   </div>
-                  <div className="text-xs text-muted-foreground">Height (ft)</div>
+                  <div className="text-xs text-muted-foreground">Elevation (ft)</div>
                 </div>
                 <div className="p-2 rounded bg-background">
                   <div className="text-lg font-semibold">
