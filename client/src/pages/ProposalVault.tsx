@@ -76,6 +76,23 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function StageBadge({ stage }: { stage: string | null | undefined }) {
+  const config: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    proposal_pending: { label: "Proposal", variant: "secondary" },
+    awaiting_internal: { label: "Awaiting Approval", variant: "outline" },
+    closed_won: { label: "Closed Won", variant: "default" },
+    closed_lost: { label: "Closed Lost", variant: "destructive" },
+    unknown: { label: "Unknown", variant: "secondary" },
+  };
+  const { label, variant } = config[stage || "unknown"] || config.unknown;
+  
+  return (
+    <Badge variant={variant} className="gap-1">
+      {label}
+    </Badge>
+  );
+}
+
 function DocumentReviewDialog({ 
   document, 
   open, 
@@ -500,6 +517,7 @@ export default function ProposalVault() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <StageBadge stage={doc.pandaDocStage} />
                         <StatusBadge status={doc.importStatus} />
                         {doc.importStatus === "pending" && (
                           <Button 
@@ -588,9 +606,12 @@ export default function ProposalVault() {
                               </div>
                             </div>
                           </div>
-                          <Button data-testid={`button-review-queue-${doc.id}`}>
-                            Review <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <StageBadge stage={doc.pandaDocStage} />
+                            <Button data-testid={`button-review-queue-${doc.id}`}>
+                              Review <ArrowRight className="h-4 w-4 ml-2" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}

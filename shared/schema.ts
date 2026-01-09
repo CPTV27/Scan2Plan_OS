@@ -1822,6 +1822,27 @@ export const PANDADOC_BATCH_STATUSES = [
 ] as const;
 export type PandaDocBatchStatus = typeof PANDADOC_BATCH_STATUSES[number];
 
+export const PANDADOC_STAGES = [
+  "proposal_pending",
+  "awaiting_internal",
+  "closed_won",
+  "closed_lost",
+  "unknown",
+] as const;
+export type PandaDocStage = typeof PANDADOC_STAGES[number];
+
+export const PANDADOC_STATUS_MAP: Record<number, PandaDocStage> = {
+  0: "proposal_pending",
+  1: "proposal_pending",
+  5: "proposal_pending",
+  6: "awaiting_internal",
+  7: "awaiting_internal",
+  2: "closed_won",
+  10: "closed_won",
+  11: "closed_lost",
+  12: "closed_lost",
+};
+
 export const pandaDocImportBatches = pgTable("pandadoc_import_batches", {
   id: serial("id").primaryKey(),
   name: text("name"),
@@ -1852,6 +1873,8 @@ export const pandaDocDocuments = pgTable("pandadoc_documents", {
   pandaDocId: text("pandadoc_id").notNull().unique(),
   pandaDocName: text("pandadoc_name"),
   pandaDocStatus: text("pandadoc_status"),
+  pandaDocStatusCode: integer("pandadoc_status_code"),
+  pandaDocStage: text("pandadoc_stage").default("unknown"),
   pandaDocVersion: text("pandadoc_version"),
   pandaDocCreatedAt: timestamp("pandadoc_created_at"),
   pandaDocUpdatedAt: timestamp("pandadoc_updated_at"),

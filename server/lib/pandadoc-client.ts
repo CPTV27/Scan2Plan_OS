@@ -8,9 +8,37 @@ import {
   type InsertPandaDocDocument,
   type PandaDocImportBatch,
   type InsertPandaDocImportBatch,
+  PANDADOC_STATUS_MAP,
+  type PandaDocStage,
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
+
+const PANDADOC_STATUS_TO_CODE: Record<string, number> = {
+  "document.draft": 0,
+  "document.sent": 1,
+  "document.completed": 2,
+  "document.uploaded": 3,
+  "document.error": 4,
+  "document.viewed": 5,
+  "document.waiting_approval": 6,
+  "document.approved": 7,
+  "document.rejected": 8,
+  "document.waiting_pay": 9,
+  "document.paid": 10,
+  "document.voided": 11,
+  "document.declined": 12,
+};
+
+function mapStatusTextToStage(statusText: string): PandaDocStage {
+  const code = PANDADOC_STATUS_TO_CODE[statusText];
+  if (code === undefined) return "unknown";
+  return PANDADOC_STATUS_MAP[code] || "unknown";
+}
+
+function mapStatusTextToCode(statusText: string): number | null {
+  return PANDADOC_STATUS_TO_CODE[statusText] ?? null;
+}
 
 const PANDADOC_API_BASE = "https://api.pandadoc.com/public/v1";
 
@@ -133,14 +161,12 @@ export class PandaDocClient {
   }
 
   async listDocuments(params: {
-    status?: string;
     createdFrom?: string;
     createdTo?: string;
     page?: number;
     count?: number;
   } = {}): Promise<PandaDocListResponse> {
     const queryParams = new URLSearchParams();
-    if (params.status) queryParams.set("status", params.status);
     if (params.createdFrom) queryParams.set("date_from", params.createdFrom);
     if (params.createdTo) queryParams.set("date_to", params.createdTo);
     if (params.page) queryParams.set("page", params.page.toString());
@@ -316,7 +342,6 @@ Return ONLY valid JSON.`;
   }
 
   async startImport(batchId: number, options: {
-    status?: string;
     dateFrom?: string;
     dateTo?: string;
   } = {}): Promise<{ documentsFound: number; documentsImported: number }> {
@@ -332,7 +357,6 @@ Return ONLY valid JSON.`;
     try {
       while (hasMore) {
         const listResponse = await this.listDocuments({
-          status: options.status || "2",
           createdFrom: options.dateFrom,
           createdTo: options.dateTo,
           page,
@@ -347,18 +371,40 @@ Return ONLY valid JSON.`;
             .where(eq(pandaDocDocuments.pandaDocId, doc.id))
             .limit(1);
 
+          const stage = mapStatusTextToStage(doc.status);
+          const statusCode = mapStatusTextToCode(doc.status);
+
           if (existing.length === 0) {
             await db.insert(pandaDocDocuments).values({
               batchId,
               pandaDocId: doc.id,
               pandaDocName: doc.name,
               pandaDocStatus: doc.status,
+              pandaDocStatusCode: statusCode,
+              pandaDocStage: stage,
               pandaDocVersion: doc.version,
               pandaDocCreatedAt: new Date(doc.date_created),
               pandaDocUpdatedAt: new Date(doc.date_modified),
               importStatus: "pending",
             });
             documentsImported++;
+          } else {
+            const needsUpdate = 
+              existing[0].pandaDocStatus !== doc.status ||
+              existing[0].pandaDocStage !== stage ||
+              existing[0].pandaDocStatusCode !== statusCode;
+            
+            if (needsUpdate) {
+              await db.update(pandaDocDocuments)
+                .set({ 
+                  pandaDocStatus: doc.status,
+                  pandaDocStatusCode: statusCode,
+                  pandaDocStage: stage,
+                  pandaDocUpdatedAt: new Date(doc.date_modified),
+                  updatedAt: new Date(),
+                })
+                .where(eq(pandaDocDocuments.id, existing[0].id));
+            }
           }
         }
 
@@ -372,7 +418,7 @@ Return ONLY valid JSON.`;
         hasMore = !!listResponse.next;
         page++;
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       await db.update(pandaDocImportBatches)
