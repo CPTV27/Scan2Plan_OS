@@ -1040,11 +1040,11 @@ Thanks!`.trim();
                           </div>
                           {/* Boundary Preview and Controls */}
                           {area.boundaryImageUrl && area.boundary && area.boundary.length >= 3 && (
-                            <div className="rounded-md overflow-hidden border bg-muted">
+                            <div className="rounded-md overflow-hidden border bg-muted aspect-square max-w-sm mx-auto">
                               <img
                                 src={area.boundaryImageUrl}
                                 alt="Boundary preview"
-                                className="w-full h-32 object-cover"
+                                className="w-full h-full object-cover"
                                 data-testid={`img-boundary-preview-${kindIndex}`}
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).style.display = "none";

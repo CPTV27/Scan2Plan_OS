@@ -41,7 +41,7 @@ function generateBoundaryImageUrl(coords: Coordinate[]): string {
   
   const pathParam = `fillcolor:0x4285F466|color:0x4285F4FF|weight:2|${pathCoords}`;
   
-  return `/api/maps/static?center=${center.lat.toFixed(6)},${center.lng.toFixed(6)}&zoom=18&size=400x300&maptype=satellite&path=${encodeURIComponent(pathParam)}`;
+  return `/api/maps/static?center=${center.lat.toFixed(6)},${center.lng.toFixed(6)}&zoom=18&size=400x400&maptype=satellite&path=${encodeURIComponent(pathParam)}`;
 }
 
 function calculatePolygonArea(coords: Coordinate[]): number {
