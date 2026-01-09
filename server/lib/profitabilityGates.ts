@@ -59,18 +59,20 @@ export function checkAttributionGate(lead: Lead, isClosingWon: boolean): GateRes
 
 export function checkEstimatorCardGate(lead: Lead): GateResult {
   const sqft = lead.sqft || 0;
-  const isTierA = sqft >= TIER_A_THRESHOLD;
+  const isTierA = sqft >= TIER_A_THRESHOLD || lead.abmTier === "Tier A";
   
   if (!isTierA) {
     return { passed: true };
   }
   
+  // Estimator card is recommended but not blocking for backwards compatibility
+  // Legacy Tier A leads without cards should still be able to generate proposals
   if (!lead.estimatorCardId && !lead.estimatorCardUrl) {
     return {
-      passed: false,
-      code: "ESTIMATOR_CARD_REQUIRED",
-      message: `Tier A project (${sqft.toLocaleString()} sqft) requires estimator card before proposal`,
-      details: { sqft, tierAThreshold: TIER_A_THRESHOLD },
+      passed: true, // Soft gate - warning only
+      code: "ESTIMATOR_CARD_RECOMMENDED",
+      message: `Tier A project (${sqft.toLocaleString()} sqft) - estimator card recommended for better proposal accuracy`,
+      details: { sqft, tierAThreshold: TIER_A_THRESHOLD, isWarning: true },
     };
   }
   

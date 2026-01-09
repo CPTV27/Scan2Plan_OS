@@ -280,13 +280,10 @@ export function registerAIRoutes(app: Express) {
       });
     }
 
-    if (!gateResults.estimatorCardGate.passed) {
-      log(`[Proposal Gate] Estimator card required for Tier A lead ${leadId}`);
-      return res.status(403).json({
-        error: gateResults.estimatorCardGate.code,
-        message: gateResults.estimatorCardGate.message,
-        details: gateResults.estimatorCardGate.details,
-      });
+    // Estimator card gate is a soft warning for backwards compatibility
+    if (gateResults.estimatorCardGate.code === "ESTIMATOR_CARD_RECOMMENDED") {
+      log(`[Proposal Gate] Tier A lead ${leadId} missing estimator card (soft warning)`);
+      // Add to warnings but don't block
     }
 
     const validTemplates = ["technical", "executive", "standard"];
