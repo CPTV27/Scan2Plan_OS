@@ -196,9 +196,18 @@ export class PandaDocClient {
 
     if (details.name) {
       extracted.projectName = details.name;
-      confidencePoints += 10;
+      
+      const s2pMatch = details.name.match(/^S2P\s*Proposal\s*[-–—]\s*(.+)$/i);
+      if (s2pMatch) {
+        const addressPart = s2pMatch[1].trim();
+        extracted.projectAddress = addressPart;
+        extracted.projectName = `S2P Proposal - ${addressPart}`;
+        confidencePoints += 15;
+      } else {
+        confidencePoints += 10;
+      }
     }
-    totalPoints += 10;
+    totalPoints += 15;
 
     if (details.recipients && details.recipients.length > 0) {
       extracted.contacts = details.recipients.map(r => ({
@@ -220,7 +229,7 @@ export class PandaDocClient {
       extracted.variables = {};
       for (const token of details.tokens) {
         extracted.variables[token.name] = token.value;
-        if (token.name.toLowerCase().includes("address")) {
+        if (token.name.toLowerCase().includes("address") && !extracted.projectAddress) {
           extracted.projectAddress = token.value;
           confidencePoints += 10;
         }
@@ -231,27 +240,32 @@ export class PandaDocClient {
     }
     totalPoints += 15;
 
+    let calculatedTotal = 0;
     if (details.pricing?.tables && details.pricing.tables.length > 0) {
       extracted.services = [];
       extracted.areas = [];
       
       for (const table of details.pricing.tables) {
         for (const item of table.items) {
+          const itemPrice = item.subtotal || item.price || 0;
           const service = {
             name: item.name,
             description: item.description,
-            price: item.subtotal || item.price,
+            price: itemPrice,
             quantity: item.qty,
           };
           extracted.services.push(service);
+          calculatedTotal += itemPrice;
 
-          const nameLower = item.name.toLowerCase();
+          const nameLower = (item.name || "").toLowerCase();
           if (nameLower.includes("scan") || nameLower.includes("model") || 
-              nameLower.includes("bim") || nameLower.includes("sqft") ||
-              nameLower.includes("sq ft") || nameLower.includes("square")) {
+              nameLower.includes("bim") || nameLower.includes("residential") ||
+              nameLower.includes("commercial") || nameLower.includes("lod")) {
+            const sqftMatch = item.description?.match(/(\d{1,3}(?:,\d{3})*)\s*(?:sqft|sq\s*ft|square\s*feet)/i);
             extracted.areas.push({
               name: item.name,
-              price: item.subtotal || item.price,
+              price: itemPrice,
+              sqft: sqftMatch ? parseInt(sqftMatch[1].replace(/,/g, ""), 10) : item.qty,
             });
           }
         }
@@ -264,6 +278,10 @@ export class PandaDocClient {
       extracted.totalPrice = details.grand_total.amount;
       extracted.currency = details.grand_total.currency;
       confidencePoints += 20;
+    } else if (calculatedTotal > 0) {
+      extracted.totalPrice = calculatedTotal;
+      extracted.currency = "USD";
+      confidencePoints += 15;
     }
     totalPoints += 20;
 
@@ -299,19 +317,30 @@ export class PandaDocClient {
   ): Promise<Partial<ExtractedQuoteData> | null> {
     if (!this.openai) return null;
 
-    const prompt = `Analyze this PandaDoc proposal data and extract structured quote information for a laser scanning/BIM services company.
+    const allPricingItems = details.pricing?.tables?.flatMap(t => t.items) || [];
+    
+    const prompt = `You are analyzing a Scan2Plan (S2P) laser scanning proposal. S2P proposals follow this format:
+- Document title: "S2P Proposal - [ADDRESS]" or "S2P Proposal - [ADDRESS], [details]"
+- The address after "S2P Proposal - " is the PROJECT ADDRESS (street, city, state, zip)
+- Pricing table has line items with QTY (square footage), RATE ($/sqft), AMOUNT (total)
+- Common services: "Scan2Plan Residential", "Scan2Plan Commercial", "MEPF LoD 300", "Structural Modeling", "CAD Standard Package"
 
 Document Name: ${details.name}
-Tokens/Variables: ${JSON.stringify(details.tokens || [], null, 2)}
-Pricing Items: ${JSON.stringify(details.pricing?.tables?.[0]?.items?.slice(0, 10) || [], null, 2)}
-Current Extraction: ${JSON.stringify(current, null, 2)}
+Recipients: ${JSON.stringify(details.recipients?.map(r => ({ name: `${r.first_name} ${r.last_name}`, company: r.company, email: r.email })) || [], null, 2)}
+Pricing Items: ${JSON.stringify(allPricingItems.slice(0, 15), null, 2)}
+Current Extraction: ${JSON.stringify({ projectName: current.projectName, projectAddress: current.projectAddress, totalPrice: current.totalPrice, clientName: current.clientName }, null, 2)}
 
 Extract and return JSON with:
-1. projectAddress: Full street address if found
-2. areas: Array of {name, sqft, buildingType} for each scannable area
-3. unmappedFields: Array of field names that couldn't be mapped to CPQ structure
+{
+  "projectAddress": "Full street address (parse from document name after 'S2P Proposal - ')",
+  "totalPrice": number (sum of all AMOUNT values from pricing, ignore discounts if negative),
+  "areas": [{"name": "area description", "sqft": number, "buildingType": "residential|commercial|industrial"}],
+  "unmappedFields": ["list of fields that couldn't be mapped"],
+  "sqft": number (primary square footage from QTY column),
+  "buildingType": "residential" | "commercial" | "industrial" | "mixed",
+  "lod": "200" | "300" | "350" (Level of Detail from service names)
+}
 
-Look for sqft values, building types (commercial, residential, industrial, etc.), and service scopes.
 Return ONLY valid JSON.`;
 
     try {
@@ -319,12 +348,19 @@ Return ONLY valid JSON.`;
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        max_tokens: 500,
+        max_tokens: 600,
       });
 
       const content = response.choices[0].message.content;
       if (content) {
-        return JSON.parse(content);
+        const parsed = JSON.parse(content);
+        if (parsed.projectAddress && !current.projectAddress) {
+          current.projectAddress = parsed.projectAddress;
+        }
+        if (parsed.totalPrice && !current.totalPrice) {
+          current.totalPrice = parsed.totalPrice;
+        }
+        return parsed;
       }
     } catch (error) {
       console.error("AI extraction error:", error);
@@ -441,6 +477,33 @@ Return ONLY valid JSON.`;
     return { documentsFound, documentsImported };
   }
 
+  private async fetchWithRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelayMs: number = 1000
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        const isRateLimited = error.message?.includes("429") || error.status === 429;
+        const isServerError = error.message?.includes("5") && /50[0-9]/.test(error.message);
+        
+        if (isRateLimited || isServerError) {
+          const delay = baseDelayMs * Math.pow(2, attempt);
+          console.log(`PandaDoc API retry ${attempt + 1}/${maxRetries} after ${delay}ms:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
+    throw lastError;
+  }
+
   async processDocument(documentId: number): Promise<PandaDocDocument> {
     const [doc] = await db.select()
       .from(pandaDocDocuments)
@@ -456,7 +519,11 @@ Return ONLY valid JSON.`;
       .where(eq(pandaDocDocuments.id, documentId));
 
     try {
-      const details = await this.getDocumentDetails(doc.pandaDocId);
+      const details = await this.fetchWithRetry(
+        () => this.getDocumentDetails(doc.pandaDocId),
+        3,
+        1000
+      );
       const extracted = await this.extractQuoteData(details);
 
       const pdfUrl = await this.getDocumentPdfUrl(doc.pandaDocId);
@@ -478,11 +545,20 @@ Return ONLY valid JSON.`;
 
       return updated;
 
-    } catch (error) {
+    } catch (error: any) {
+      const errorDetails = {
+        message: String(error?.message || error),
+        status: error?.status,
+        type: error?.name,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error(`PandaDoc extraction failed for doc ${documentId}:`, errorDetails);
+      
       await db.update(pandaDocDocuments)
         .set({
           importStatus: "error",
-          extractionErrors: { error: String(error) } as any,
+          extractionErrors: errorDetails as any,
           updatedAt: new Date(),
         })
         .where(eq(pandaDocDocuments.id, documentId));
