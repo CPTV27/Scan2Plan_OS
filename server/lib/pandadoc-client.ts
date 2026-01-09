@@ -332,7 +332,7 @@ Return ONLY valid JSON.`;
     try {
       while (hasMore) {
         const listResponse = await this.listDocuments({
-          status: options.status || "document.completed",
+          status: options.status || "2",
           createdFrom: options.dateFrom,
           createdTo: options.dateTo,
           page,
