@@ -48,4 +48,9 @@ integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_openai_ai_int
 AIRTABLE_BASE_ID = "appmeFSst3UUcxnB9"
 VITE_CPQ_URL = "https://cpq.scan2plan.dev"
 APP_URL = "https://scan2plan-os.replit.app"
+
+[userenv.development]
 QUICKBOOKS_REDIRECT_URI = "https://scan2plan-os.replit.app/api/quickbooks/callback"
+
+[userenv.production]
+QUICKBOOKS_REDIRECT_URI = "https://scan2planos.com/api/quickbooks/callback"
