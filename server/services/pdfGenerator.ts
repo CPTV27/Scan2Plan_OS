@@ -45,6 +45,44 @@ function deriveScope(lead: Lead): string {
   return lead.scope || "Full Building";
 }
 
+interface AreaWithBoundary {
+  name: string;
+  acres: number;
+  boundaryImageUrl?: string;
+}
+
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) return null;
+    
+    // Parse the internal API URL and construct direct Google URL
+    const urlObj = new URL(url, "http://localhost");
+    const center = urlObj.searchParams.get("center");
+    const zoom = urlObj.searchParams.get("zoom");
+    const size = urlObj.searchParams.get("size");
+    const maptype = urlObj.searchParams.get("maptype");
+    const path = urlObj.searchParams.get("path");
+    
+    if (!center || !zoom || !size) return null;
+    
+    let googleUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(center)}&zoom=${zoom}&size=${encodeURIComponent(size)}&maptype=${maptype || "satellite"}&key=${apiKey}`;
+    if (path) {
+      googleUrl += `&path=${encodeURIComponent(path)}`;
+    }
+    
+    const response = await fetch(googleUrl);
+    if (!response.ok) return null;
+    
+    const buffer = await response.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    console.error("Failed to fetch boundary image:", error);
+    return null;
+  }
+}
+
 export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   const { lead, quote, caseStudies } = data;
   const doc = new jsPDF();
@@ -147,6 +185,46 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   addSection("Scope of Work", 15);
   const scopeText = getScopeDescription(scope, lod);
   addParagraph(scopeText);
+
+  // Add Site Boundary Maps section if quote has landscape areas with boundaries
+  if (quote?.areas) {
+    const areas = quote.areas as any[];
+    const landscapeAreas: AreaWithBoundary[] = areas
+      .filter((a: any) => a.kind === "landscape" && a.boundaryImageUrl && a.boundary?.length >= 3)
+      .map((a: any) => ({
+        name: a.name || "Landscape Area",
+        acres: parseFloat(a.squareFeet) || 0,
+        boundaryImageUrl: a.boundaryImageUrl,
+      }));
+
+    if (landscapeAreas.length > 0) {
+      addSection("Site Boundary Maps", 15);
+      addParagraph("The following satellite imagery shows the defined scan boundaries for landscape areas:");
+      
+      for (const area of landscapeAreas) {
+        addNewPageIfNeeded(100);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text(`${area.name} (${area.acres.toFixed(2)} acres)`, margin, yPos);
+        yPos += 8;
+        doc.setFont("helvetica", "normal");
+        
+        if (area.boundaryImageUrl) {
+          try {
+            const imageData = await fetchImageAsBase64(area.boundaryImageUrl);
+            if (imageData) {
+              const imgWidth = 80;
+              const imgHeight = 80;
+              doc.addImage(imageData, "PNG", margin, yPos, imgWidth, imgHeight);
+              yPos += imgHeight + 10;
+            }
+          } catch (error) {
+            console.error("Failed to add boundary image:", error);
+          }
+        }
+      }
+    }
+  }
 
   if (quote) {
     addSection("Pricing", 15);
