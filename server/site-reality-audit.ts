@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { log } from "./lib/logger";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY!,
@@ -134,7 +135,7 @@ Respond in this exact JSON format:
         throw new Error("No JSON found in response");
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", text);
+      log(`ERROR: Failed to parse AI response: ${text}`);
       throw new Error("Failed to parse site audit response");
     }
 
@@ -162,7 +163,7 @@ Respond in this exact JSON format:
       rawAnalysis: parsed.analysis || text,
     };
   } catch (error) {
-    console.error("Site reality audit failed:", error);
+    log(`ERROR: Site reality audit failed - ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }

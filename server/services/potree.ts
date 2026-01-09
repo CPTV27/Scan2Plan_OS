@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { db } from '../db';
 import { projects } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { log } from "../lib/logger";
 
 const CONVERTER_BINARY = './bin/PotreeConverter';
 const SIMULATION_MODE = !fs.existsSync(CONVERTER_BINARY);
@@ -10,7 +11,7 @@ const SIMULATION_MODE = !fs.existsSync(CONVERTER_BINARY);
 export type DeliveryStatus = "pending" | "processing" | "ready" | "failed";
 
 export async function processPointCloud(projectId: number, localE57Path: string): Promise<void> {
-  console.log(`Triggering Point Cloud Processing for Project ${projectId}...`);
+  log(`Triggering Point Cloud Processing for Project ${projectId}...`);
 
   try {
     await db.update(projects)
@@ -18,13 +19,13 @@ export async function processPointCloud(projectId: number, localE57Path: string)
       .where(eq(projects.id, projectId));
 
     if (SIMULATION_MODE) {
-      console.warn("PotreeConverter binary not found. Running in SIMULATION MODE.");
+      log("WARN: PotreeConverter binary not found. Running in SIMULATION MODE.");
       simulateConversion(projectId);
     } else {
       runRealConversion(projectId, localE57Path);
     }
   } catch (error) {
-    console.error(`Failed to start point cloud processing for project ${projectId}:`, error);
+    log(`ERROR: Failed to start point cloud processing for project ${projectId} - ${error instanceof Error ? error.message : String(error)}`);
     await db.update(projects)
       .set({ deliveryStatus: "failed" })
       .where(eq(projects.id, projectId));
@@ -35,7 +36,7 @@ export async function processPointCloud(projectId: number, localE57Path: string)
 function simulateConversion(projectId: number): void {
   setTimeout(async () => {
     try {
-      console.log(`[SIMULATION] Conversion Complete for Project ${projectId}`);
+      log(`[SIMULATION] Conversion Complete for Project ${projectId}`);
 
       await db.update(projects).set({
         potreePath: `projects/${projectId}/mock_data`,
@@ -43,7 +44,7 @@ function simulateConversion(projectId: number): void {
         deliveryStatus: "ready"
       }).where(eq(projects.id, projectId));
     } catch (error) {
-      console.error(`[SIMULATION] Failed to update project ${projectId}:`, error);
+      log(`ERROR: [SIMULATION] Failed to update project ${projectId} - ${error instanceof Error ? error.message : String(error)}`);
       await db.update(projects).set({ deliveryStatus: "failed" }).where(eq(projects.id, projectId));
     }
   }, 5000);
@@ -55,12 +56,12 @@ async function runRealConversion(projectId: number, filePath: string) {
 
   exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, async (error) => {
     if (error) {
-      console.error(`Conversion Failed: ${error.message}`);
+      log(`ERROR: Conversion Failed: ${error.message}`);
       await db.update(projects).set({ deliveryStatus: "failed" }).where(eq(projects.id, projectId));
       return;
     }
 
-    console.log("Conversion & Upload Complete.");
+    log("Conversion & Upload Complete.");
 
     const publicUrl = `https://storage.googleapis.com/s2p-share/projects/${projectId}/potree/index.html`;
 

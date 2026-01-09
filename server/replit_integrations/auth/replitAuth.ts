@@ -2,6 +2,7 @@ import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
 
 import passport from "passport";
+import { log } from "../../lib/logger";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
@@ -179,17 +180,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   // Debug logging for auth issues
   if (!req.isAuthenticated()) {
-    console.log("[Auth Debug] req.isAuthenticated() returned false");
+    log("DEBUG: [Auth Debug] req.isAuthenticated() returned false");
     return res.status(401).json({ message: "Unauthorized" });
   }
   
   if (!user) {
-    console.log("[Auth Debug] No user object on request");
+    log("DEBUG: [Auth Debug] No user object on request");
     return res.status(401).json({ message: "Unauthorized" });
   }
   
   if (!user.expires_at) {
-    console.log("[Auth Debug] User exists but no expires_at. User keys:", Object.keys(user));
+    log(`DEBUG: [Auth Debug] User exists but no expires_at. User keys: ${Object.keys(user).join(", ")}`);
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -248,7 +249,7 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
       (req as any).dbUser = dbUser;
       next();
     } catch (error) {
-      console.error("Role check error:", error);
+      log(`ERROR: Role check error - ${error instanceof Error ? error.message : String(error)}`);
       return res.status(500).json({ message: "Error checking permissions" });
     }
   };

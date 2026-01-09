@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { quickbooksTokens, expenses, type Expense, type InsertExpense } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { log } from "./lib/logger";
 
 const QB_BASE_URL = process.env.QB_SANDBOX === "true" 
   ? "https://sandbox-quickbooks.api.intuit.com"
@@ -417,7 +418,7 @@ export class QuickBooksClient {
           tax_reserve = taxAccount?.balance || 0;
         }
       } catch (err) {
-        console.warn("[QBO] Failed to fetch account balances:", err);
+        log(`WARN: [QBO] Failed to fetch account balances - ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -426,7 +427,7 @@ export class QuickBooksClient {
       const pnl = await this.getProfitAndLossWithToken(tokenData.accessToken, tokenData.realmId);
       revenue_mtd = this.extractIncomeTotal(pnl);
     } catch (err) {
-      console.warn("[QBO] Failed to fetch P&L for revenue_mtd:", err);
+      log(`WARN: [QBO] Failed to fetch P&L for revenue_mtd - ${err instanceof Error ? err.message : String(err)}`);
     }
 
     return {

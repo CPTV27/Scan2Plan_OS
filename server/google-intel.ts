@@ -7,6 +7,7 @@
 
 import type { GoogleIntel, GoogleBuildingInsights, GoogleTravelInsights } from "@shared/schema";
 import { calculateTravelDistance, type DistanceResult } from "./travel-scheduling";
+import { log } from "./lib/logger";
 
 // Note: Read env vars at runtime, not module initialization, to ensure secrets are loaded
 const DEFAULT_OFFICE_ADDRESS = process.env.OFFICE_ADDRESS || "101 Merrick Road, Rockville Centre, NY 11570";
@@ -27,7 +28,7 @@ interface GeocodeResult {
 async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
   const apiKey = getGoogleMapsApiKey() || getGoogleApiKey();
   if (!apiKey) {
-    console.warn("[Google Intel] No Google API key configured for geocoding");
+    log("WARN: [Google Intel] No Google API key configured for geocoding");
     return null;
   }
 
@@ -47,7 +48,7 @@ async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
     }
     return null;
   } catch (error) {
-    console.error("Geocoding failed:", error);
+    log(`ERROR: Geocoding failed - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -55,7 +56,7 @@ async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
 async function fetchBuildingInsights(lat: number, lng: number): Promise<GoogleBuildingInsights> {
   const apiKey = getGoogleApiKey() || getGoogleMapsApiKey();
   if (!apiKey) {
-    console.warn("[Google Intel] No Google API key configured for building insights");
+    log("WARN: [Google Intel] No Google API key configured for building insights");
     return { available: false, error: "No API key configured" };
   }
 
@@ -69,7 +70,7 @@ async function fetchBuildingInsights(lat: number, lng: number): Promise<GoogleBu
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Solar API error:", response.status, errorText);
+      log(`ERROR: Solar API error: ${response.status} - ${errorText}`);
       return { available: false, error: `Solar API error: ${response.status}` };
     }
 
@@ -103,7 +104,7 @@ async function fetchBuildingInsights(lat: number, lng: number): Promise<GoogleBu
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error("Building insights fetch failed:", error);
+    log(`ERROR: Building insights fetch failed - ${error instanceof Error ? error.message : String(error)}`);
     return { available: false, error: String(error) };
   }
 }

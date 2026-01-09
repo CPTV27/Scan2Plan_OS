@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { personas, evidenceVault } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { log } from "../lib/logger";
 
 export const PERSONA_SEED = [
   {
@@ -82,7 +83,7 @@ export const EVIDENCE_SEED = [
 ];
 
 export async function seedMarketingData() {
-  console.log('Seeding Marketing Engine...');
+  log('Seeding Marketing Engine...');
 
   for (const p of PERSONA_SEED) {
     await db.insert(personas).values(p).onConflictDoNothing();
@@ -95,5 +96,5 @@ export async function seedMarketingData() {
     }
   }
   
-  console.log('Marketing Engine Seeded.');
+  log('Marketing Engine Seeded.');
 }

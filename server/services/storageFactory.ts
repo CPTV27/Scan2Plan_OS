@@ -1,5 +1,6 @@
 import { createProjectFolder, isGoogleDriveConnected } from "../googleDrive";
 import { StorageMode } from "../../shared/schema";
+import { log } from "../lib/logger";
 
 const GCS_DEFAULT_BUCKET = "s2p-active";
 const GCS_SUBFOLDER_STRUCTURE = [
@@ -39,8 +40,8 @@ export async function initializeGCSStructure(
   const gcsPath = `${universalProjectId}/`;
   
   try {
-    console.log(`[GCS] Would initialize bucket structure at gs://${bucket}/${gcsPath}`);
-    console.log(`[GCS] Subfolders to create: ${GCS_SUBFOLDER_STRUCTURE.join(", ")}`);
+    log(`[GCS] Would initialize bucket structure at gs://${bucket}/${gcsPath}`);
+    log(`[GCS] Subfolders to create: ${GCS_SUBFOLDER_STRUCTURE.join(", ")}`);
     
     return {
       bucket,
@@ -49,7 +50,7 @@ export async function initializeGCSStructure(
       initialized: true,
     };
   } catch (error) {
-    console.error(`[GCS] Failed to initialize bucket structure:`, error);
+    log(`ERROR: [GCS] Failed to initialize bucket structure - ${error instanceof Error ? error.message : String(error)}`);
     return {
       bucket,
       path: gcsPath,
@@ -75,7 +76,7 @@ export async function initializeHybridStorage(
     (async () => {
       const driveConnected = await isGoogleDriveConnected();
       if (!driveConnected) {
-        console.warn("[StorageFactory] Google Drive not connected");
+        log("WARN: [StorageFactory] Google Drive not connected");
         return null;
       }
       return createProjectFolder(universalProjectId, projectName, clientName);
@@ -88,11 +89,11 @@ export async function initializeHybridStorage(
     result.driveFolderUrl = driveResult.value.folderUrl;
     result.driveFolderStatus = "success";
     result.driveSubfolders = driveResult.value.subfolders;
-    console.log(`[StorageFactory] Google Drive folder created: ${result.driveFolderUrl}`);
+    log(`[StorageFactory] Google Drive folder created: ${result.driveFolderUrl}`);
   } else {
     result.driveFolderStatus = "failed";
     if (driveResult.status === "rejected") {
-      console.error("[StorageFactory] Drive folder creation failed:", driveResult.reason);
+      log(`ERROR: [StorageFactory] Drive folder creation failed - ${driveResult.reason instanceof Error ? driveResult.reason.message : String(driveResult.reason)}`);
     }
   }
 
@@ -100,9 +101,9 @@ export async function initializeHybridStorage(
     result.gcsBucket = gcsResult.value.bucket;
     result.gcsPath = gcsResult.value.path;
     result.gcsInitialized = gcsResult.value.initialized;
-    console.log(`[StorageFactory] GCS structure initialized: gs://${result.gcsBucket}/${result.gcsPath}`);
+    log(`[StorageFactory] GCS structure initialized: gs://${result.gcsBucket}/${result.gcsPath}`);
   } else if (gcsResult.status === "rejected") {
-    console.error("[StorageFactory] GCS initialization failed:", gcsResult.reason);
+    log(`ERROR: [StorageFactory] GCS initialization failed - ${gcsResult.reason instanceof Error ? gcsResult.reason.message : String(gcsResult.reason)}`);
   }
 
   if (!useHybridMode) {
@@ -131,7 +132,7 @@ export async function migrateProjectToHybrid(
       gcsPath: gcsResult.path,
     };
   } catch (error: any) {
-    console.error("[StorageFactory] Migration failed:", error);
+    log(`ERROR: [StorageFactory] Migration failed - ${error?.message || String(error)}`);
     return {
       success: false,
       error: error.message || "Unknown error during migration",

@@ -3,6 +3,7 @@
 // Creates project folders on "Closed Won" events with standard subfolder structure
 
 import { google } from 'googleapis';
+import { log } from "./lib/logger";
 
 let connectionSettings: any;
 
@@ -115,11 +116,11 @@ export async function createProjectFolder(universalProjectId: string): Promise<P
         sendNotificationEmail: false,
       });
     } catch (err) {
-      console.warn(`Failed to share folder with ${email}:`, err);
+      log(`WARN: Failed to share folder with ${email} - ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  console.log(`Created Google Drive folder for project ${universalProjectId}: ${folderUrl}`);
+  log(`Created Google Drive folder for project ${universalProjectId}: ${folderUrl}`);
 
   return {
     folderId,

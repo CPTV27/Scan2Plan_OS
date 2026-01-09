@@ -5,6 +5,7 @@ import { db } from "./db";
 import { desc } from "drizzle-orm";
 import { missionLogs } from "@shared/schema";
 import { setupAuth, registerAuthRoutes, isAuthenticated, requireRole } from "./replit_integrations/auth";
+import { asyncHandler } from "./middleware/errorHandler";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import OpenAI from "openai";
@@ -215,7 +216,7 @@ export async function registerRoutes(
   registerInvoiceRoutes(app);
   registerAirtableRoutes(app);
 
-  app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), async (req, res) => {
+  app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -254,26 +255,26 @@ export async function registerRoutes(
       log("ERROR: PDF import error - " + (err?.message || err));
       res.status(500).json({ message: err.message || "Failed to import PDF" });
     }
-  });
+  }));
 
-  app.get("/api/staleness/status", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/staleness/status", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const leads = await storage.getLeads();
     const status = getStalenessStatus(leads);
     res.json(status);
-  });
+  }));
 
-  app.post("/api/staleness/apply", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/staleness/apply", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     const leads = await storage.getLeads();
     const results = applyStalenessPenalties(leads);
     res.json(results);
-  });
+  }));
 
-  app.post("/api/probability/recalculate", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/probability/recalculate", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     const results = await recalculateAllProbabilities();
     res.json(results);
-  });
+  }));
 
-  app.get("/api/leads/:id/probability-factors", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/leads/:id/probability-factors", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const leadId = Number(req.params.id);
     const lead = await storage.getLead(leadId);
     if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -289,9 +290,9 @@ export async function registerRoutes(
       lastContactDate: lead.lastContactDate,
       dealStage: lead.dealStage,
     });
-  });
+  }));
 
-  app.get("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const logs = await db.select().from(missionLogs).orderBy(desc(missionLogs.missionDate)).limit(100);
       res.json(logs);
@@ -299,9 +300,9 @@ export async function registerRoutes(
       log("ERROR: Error fetching mission logs - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.post("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.post("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const { projectId, techId, notes } = req.body;
       
@@ -317,9 +318,9 @@ export async function registerRoutes(
       log("ERROR: Error creating mission log - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const projectId = Number(req.params.projectId);
       const project = await storage.getProject(projectId);
@@ -340,14 +341,14 @@ export async function registerRoutes(
       log("ERROR: Error updating completion checklist - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.get("/api/field-translation/status", isAuthenticated, async (req, res) => {
+  app.get("/api/field-translation/status", isAuthenticated, asyncHandler(async (req, res) => {
     const hasOpenAI = !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     res.json({ enabled: hasOpenAI });
-  });
+  }));
 
-  app.post("/api/field-translation/translate", isAuthenticated, async (req, res) => {
+  app.post("/api/field-translation/translate", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { rawNote, projectId } = req.body;
       
@@ -411,9 +412,9 @@ Return ONLY valid JSON:
       log("ERROR: Field translation error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Translation failed" });
     }
-  });
+  }));
 
-  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const leads = await storage.getLeads();
       const projects = await storage.getProjects();
@@ -449,7 +450,7 @@ Return ONLY valid JSON:
       log("ERROR: Daily summary error - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
   return httpServer;
 }

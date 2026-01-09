@@ -3,6 +3,7 @@ import { db } from "../db";
 import { settings, expenses } from "@shared/schema";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { quickbooksClient } from "../quickbooks-client";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -10,7 +11,7 @@ import crypto from "crypto";
 import { log } from "../lib/logger";
 
 export function registerQuickbooksRoutes(app: Express): void {
-  app.get("/api/quickbooks/status", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/quickbooks/status", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const configured = quickbooksClient.isConfigured();
       const connected = configured ? await quickbooksClient.isConnected() : false;
@@ -32,9 +33,9 @@ export function registerQuickbooksRoutes(app: Express): void {
       log("ERROR: [QuickBooks] Status error - " + error.message);
       res.json({ configured: quickbooksClient.isConfigured(), connected: false, error: error.message });
     }
-  });
+  }));
 
-  app.get("/api/quickbooks/estimate-url/:leadId", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/quickbooks/estimate-url/:leadId", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.leadId);
       const lead = await storage.getLead(leadId);
@@ -54,7 +55,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
   app.get("/api/quickbooks/auth", isAuthenticated, requireRole("ceo"), (req, res) => {
     if (!quickbooksClient.isConfigured()) {
@@ -66,7 +67,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     res.json({ authUrl });
   });
 
-  app.get("/api/quickbooks/callback", async (req, res) => {
+  app.get("/api/quickbooks/callback", asyncHandler(async (req, res) => {
     try {
       const { code, state, realmId } = req.query;
       
@@ -88,18 +89,18 @@ export function registerQuickbooksRoutes(app: Express): void {
       log("ERROR: QuickBooks callback error - " + error.message);
       res.redirect(`/settings?qb_error=${encodeURIComponent(error.message)}`);
     }
-  });
+  }));
 
-  app.post("/api/quickbooks/disconnect", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/quickbooks/disconnect", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       await quickbooksClient.disconnect();
       res.json({ message: "QuickBooks disconnected" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.post("/api/quickbooks/sync", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/quickbooks/sync", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const result = await quickbooksClient.syncExpenses();
       res.json(result);
@@ -111,9 +112,9 @@ export function registerQuickbooksRoutes(app: Express): void {
         res.status(500).json({ message: errorMessage });
       }
     }
-  });
+  }));
 
-  app.get("/api/quickbooks/accounts", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/quickbooks/accounts", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const accounts = await quickbooksClient.getAccounts();
       const bankAccounts = accounts.filter(a => a.type === "Bank");
@@ -128,9 +129,9 @@ export function registerQuickbooksRoutes(app: Express): void {
         res.status(500).json({ message: errorMessage });
       }
     }
-  });
+  }));
 
-  app.get("/api/settings/financial-mapping", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/settings/financial-mapping", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const result = await db.select().from(settings).where(eq(settings.key, "financial_mapping")).limit(1);
       if (result.length === 0) {
@@ -140,7 +141,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
   const financialMappingSchema = z.object({
     operatingAccountId: z.string().min(1, "Operating account is required").nullable(),
@@ -148,7 +149,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     expenseAccountId: z.string().nullable().optional(),
   });
 
-  app.post("/api/settings/financial-mapping", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/settings/financial-mapping", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const parsed = financialMappingSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -179,9 +180,9 @@ export function registerQuickbooksRoutes(app: Express): void {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.get("/api/quickbooks/financial-metrics", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/quickbooks/financial-metrics", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const mappingResult = await db.select().from(settings).where(eq(settings.key, "financial_mapping")).limit(1);
       const mapping = mappingResult.length > 0 
@@ -198,18 +199,18 @@ export function registerQuickbooksRoutes(app: Express): void {
         res.status(500).json({ message: errorMessage });
       }
     }
-  });
+  }));
 
-  app.get("/api/expenses", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/expenses", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const expensesList = await quickbooksClient.getExpenses();
       res.json(expensesList);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.patch("/api/expenses/:id/link", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.patch("/api/expenses/:id/link", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const expenseId = parseInt(req.params.id);
       const { leadId, projectId } = req.body;
@@ -226,7 +227,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
   const fieldExpenseSchema = z.object({
     category: z.enum(["Parking", "Tolls", "Fuel", "Meals", "Hotel", "Equipment Rental", "Supplies", "Other"]),
@@ -235,7 +236,7 @@ export function registerQuickbooksRoutes(app: Express): void {
     vendorName: z.string().optional(),
   });
 
-  app.post("/api/projects/:projectId/expenses", isAuthenticated, requireRole("production", "ceo"), async (req, res) => {
+  app.post("/api/projects/:projectId/expenses", isAuthenticated, requireRole("production", "ceo"), asyncHandler(async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const user = req.user as any;
@@ -263,9 +264,9 @@ export function registerQuickbooksRoutes(app: Express): void {
       log("ERROR: Field expense error - " + error.message);
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.get("/api/projects/:projectId/expenses", isAuthenticated, requireRole("production", "ceo"), async (req, res) => {
+  app.get("/api/projects/:projectId/expenses", isAuthenticated, requireRole("production", "ceo"), asyncHandler(async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const projectExpenses = await db.select()
@@ -275,14 +276,14 @@ export function registerQuickbooksRoutes(app: Express): void {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.get("/api/analytics/profitability", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/analytics/profitability", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const stats = await quickbooksClient.getProfitabilityStats();
       res.json(stats);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 }

@@ -3,6 +3,7 @@ import { Lead, Persona, CaseStudy } from '@shared/schema';
 import { db } from '../db';
 import { ghlSyncLogs, trackingEvents, notifications, leads, personas, caseStudies } from '@shared/schema';
 import { eq, and, gte, inArray } from 'drizzle-orm';
+import { log } from "../lib/logger";
 
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 
@@ -175,7 +176,7 @@ export async function syncLead(lead: Lead, persona: Persona): Promise<{ success:
 
       return { success: true, ghlContactId };
     } catch (error: any) {
-      console.error('GoHighLevel sync error:', error);
+      log(`ERROR: GoHighLevel sync error - ${error?.message || String(error)}`);
       
       await db.insert(ghlSyncLogs).values({
         leadId: lead.id,
@@ -237,7 +238,7 @@ export async function createOpportunity(
     const result = await ghlRequest('/opportunities/', 'POST', opportunityData);
     return { success: true, opportunityId: result.opportunity?.id };
   } catch (error: any) {
-    console.error('GHL opportunity creation error:', error);
+    log(`ERROR: GHL opportunity creation error - ${error?.message || String(error)}`);
     return { success: false, error: error.message };
   }
 }
@@ -252,7 +253,7 @@ export async function updateOpportunityStage(
     });
     return true;
   } catch (error) {
-    console.error('GHL opportunity update error:', error);
+    log(`ERROR: GHL opportunity update error - ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

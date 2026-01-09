@@ -3,6 +3,8 @@
  * Sends formatted Cards to Google Chat Spaces via Webhooks
  */
 
+import { log } from "../lib/logger";
+
 interface ChatCardProps {
   title: string;
   subtitle?: string;
@@ -25,7 +27,7 @@ export async function sendToGoogleChat(space: 'sales' | 'ops', data: ChatCardPro
     : process.env.GOOGLE_CHAT_WEBHOOK_OPS;
 
   if (!webhookUrl) {
-    console.warn(`[GoogleChat] No webhook configured for ${space} space`);
+    log(`WARN: [GoogleChat] No webhook configured for ${space} space`);
     return false;
   }
 
@@ -71,14 +73,15 @@ export async function sendToGoogleChat(space: 'sales' | 'ops', data: ChatCardPro
     });
 
     if (!response.ok) {
-      console.error(`[GoogleChat] Failed to send to ${space}:`, response.status, await response.text());
+      const errorText = await response.text();
+      log(`ERROR: [GoogleChat] Failed to send to ${space}: ${response.status} - ${errorText}`);
       return false;
     }
 
-    console.log(`[GoogleChat] Notification sent to ${space} space`);
+    log(`[GoogleChat] Notification sent to ${space} space`);
     return true;
   } catch (error) {
-    console.error(`[GoogleChat] Error sending to ${space}:`, error);
+    log(`ERROR: [GoogleChat] Error sending to ${space} - ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

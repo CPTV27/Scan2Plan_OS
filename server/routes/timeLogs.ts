@@ -2,11 +2,12 @@ import type { Express } from "express";
 import { db } from "../db";
 import { timeLogs } from "@shared/schema";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { eq, and, gte, lt, desc } from "drizzle-orm";
 import { log } from "../lib/logger";
 
 export function registerTimeLogRoutes(app: Express): void {
-  app.get("/api/time-logs", isAuthenticated, async (req, res) => {
+  app.get("/api/time-logs", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const techId = (req.user as any)?.id?.toString() || "";
       const { projectId, date } = req.query;
@@ -39,9 +40,9 @@ export function registerTimeLogRoutes(app: Express): void {
       log("ERROR: Error fetching time logs - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.post("/api/time-logs", isAuthenticated, async (req, res) => {
+  app.post("/api/time-logs", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const techId = (req.user as any)?.id?.toString() || "";
       const { projectId, role, hours, notes } = req.body;
@@ -64,9 +65,9 @@ export function registerTimeLogRoutes(app: Express): void {
       log("ERROR: Error creating time log - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.patch("/api/time-logs/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/time-logs/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const logId = Number(req.params.id);
       const { hours, notes, role } = req.body;
@@ -90,9 +91,9 @@ export function registerTimeLogRoutes(app: Express): void {
       log("ERROR: Error updating time log - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.delete("/api/time-logs/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/time-logs/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const logId = Number(req.params.id);
       
@@ -109,5 +110,5 @@ export function registerTimeLogRoutes(app: Express): void {
       log("ERROR: Error deleting time log - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 }

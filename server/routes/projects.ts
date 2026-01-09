@@ -1,31 +1,32 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { calculateTravelDistance, validateShiftGate, createScanCalendarEvent, getTechnicianAvailability } from "../travel-scheduling";
 import { log } from "../lib/logger";
 
 export function registerProjectRoutes(app: Express): void {
-  app.get("/api/projects", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/projects", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const projects = await storage.getProjects();
     res.json(projects);
-  });
+  }));
 
-  app.get("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.json(project);
-  });
+  }));
 
-  app.post("/api/projects", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/projects", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const project = await storage.createProject(req.body);
       res.status(201).json(project);
     } catch (err) {
       return res.status(400).json({ message: "Failed to create project" });
     }
-  });
+  }));
 
-  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const projectId = Number(req.params.id);
     const input = req.body;
     
@@ -70,9 +71,9 @@ export function registerProjectRoutes(app: Express): void {
     }
     
     res.json(responseProject);
-  });
+  }));
 
-  app.post("/api/projects/:id/recalculate-margin", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.post("/api/projects/:id/recalculate-margin", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const { updateProjectMargin } = await import("../services/marginCalculator");
@@ -85,9 +86,9 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Margin calculation error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to calculate margin" });
     }
-  });
+  }));
 
-  app.post("/api/projects/recalculate-all-margins", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/projects/recalculate-all-margins", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const { recalculateAllProjectMargins } = await import("../services/marginCalculator");
       const count = await recalculateAllProjectMargins();
@@ -96,38 +97,38 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Batch margin calculation error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to recalculate margins" });
     }
-  });
+  }));
 
-  app.get("/api/scantechs", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/scantechs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const scantechs = await storage.getScantechs();
     res.json(scantechs);
-  });
+  }));
 
-  app.get("/api/scantechs/:id", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/scantechs/:id", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const scantech = await storage.getScantech(Number(req.params.id));
     if (!scantech) return res.status(404).json({ message: "ScanTech not found" });
     res.json(scantech);
-  });
+  }));
 
-  app.post("/api/scantechs", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.post("/api/scantechs", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const scantech = await storage.createScantech(req.body);
       res.status(201).json(scantech);
     } catch (err) {
       return res.status(400).json({ message: "Failed to create ScanTech" });
     }
-  });
+  }));
 
-  app.patch("/api/scantechs/:id", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.patch("/api/scantechs/:id", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const scantech = await storage.updateScantech(Number(req.params.id), req.body);
       res.json(scantech);
     } catch (err) {
       return res.status(400).json({ message: "Failed to update ScanTech" });
     }
-  });
+  }));
 
-  app.post("/api/travel/calculate", isAuthenticated, requireRole("ceo", "production", "sales"), async (req, res) => {
+  app.post("/api/travel/calculate", isAuthenticated, requireRole("ceo", "production", "sales"), asyncHandler(async (req, res) => {
     try {
       const { destination, origin } = req.body;
       
@@ -155,9 +156,9 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Travel calculation error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to calculate travel" });
     }
-  });
+  }));
 
-  app.post("/api/travel/validate-shift", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.post("/api/travel/validate-shift", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const { travelTimeMinutes, scanDurationHours } = req.body;
       
@@ -170,9 +171,9 @@ export function registerProjectRoutes(app: Express): void {
     } catch (error) {
       res.status(500).json({ message: "Failed to validate shift" });
     }
-  });
+  }));
 
-  app.get("/api/calendar/availability/:date", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.get("/api/calendar/availability/:date", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const date = new Date(req.params.date);
       const technicianEmail = req.query.technicianEmail as string | undefined;
@@ -183,9 +184,9 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Calendar availability error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch calendar availability" });
     }
-  });
+  }));
 
-  app.post("/api/scheduling/create-scan-event", isAuthenticated, requireRole("ceo", "production"), async (req, res) => {
+  app.post("/api/scheduling/create-scan-event", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const { projectId, scanDate, startTime, endTime, technicianEmail, notes } = req.body;
       
@@ -258,9 +259,9 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Create scan event error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to schedule scan" });
     }
-  });
+  }));
 
-  app.post("/api/site-audit/:projectId", isAuthenticated, requireRole(["ceo", "production", "sales"]), async (req, res) => {
+  app.post("/api/site-audit/:projectId", isAuthenticated, requireRole(["ceo", "production", "sales"]), asyncHandler(async (req, res) => {
     try {
       const projectId = Number(req.params.projectId);
       const project = await storage.getProject(projectId);
@@ -293,9 +294,9 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Site reality audit error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to perform site audit" });
     }
-  });
+  }));
 
-  app.post("/api/site-audit/lead/:leadId", isAuthenticated, requireRole(["ceo", "production", "sales"]), async (req, res) => {
+  app.post("/api/site-audit/lead/:leadId", isAuthenticated, requireRole(["ceo", "production", "sales"]), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.leadId);
       const lead = await storage.getLead(leadId);
@@ -325,12 +326,12 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Site reality audit error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to perform site audit" });
     }
-  });
+  }));
 
   let cashflowCache: { data: any; timestamp: number } | null = null;
   const CASHFLOW_CACHE_TTL = 5 * 60 * 1000;
   
-  app.get("/api/predictive-cashflow", isAuthenticated, requireRole(["ceo"]), async (req, res) => {
+  app.get("/api/predictive-cashflow", isAuthenticated, requireRole(["ceo"]), asyncHandler(async (req, res) => {
     try {
       if (cashflowCache && Date.now() - cashflowCache.timestamp < CASHFLOW_CACHE_TTL) {
         return res.json(cashflowCache.data);
@@ -346,5 +347,5 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Predictive cashflow error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to generate cashflow forecast" });
     }
-  });
+  }));
 }

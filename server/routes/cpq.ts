@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { z } from "zod";
 import { generateUPID } from "@shared/utils/projectId";
 import { nanoid } from "nanoid";
@@ -40,7 +41,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     quoteVersion: z.number().int().positive().optional(),
   });
 
-  app.post("/api/cpq/sync/:leadId", verifyCpqAuth, async (req, res) => {
+  app.post("/api/cpq/sync/:leadId", verifyCpqAuth, asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.leadId);
       const lead = await storage.getLead(leadId);
@@ -106,9 +107,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: CPQ sync error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to sync with CPQ" });
     }
-  });
+  }));
 
-  app.get("/api/cpq/lead/:leadId", verifyCpqAuth, async (req, res) => {
+  app.get("/api/cpq/lead/:leadId", verifyCpqAuth, asyncHandler(async (req, res) => {
     const leadId = Number(req.params.leadId);
     const lead = await storage.getLead(leadId);
     if (!lead) {
@@ -132,7 +133,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       contactName: lead.contactName,
       contactEmail: lead.contactEmail,
     });
-  });
+  }));
 
   const integrityAuditSchema = z.object({
     status: z.enum(["pass", "warning", "blocked"]),
@@ -148,7 +149,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     overrideApprovedAt: z.string().optional(),
   });
 
-  app.post("/api/cpq/integrity/:leadId", verifyCpqAuth, async (req, res) => {
+  app.post("/api/cpq/integrity/:leadId", verifyCpqAuth, asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.leadId);
       const lead = await storage.getLead(leadId);
@@ -180,9 +181,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: CPQ integrity sync error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to sync integrity audit" });
     }
-  });
+  }));
 
-  app.post("/api/leads/:id/request-override", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/leads/:id/request-override", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const lead = await storage.getLead(leadId);
@@ -207,9 +208,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Override request error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to submit override request" });
     }
-  });
+  }));
 
-  app.get("/api/cpq/pricing-matrix", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/cpq/pricing-matrix", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     log("WARN: [DEPRECATED] /api/cpq/pricing-matrix - use client-side pricing instead");
     try {
       const rates = await storage.getCpqPricingMatrix();
@@ -218,9 +219,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error fetching CPQ pricing matrix - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch pricing matrix" });
     }
-  });
+  }));
 
-  app.post("/api/cpq/quotes", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/cpq/quotes", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const user = req.user as any;
       const quote = await storage.createCpqQuote({
@@ -232,9 +233,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error creating CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to create quote" });
     }
-  });
+  }));
 
-  app.get("/api/cpq/quotes/:id", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/cpq/quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
       const quote = await storage.getCpqQuote(quoteId);
@@ -244,9 +245,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error fetching CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch quote" });
     }
-  });
+  }));
 
-  app.patch("/api/cpq/quotes/:id", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.patch("/api/cpq/quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
       const quote = await storage.updateCpqQuote(quoteId, req.body);
@@ -256,9 +257,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error updating CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to update quote" });
     }
-  });
+  }));
 
-  app.post("/api/leads/:id/cpq-quotes", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/leads/:id/cpq-quotes", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       log(`[CPQ Quote Create] LeadId: ${leadId}, Body keys: ${Object.keys(req.body)}`);
@@ -291,9 +292,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: [CPQ Quote Create] - " + (error?.message || error));
       res.status(500).json({ message: error?.message || "Failed to create quote" });
     }
-  });
+  }));
 
-  app.get("/api/leads/:id/cpq-quotes", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/leads/:id/cpq-quotes", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const quotes = await storage.getCpqQuotesByLead(leadId);
@@ -302,9 +303,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error fetching CPQ quotes - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch quotes" });
     }
-  });
+  }));
 
-  app.get("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
       const quote = await storage.getCpqQuote(quoteId);
@@ -314,9 +315,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error fetching CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch quote" });
     }
-  });
+  }));
 
-  app.patch("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.patch("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
       const quote = await storage.updateCpqQuote(quoteId, req.body);
@@ -326,9 +327,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error updating CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to update quote" });
     }
-  });
+  }));
 
-  app.post("/api/cpq-quotes/:id/versions", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/cpq-quotes/:id/versions", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const sourceQuoteId = Number(req.params.id);
       const { versionName } = req.body;
@@ -344,9 +345,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error creating CPQ quote version - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to create quote version" });
     }
-  });
+  }));
 
-  app.post("/api/cpq/calculate-distance", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/cpq/calculate-distance", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const { origin, destination } = req.body;
       
@@ -396,9 +397,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error calculating distance - " + (error as any)?.message);
       res.status(500).json({ error: "Failed to calculate distance" });
     }
-  });
+  }));
 
-  app.post("/api/cpq-quotes/:id/generate-link", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/cpq-quotes/:id/generate-link", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
       const token = nanoid(12);
@@ -423,9 +424,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error generating client link - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to generate link" });
     }
-  });
+  }));
 
-  app.get("/api/public/quote/:token", async (req, res) => {
+  app.get("/api/public/quote/:token", asyncHandler(async (req, res) => {
     try {
       const { token } = req.params;
       const quote = await storage.getCpqQuoteByToken(token);
@@ -457,9 +458,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error fetching public quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to load project details" });
     }
-  });
+  }));
 
-  app.post("/api/public/quote/:token", async (req, res) => {
+  app.post("/api/public/quote/:token", asyncHandler(async (req, res) => {
     try {
       const { token } = req.params;
       const { answers } = req.body;
@@ -526,5 +527,5 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error submitting client answers - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to submit answers" });
     }
-  });
+  }));
 }

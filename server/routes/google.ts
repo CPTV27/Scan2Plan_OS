@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { getGmailClient, getCalendarClient, getDriveClient } from "../google-clients";
 import { log } from "../lib/logger";
 import multer from "multer";
@@ -8,7 +9,7 @@ import fs from "fs";
 const upload = multer({ dest: "/tmp/uploads/" });
 
 export async function registerGoogleRoutes(app: Express): Promise<void> {
-  app.get("/api/google/gmail/messages", isAuthenticated, async (req, res) => {
+  app.get("/api/google/gmail/messages", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const gmail = await getGmailClient();
       const maxResults = Number(req.query.maxResults) || 10;
@@ -46,9 +47,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Gmail list error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to fetch emails" });
     }
-  });
+  }));
 
-  app.post("/api/google/gmail/send", isAuthenticated, async (req, res) => {
+  app.post("/api/google/gmail/send", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const gmail = await getGmailClient();
       const { to, subject, body } = req.body;
@@ -77,9 +78,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Gmail send error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to send email" });
     }
-  });
+  }));
 
-  app.get("/api/google/calendar/events", isAuthenticated, async (req, res) => {
+  app.get("/api/google/calendar/events", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const calendar = await getCalendarClient();
       const maxResults = Number(req.query.maxResults) || 10;
@@ -108,9 +109,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Calendar list error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to fetch calendar events" });
     }
-  });
+  }));
 
-  app.post("/api/google/calendar/events", isAuthenticated, async (req, res) => {
+  app.post("/api/google/calendar/events", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const calendar = await getCalendarClient();
       const { summary, description, location, start, end } = req.body;
@@ -139,9 +140,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Calendar create error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to create event" });
     }
-  });
+  }));
 
-  app.get("/api/google/drive/files", isAuthenticated, async (req, res) => {
+  app.get("/api/google/drive/files", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const drive = await getDriveClient();
       const pageSize = Number(req.query.pageSize) || 10;
@@ -158,9 +159,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Drive list error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to list files" });
     }
-  });
+  }));
 
-  app.post("/api/google/drive/upload", isAuthenticated, upload.single("file"), async (req, res) => {
+  app.post("/api/google/drive/upload", isAuthenticated, upload.single("file"), asyncHandler(async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file provided" });
@@ -193,7 +194,7 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       if (req.file?.path) fs.unlinkSync(req.file.path);
       res.status(500).json({ message: error.message || "Failed to upload file" });
     }
-  });
+  }));
 
   app.get("/api/maps/script", (req, res) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -208,7 +209,7 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
     res.redirect(scriptUrl);
   });
 
-  app.get("/api/maps/static", async (req, res) => {
+  app.get("/api/maps/static", asyncHandler(async (req, res) => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       return res.status(503).json({ error: "Google Maps API key not configured" });
@@ -266,9 +267,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Static map error - " + (error as any)?.message);
       res.status(500).json({ error: "Failed to generate static map" });
     }
-  });
+  }));
 
-  app.get("/api/location/preview", async (req, res) => {
+  app.get("/api/location/preview", asyncHandler(async (req, res) => {
     try {
       const address = req.query.address as string;
       if (!address || address.trim().length < 5) {
@@ -325,9 +326,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Location preview error - " + (error as any)?.message);
       res.status(500).json({ error: "Failed to generate location preview" });
     }
-  });
+  }));
 
-  app.get("/api/location/aerial-view", isAuthenticated, async (req, res) => {
+  app.get("/api/location/aerial-view", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const lat = parseFloat(req.query.lat as string);
       const lng = parseFloat(req.query.lng as string);
@@ -384,9 +385,9 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Aerial view error - " + (error as any)?.message);
       res.status(500).json({ error: "Failed to fetch aerial view data" });
     }
-  });
+  }));
 
-  app.post("/api/location/aerial-view/request", isAuthenticated, async (req, res) => {
+  app.post("/api/location/aerial-view/request", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { lat, lng, address } = req.body;
       
@@ -431,5 +432,5 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
       log("ERROR: Aerial view render request error - " + (error as any)?.message);
       res.status(500).json({ error: "Failed to request video rendering" });
     }
-  });
+  }));
 }

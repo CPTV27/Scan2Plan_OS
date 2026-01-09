@@ -2,11 +2,12 @@ import type { Express } from "express";
 import { db } from "../db";
 import { marketingPosts, evidenceVault, insertEvidenceVaultSchema } from "@shared/schema";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { eq } from "drizzle-orm";
 import { log } from "../lib/logger";
 
 export function registerMarketingRoutes(app: Express): void {
-  app.get("/api/marketing-posts", isAuthenticated, async (req, res) => {
+  app.get("/api/marketing-posts", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { status } = req.query;
       let query = db.select().from(marketingPosts);
@@ -21,9 +22,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error fetching marketing posts - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch marketing posts" });
     }
-  });
+  }));
   
-  app.get("/api/marketing-posts/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/marketing-posts/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const [post] = await db.select()
         .from(marketingPosts)
@@ -38,9 +39,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error fetching marketing post - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch marketing post" });
     }
-  });
+  }));
   
-  app.patch("/api/marketing-posts/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/marketing-posts/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { status, content, platform } = req.body;
       const updateData: any = {};
@@ -67,9 +68,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error updating marketing post - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to update marketing post" });
     }
-  });
+  }));
   
-  app.post("/api/marketing-posts/trigger/:projectId", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/marketing-posts/trigger/:projectId", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const projectId = Number(req.params.projectId);
       const { variancePercent, actualSqft, costPerSqft, varianceThreshold } = req.body;
@@ -93,9 +94,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error triggering Truth Loop - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to trigger Truth Loop" });
     }
-  });
+  }));
   
-  app.delete("/api/marketing-posts/:id", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.delete("/api/marketing-posts/:id", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const [deleted] = await db.delete(marketingPosts)
         .where(eq(marketingPosts.id, Number(req.params.id)))
@@ -110,9 +111,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error deleting marketing post - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to delete marketing post" });
     }
-  });
+  }));
 
-  app.get("/api/evidence-vault", isAuthenticated, async (req, res) => {
+  app.get("/api/evidence-vault", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { personaCode, minEws } = req.query;
       
@@ -133,9 +134,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error fetching evidence vault - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch evidence vault entries" });
     }
-  });
+  }));
   
-  app.get("/api/evidence-vault/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/evidence-vault/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const [entry] = await db.select()
         .from(evidenceVault)
@@ -150,9 +151,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error fetching evidence vault entry - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to fetch evidence vault entry" });
     }
-  });
+  }));
   
-  app.post("/api/evidence-vault", isAuthenticated, async (req, res) => {
+  app.post("/api/evidence-vault", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const parsed = insertEvidenceVaultSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -168,9 +169,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error creating evidence vault entry - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to create evidence vault entry" });
     }
-  });
+  }));
   
-  app.patch("/api/evidence-vault/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/evidence-vault/:id", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const { hookContent, ewsScore, sourceUrl, personaCode } = req.body;
       
@@ -193,9 +194,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error updating evidence vault entry - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to update evidence vault entry" });
     }
-  });
+  }));
   
-  app.post("/api/evidence-vault/:id/use", isAuthenticated, async (req, res) => {
+  app.post("/api/evidence-vault/:id/use", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const [entry] = await db.select()
         .from(evidenceVault)
@@ -215,9 +216,9 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error incrementing usage count - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to increment usage count" });
     }
-  });
+  }));
   
-  app.delete("/api/evidence-vault/:id", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.delete("/api/evidence-vault/:id", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const [deleted] = await db.delete(evidenceVault)
         .where(eq(evidenceVault.id, Number(req.params.id)))
@@ -232,5 +233,5 @@ export function registerMarketingRoutes(app: Express): void {
       log("ERROR: Error deleting evidence vault entry - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to delete evidence vault entry" });
     }
-  });
+  }));
 }

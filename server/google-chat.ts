@@ -2,6 +2,7 @@
 // Creates dedicated project spaces when Retainer Gate is cleared
 
 import { google, chat_v1 } from 'googleapis';
+import { log } from "./lib/logger";
 
 const GOOGLE_CHAT_SERVICE_ACCOUNT = process.env.GOOGLE_CHAT_SERVICE_ACCOUNT_JSON;
 // The user email to impersonate for domain-wide delegation
@@ -24,7 +25,7 @@ interface CreateSpaceResult {
 
 async function getChatClient(): Promise<chat_v1.Chat | null> {
   if (!GOOGLE_CHAT_SERVICE_ACCOUNT) {
-    console.warn("Google Chat service account not configured");
+    log("WARN: Google Chat service account not configured");
     return null;
   }
 
@@ -47,7 +48,7 @@ async function getChatClient(): Promise<chat_v1.Chat | null> {
     await auth.authorize();
     return google.chat({ version: 'v1', auth });
   } catch (error) {
-    console.error("Failed to initialize Google Chat client:", error);
+    log(`ERROR: Failed to initialize Google Chat client - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -106,7 +107,7 @@ export async function createProjectSpace(config: ChatSpaceConfig): Promise<Creat
         },
       });
     } catch (msgError) {
-      console.warn("Failed to send welcome message:", msgError);
+      log(`WARN: Failed to send welcome message - ${msgError instanceof Error ? msgError.message : String(msgError)}`);
     }
 
     const spaceUrl = `https://chat.google.com/room/${space.name?.replace('spaces/', '')}`;
@@ -117,7 +118,7 @@ export async function createProjectSpace(config: ChatSpaceConfig): Promise<Creat
       spaceUrl,
     };
   } catch (error) {
-    console.error("Failed to create project space:", error);
+    log(`ERROR: Failed to create project space - ${error instanceof Error ? error.message : String(error)}`);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : "Unknown error" 
@@ -159,7 +160,7 @@ export async function sendProjectUpdate(
   const chat = await getChatClient();
   
   if (!chat) {
-    console.warn("Google Chat not configured");
+    log("WARN: Google Chat not configured");
     return false;
   }
 
@@ -172,7 +173,7 @@ export async function sendProjectUpdate(
     });
     return true;
   } catch (error) {
-    console.error("Failed to send project update:", error);
+    log(`ERROR: Failed to send project update - ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

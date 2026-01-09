@@ -4,6 +4,7 @@ import { Lead, Persona, CaseStudy } from '@shared/schema';
 import { db } from '../db';
 import { hubspotSyncLogs, trackingEvents, notifications, leads, personas, caseStudies } from '@shared/schema';
 import { eq, and, gte, inArray } from 'drizzle-orm';
+import { log } from "../lib/logger";
 
 let connectionSettings: any;
 
@@ -175,7 +176,7 @@ export async function syncLead(lead: Lead, persona: Persona): Promise<{ success:
 
       return { success: true, hubspotId: hubspotContactId };
     } catch (error: any) {
-      console.error('HubSpot sync error:', error);
+      log(`ERROR: HubSpot sync error - ${error?.message || String(error)}`);
       
       await db.insert(hubspotSyncLogs).values({
         leadId: lead.id,

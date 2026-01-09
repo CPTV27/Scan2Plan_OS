@@ -3,6 +3,7 @@ import { marketingPosts, notifications, projects, leads, caseStudies } from "@sh
 import { eq } from "drizzle-orm";
 import { generateSocialContent } from "../lib/contentGenerator";
 import { notifyTruthLoopVariance } from "./googleChat";
+import { log } from "../lib/logger";
 
 interface TruthLoopResult {
   success: boolean;
@@ -175,7 +176,7 @@ export async function triggerTruthLoop(
           baseUrl
         );
       } catch (err) {
-        console.warn("[GoogleChat] Truth Loop notification failed (non-blocking):", err);
+        log(`WARN: [GoogleChat] Truth Loop notification failed (non-blocking) - ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -188,7 +189,7 @@ export async function triggerTruthLoop(
     };
 
   } catch (error) {
-    console.error("Truth Loop error:", error);
+    log(`ERROR: Truth Loop error - ${error instanceof Error ? error.message : String(error)}`);
     return {
       success: false,
       postsCreated: 0,

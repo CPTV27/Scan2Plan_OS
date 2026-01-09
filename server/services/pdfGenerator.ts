@@ -4,6 +4,7 @@
  */
 
 import { jsPDF } from "jspdf";
+import { log } from "../lib/logger";
 import type { Lead, CpqQuote, CaseStudy } from "@shared/schema";
 import { MARKETING_COPY, PAYMENT_TERMS, getScopeDescription } from "@shared/proposalContent";
 
@@ -78,7 +79,7 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
     const base64 = Buffer.from(buffer).toString("base64");
     return `data:image/png;base64,${base64}`;
   } catch (error) {
-    console.error("Failed to fetch boundary image:", error);
+    log(`ERROR: Failed to fetch boundary image - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -219,7 +220,7 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
               yPos += imgHeight + 10;
             }
           } catch (error) {
-            console.error("Failed to add boundary image:", error);
+            log(`ERROR: Failed to add boundary image - ${error instanceof Error ? error.message : String(error)}`);
           }
         }
       }

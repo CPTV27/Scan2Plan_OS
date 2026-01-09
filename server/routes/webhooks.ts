@@ -2,13 +2,14 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { trackingEvents } from "@shared/schema";
+import { asyncHandler } from "../middleware/errorHandler";
 import { and, eq, gte } from "drizzle-orm";
 import { log } from "../lib/logger";
 
 export async function registerWebhookRoutes(app: Express): Promise<void> {
   const hubspotService = await import('../services/hubspot');
 
-  app.post("/api/webhooks/hubspot/deal", async (req, res) => {
+  app.post("/api/webhooks/hubspot/deal", asyncHandler(async (req, res) => {
     try {
       const events = Array.isArray(req.body) ? req.body : [req.body];
       
@@ -23,9 +24,9 @@ export async function registerWebhookRoutes(app: Express): Promise<void> {
       log("ERROR: HubSpot webhook error - " + (error as Error)?.message);
       res.status(500).send('Error');
     }
-  });
+  }));
 
-  app.post("/api/webhooks/hubspot/engagement", async (req, res) => {
+  app.post("/api/webhooks/hubspot/engagement", asyncHandler(async (req, res) => {
     try {
       const events = Array.isArray(req.body) ? req.body : [req.body];
       log("[HubSpot Engagement] Webhook received: " + JSON.stringify(events).slice(0, 500));
@@ -75,9 +76,9 @@ export async function registerWebhookRoutes(app: Express): Promise<void> {
       log("ERROR: [HubSpot Engagement] Webhook error - " + (error as Error)?.message);
       res.status(500).send('Error');
     }
-  });
+  }));
 
-  app.post("/api/google-chat/webhook", async (req, res) => {
+  app.post("/api/google-chat/webhook", asyncHandler(async (req, res) => {
     const event = req.body;
     log("Google Chat webhook received: " + (event.type || "unknown event"));
     
@@ -97,5 +98,5 @@ export async function registerWebhookRoutes(app: Express): Promise<void> {
       default:
         res.json({ text: "Event received" });
     }
-  });
+  }));
 }

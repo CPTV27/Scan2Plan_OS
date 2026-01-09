@@ -3,6 +3,8 @@
  * Handles document creation, sending, and status tracking
  */
 
+import { log } from "../lib/logger";
+
 const PANDADOC_API_BASE = 'https://api.pandadoc.com/public/v1';
 
 interface PandaDocDocument {
@@ -250,7 +252,7 @@ export async function uploadPdfDocument(
     const data = await response.json();
     return { success: true, documentId: data.id };
   } catch (error: any) {
-    console.error('[PandaDoc] Upload error:', error);
+    log(`ERROR: [PandaDoc] Upload error - ${error?.message || String(error)}`);
     return { success: false, error: error.message };
   }
 }

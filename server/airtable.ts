@@ -1,4 +1,5 @@
 import pLimit from 'p-limit';
+import { log } from "./lib/logger";
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -68,7 +69,7 @@ async function airtableRequestRaw(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error(`Airtable API error: ${response.status} - ${error}`);
+    log(`ERROR: Airtable API error: ${response.status} - ${error}`);
     
     // Handle rate limiting with retry hint
     if (response.status === 429) {
@@ -167,7 +168,7 @@ export async function getAirtableOverview(): Promise<AirtableOverview> {
         sampleRecords: sampleRecords.slice(0, 5),
       });
     } catch (error) {
-      console.error(`Failed to fetch table ${name}:`, error);
+      log(`ERROR: Failed to fetch table ${name} - ${error instanceof Error ? error.message : String(error)}`);
       tables.push({
         name,
         tableId: TABLES[name],
@@ -249,7 +250,7 @@ export async function syncProjectToAirtable(project: {
       return { success: true, recordId: created.id };
     }
   } catch (error) {
-    console.error('Failed to sync project to Airtable:', error);
+    log(`ERROR: Failed to sync project to Airtable - ${error instanceof Error ? error.message : String(error)}`);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

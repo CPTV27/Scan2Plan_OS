@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { asyncHandler } from "../middleware/errorHandler";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { generateUniversalProjectId, generateClientCode, generateUPID } from "@shared/utils/projectId";
@@ -35,12 +36,12 @@ function parseCSVLine(line: string): string[] {
 export async function registerLeadRoutes(app: Express): Promise<void> {
   const hubspotService = await import('../services/hubspot');
 
-  app.get(api.leads.list.path, isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get(api.leads.list.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const leads = await storage.getLeads();
     res.json(leads);
-  });
+  }));
 
-  app.get(api.leads.get.path, isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get(api.leads.get.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const lead = await storage.getLead(Number(req.params.id));
     if (!lead) return res.status(404).json({ message: "Lead not found" });
     
@@ -58,9 +59,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     }
     
     res.json(lead);
-  });
+  }));
 
-  app.post(api.leads.create.path, isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post(api.leads.create.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       log("[Lead Create] Request body: " + JSON.stringify(req.body, null, 2).slice(0, 1000));
       const input = api.leads.create.input.parse(req.body);
@@ -115,9 +116,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       }
       res.status(500).json({ message: err.message || "Failed to create lead" });
     }
-  });
+  }));
 
-  app.put(api.leads.update.path, isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.put(api.leads.update.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const input = api.leads.update.input.parse(req.body);
@@ -216,14 +217,14 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     } catch (err) {
       return res.status(400).json({ message: "Invalid update data" });
     }
-  });
+  }));
 
-  app.delete(api.leads.delete.path, isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.delete(api.leads.delete.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     await storage.deleteLead(Number(req.params.id));
     res.status(204).send();
-  });
+  }));
 
-  app.patch("/api/leads/:id/stage", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.patch("/api/leads/:id/stage", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const { dealStage } = req.body;
@@ -318,9 +319,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       log("ERROR: Stage update error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to update stage" });
     }
-  });
+  }));
 
-  app.post("/api/leads/import", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), async (req, res) => {
+  app.post("/api/leads/import", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -457,9 +458,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       log("ERROR: CSV Import error - " + (err?.message || err));
       res.status(500).json({ message: err.message || "Failed to import CSV" });
     }
-  });
+  }));
 
-  app.post("/api/leads/:id/generate-upid", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/leads/:id/generate-upid", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const lead = await storage.getLead(leadId);
@@ -522,9 +523,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       log("ERROR: Generate UPID error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to generate UPID" });
     }
-  });
+  }));
 
-  app.get("/api/leads/:id/estimate-pdf", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.get("/api/leads/:id/estimate-pdf", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const lead = await storage.getLead(leadId);
@@ -547,9 +548,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       log("ERROR: PDF generation error - " + (err as any)?.message);
       return res.status(500).json({ message: "Failed to generate PDF estimate" });
     }
-  });
+  }));
 
-  app.post("/api/leads/:id/hubspot-sync", isAuthenticated, requireRole("ceo", "sales"), async (req, res) => {
+  app.post("/api/leads/:id/hubspot-sync", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const leadId = Number(req.params.id);
     const { personaCode } = req.body;
     
@@ -562,9 +563,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
 
     const result = await hubspotService.syncLead(lead, persona);
     res.json(result);
-  });
+  }));
 
-  app.get("/api/leads/:id/expenses", isAuthenticated, requireRole("ceo"), async (req, res) => {
+  app.get("/api/leads/:id/expenses", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const { quickbooksClient } = await import("../quickbooks-client");
       const leadId = parseInt(req.params.id);
@@ -574,49 +575,28 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
-  });
+  }));
 
-  app.get("/api/leads/:id/outstanding-balance", isAuthenticated, async (req, res) => {
+  app.get("/api/leads/:id/outstanding-balance", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const leadInvoices = await storage.getInvoicesByLead(leadId);
       
       const outstandingBalance = leadInvoices.reduce((sum, inv) => {
         if (inv.status !== "Paid" && inv.status !== "Written Off") {
-          return sum + (Number(inv.totalAmount) - Number(inv.amountPaid));
+          return sum + Number(inv.amount || 0);
         }
         return sum;
       }, 0);
 
-      res.json({ 
+      res.json({
         leadId,
         outstandingBalance,
-        hasOutstandingBalance: outstandingBalance > 0,
         invoiceCount: leadInvoices.filter(i => i.status !== "Paid").length
       });
     } catch (error) {
       log("ERROR: Outstanding balance check error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to check outstanding balance" });
     }
-  });
-
-  app.get("/api/leads/:id/retainer-status", isAuthenticated, async (req, res) => {
-    try {
-      const leadId = Number(req.params.id);
-      const lead = await storage.getLead(leadId);
-      
-      if (!lead) {
-        return res.status(404).json({ message: "Lead not found" });
-      }
-
-      res.json({ 
-        retainerPaid: lead.retainerPaid || false,
-        retainerAmount: lead.retainerAmount,
-        retainerPaidDate: lead.retainerPaidDate
-      });
-    } catch (error) {
-      log("ERROR: Retainer status check error - " + (error as any)?.message);
-      res.status(500).json({ message: "Failed to check retainer status" });
-    }
-  });
+  }));
 }

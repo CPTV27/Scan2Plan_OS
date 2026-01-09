@@ -1,5 +1,6 @@
 import { getCalendarClient } from "./google-clients";
 import type { Project, Scantech } from "@shared/schema";
+import { log } from "./lib/logger";
 
 // Note: Read env vars at runtime, not module initialization, to ensure secrets are loaded
 function getGoogleMapsApiKey(): string | undefined {
@@ -107,22 +108,22 @@ async function geocodeAddress(address: string, apiKey: string): Promise<string |
         clearTimeout(timeoutId);
         const data = await response.json();
         
-        console.log("[Geocode] Attempt for:", variation, "Status:", data.status);
+        log(`[Geocode] Attempt for: ${variation} Status: ${data.status}`);
         
         if (data.status === "OK" && data.results?.[0]?.formatted_address) {
-          console.log("[Geocode] Resolved:", variation, "->", data.results[0].formatted_address);
+          log(`[Geocode] Resolved: ${variation} -> ${data.results[0].formatted_address}`);
           return data.results[0].formatted_address;
         }
       } catch (error: any) {
         clearTimeout(timeoutId);
-        console.error("[Geocode] Fetch error for", variation, ":", error.message);
+        log(`ERROR: [Geocode] Fetch error for ${variation}: ${error.message}`);
       }
     }
     
-    console.log("[Geocode] No results for any variation of:", cleanedAddress);
+    log(`[Geocode] No results for any variation of: ${cleanedAddress}`);
     return null;
   } catch (error) {
-    console.error("[Geocode] Failed:", error);
+    log(`ERROR: [Geocode] Failed - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -144,13 +145,13 @@ async function tryDistanceMatrix(from: string, destination: string, apiKey: stri
     const data = await response.json();
 
     if (data.status !== "OK" || !data.rows?.[0]?.elements?.[0]) {
-      console.log("[Distance Matrix] API status:", data.status, "Element status:", data.rows?.[0]?.elements?.[0]?.status);
+      log(`[Distance Matrix] API status: ${data.status} Element status: ${data.rows?.[0]?.elements?.[0]?.status}`);
       return null;
     }
 
     const element = data.rows[0].elements[0];
     if (element.status !== "OK") {
-      console.log("[Distance Matrix] Element status not OK:", element.status);
+      log(`[Distance Matrix] Element status not OK: ${element.status}`);
       return null;
     }
 
@@ -162,9 +163,9 @@ async function tryDistanceMatrix(from: string, destination: string, apiKey: stri
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError") {
-      console.error("[Distance Matrix] Request timed out after 10 seconds");
+      log("ERROR: [Distance Matrix] Request timed out after 10 seconds");
     } else {
-      console.error("[Distance Matrix] Fetch error:", error.message);
+      log(`ERROR: [Distance Matrix] Fetch error: ${error.message}`);
     }
     return null;
   }
@@ -173,13 +174,13 @@ async function tryDistanceMatrix(from: string, destination: string, apiKey: stri
 export async function calculateTravelDistance(destination: string, origin?: string): Promise<DistanceResult | null> {
   const apiKey = getGoogleMapsApiKey();
   if (!apiKey) {
-    console.warn("[Distance Matrix] Google Maps API key not configured");
+    log("WARN: [Distance Matrix] Google Maps API key not configured");
     return null;
   }
 
   const from = origin || OFFICE_ADDRESS;
   
-  console.log("[Distance Matrix] Calculating:", { from, destination });
+  log(`[Distance Matrix] Calculating: from=${from} destination=${destination}`);
   
   try {
     // First attempt with original addresses
@@ -187,33 +188,33 @@ export async function calculateTravelDistance(destination: string, origin?: stri
     
     // If NOT_FOUND, try to geocode the destination first
     if (!result) {
-      console.log("[Distance Matrix] First attempt failed, trying geocoded destination...");
+      log("[Distance Matrix] First attempt failed, trying geocoded destination...");
       const formattedDestination = await geocodeAddress(destination, apiKey);
       
       if (formattedDestination && formattedDestination !== destination) {
         result = await tryDistanceMatrix(from, formattedDestination, apiKey);
         if (result) {
-          console.log("[Distance Matrix] Success with geocoded destination");
+          log("[Distance Matrix] Success with geocoded destination");
         }
       }
     }
     
     // If still no result, try geocoding the origin (e.g., "Brooklyn, NY 11201")
     if (!result) {
-      console.log("[Distance Matrix] Still failed, trying geocoded origin...");
+      log("[Distance Matrix] Still failed, trying geocoded origin...");
       const formattedOrigin = await geocodeAddress(from, apiKey);
       
       if (formattedOrigin && formattedOrigin !== from) {
         result = await tryDistanceMatrix(formattedOrigin, destination, apiKey);
         if (result) {
-          console.log("[Distance Matrix] Success with geocoded origin");
+          log("[Distance Matrix] Success with geocoded origin");
         } else {
           // Try both geocoded
           const formattedDest = await geocodeAddress(destination, apiKey);
           if (formattedDest) {
             result = await tryDistanceMatrix(formattedOrigin, formattedDest, apiKey);
             if (result) {
-              console.log("[Distance Matrix] Success with both addresses geocoded");
+              log("[Distance Matrix] Success with both addresses geocoded");
             }
           }
         }
@@ -221,7 +222,7 @@ export async function calculateTravelDistance(destination: string, origin?: stri
     }
     
     if (!result) {
-      console.error("[Distance Matrix] Route not found for", from, "->", destination);
+      log(`ERROR: [Distance Matrix] Route not found for ${from} -> ${destination}`);
       return null;
     }
 
@@ -236,7 +237,7 @@ export async function calculateTravelDistance(destination: string, origin?: stri
       scenario: determineTravelScenario(distanceMiles),
     };
   } catch (error) {
-    console.error("Failed to calculate travel distance:", error);
+    log(`ERROR: Failed to calculate travel distance - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -340,7 +341,7 @@ export async function createScanCalendarEvent(params: CreateScanEventParams): Pr
       htmlLink: response.data.htmlLink!,
     };
   } catch (error) {
-    console.error("Failed to create calendar event:", error);
+    log(`ERROR: Failed to create calendar event - ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
@@ -377,7 +378,7 @@ export async function getTechnicianAvailability(
       events,
     };
   } catch (error) {
-    console.error("Failed to fetch calendar availability:", error);
+    log(`ERROR: Failed to fetch calendar availability - ${error instanceof Error ? error.message : String(error)}`);
     return { busy: false, events: [] };
   }
 }
