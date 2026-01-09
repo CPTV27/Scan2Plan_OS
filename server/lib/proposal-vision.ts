@@ -247,80 +247,76 @@ export async function extractProposalData(pdfBuffer: Buffer): Promise<ProposalDa
 }
 
 export function convertVisionToExtractedData(visionData: ProposalData) {
-  // Calculate the sum of line item totals to compare against grandTotal
-  const lineItemSum = visionData.lineItems.reduce((sum, item) => {
-    if (item.total > 0) return sum + item.total;
-    return sum + (item.rate * item.qty);
+  const grandTotal = visionData.grandTotal;
+  
+  // Calculate what GPT-4o thinks the sum is
+  const rawLineItemSum = visionData.lineItems.reduce((sum, item) => {
+    return sum + (item.total > 0 ? item.total : item.rate * item.qty);
   }, 0);
   
-  // If line item sum is wildly different from grandTotal (more than 10x), 
-  // the extraction likely confused sqft with qty and totals with rates
-  const extractionConfused = lineItemSum > visionData.grandTotal * 10 && visionData.grandTotal > 0;
+  // Check if line item sum is wildly off from grandTotal
+  // This indicates GPT-4o confused sqft with qty and calculated wrong totals
+  const isDataConfused = grandTotal > 0 && rawLineItemSum > grandTotal * 5;
   
-  if (extractionConfused) {
-    console.log("Vision extraction detected confused data - sqft likely interpreted as qty");
-    console.log(`Line item sum: $${lineItemSum.toLocaleString()}, grandTotal: $${visionData.grandTotal.toLocaleString()}`);
+  if (isDataConfused) {
+    console.log("Vision extraction detected confused data:");
+    console.log(`  Raw line item sum: $${rawLineItemSum.toLocaleString()}`);
+    console.log(`  Grand total: $${grandTotal.toLocaleString()}`);
+    console.log("  Will use rate field as actual line item price");
+  }
+  
+  // Map line items, correcting prices when data is confused
+  const services = visionData.lineItems.map(item => {
+    let price: number;
+    
+    if (isDataConfused) {
+      // When data is confused, the "rate" field often contains the actual line total
+      // Check if rate looks reasonable as a line item price (< grandTotal)
+      if (item.rate > 0 && item.rate <= grandTotal) {
+        price = item.rate;
+        console.log(`  "${item.title}": Using rate $${item.rate} as price`);
+      } else if (item.total > 0 && item.total <= grandTotal) {
+        price = item.total;
+        console.log(`  "${item.title}": Using total $${item.total} as price`);
+      } else {
+        // Fallback: distribute grandTotal proportionally
+        const proportion = 1 / visionData.lineItems.length;
+        price = grandTotal * proportion;
+        console.log(`  "${item.title}": Distributing proportionally: $${price.toFixed(2)}`);
+      }
+    } else {
+      // Normal case: use total if available, otherwise rate * qty
+      price = item.total > 0 ? item.total : item.rate * item.qty;
+    }
+    
+    return {
+      name: item.title,
+      description: item.description,
+      quantity: item.qty,
+      price: price,
+    };
+  });
+  
+  // Verify sum matches grandTotal reasonably
+  const serviceSum = services.reduce((sum, s) => sum + s.price, 0);
+  const sumMatchesTotal = Math.abs(serviceSum - grandTotal) < grandTotal * 0.1; // Within 10%
+  
+  if (!sumMatchesTotal && grandTotal > 0) {
+    console.log(`Service sum ($${serviceSum.toFixed(2)}) doesn't match grandTotal ($${grandTotal.toFixed(2)})`);
   }
   
   return {
     projectName: visionData.project.address,
     projectAddress: visionData.project.address,
     clientName: visionData.client.company || visionData.client.name,
-    totalPrice: visionData.grandTotal,
-    confidence: extractionConfused ? 65 : 85, // Lower confidence if data seems confused
+    totalPrice: grandTotal,
+    confidence: isDataConfused ? 65 : 85,
     contacts: [{
       name: visionData.client.name,
       email: visionData.client.email,
       company: visionData.client.company,
     }].filter(c => c.name),
-    services: visionData.lineItems.map(item => {
-      // If total is provided and reasonable, use it
-      if (item.total > 0) {
-        // Check if "rate" field actually contains the line total (common misread)
-        // This happens when sqft is put in qty and line total is put in rate
-        const calculatedPrice = item.rate * item.qty;
-        const isRateLikelyLineTotal = calculatedPrice > 100000 && item.rate < 50000 && item.qty > 1000;
-        
-        if (isRateLikelyLineTotal) {
-          // The "rate" field probably contains the actual line item price
-          return {
-            name: item.title,
-            description: item.description,
-            quantity: item.qty, // Keep sqft as informational
-            price: item.rate, // Use "rate" as actual price since it's the line total
-          };
-        }
-        
-        return {
-          name: item.title,
-          description: item.description,
-          quantity: item.qty,
-          price: item.total,
-        };
-      }
-      
-      // Calculate price from rate * qty
-      const calculatedPrice = item.rate * item.qty;
-      
-      // Sanity check: if calculated price is unreasonably high (>$1M for a single line item)
-      // and qty looks like sqft (>1000), the rate is probably the actual line total
-      if (calculatedPrice > 1000000 && item.qty > 1000) {
-        console.log(`Correcting likely misread: "${item.title}" - using rate $${item.rate} as price instead of $${calculatedPrice.toLocaleString()}`);
-        return {
-          name: item.title,
-          description: item.description,
-          quantity: item.qty,
-          price: item.rate, // Rate is actually the line total
-        };
-      }
-      
-      return {
-        name: item.title,
-        description: item.description,
-        quantity: item.qty,
-        price: calculatedPrice,
-      };
-    }),
+    services,
     areas: [],
     variables: {},
     unmappedFields: [],
