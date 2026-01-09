@@ -5901,6 +5901,20 @@ Scan2Plan Accounting`;
     }
   });
 
+  // Google Maps JavaScript API script endpoint
+  app.get("/api/maps/script", (req, res) => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      return res.status(503).send("// Google Maps API key not configured");
+    }
+    
+    const libraries = req.query.libraries || "drawing,geometry";
+    const callback = req.query.callback || "";
+    
+    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${libraries}${callback ? `&callback=${callback}` : ""}`;
+    res.redirect(scriptUrl);
+  });
+
   // Google Maps Geocoding and Embed API endpoint
   app.get("/api/location/preview", async (req, res) => {
     try {

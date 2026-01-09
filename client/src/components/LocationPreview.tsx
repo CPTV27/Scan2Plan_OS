@@ -26,11 +26,18 @@ import {
   Check,
   TriangleAlert,
   Layers,
-  Move3d
+  Move3d,
+  PenTool
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { BoundaryDrawer } from "./BoundaryDrawer";
+
+interface BoundaryCoordinate {
+  lat: number;
+  lng: number;
+}
 
 interface LocationPreviewProps {
   address: string;
@@ -40,6 +47,8 @@ interface LocationPreviewProps {
   onSiteNotesChange?: (notes: string) => void;
   onAddressUpdate?: (formattedAddress: string) => void;
   siteNotes?: string;
+  boundary?: BoundaryCoordinate[];
+  onBoundaryChange?: (boundary: BoundaryCoordinate[], areaAcres: number) => void;
 }
 
 interface LocationData {
@@ -163,7 +172,9 @@ export function LocationPreview({
   onApplyToQuote,
   onSiteNotesChange,
   onAddressUpdate,
-  siteNotes = ""
+  siteNotes = "",
+  boundary,
+  onBoundaryChange
 }: LocationPreviewProps) {
   const [activeView, setActiveView] = useState<"map" | "streetview" | "photos">("map");
   const [debouncedAddress, setDebouncedAddress] = useState(address);
@@ -171,6 +182,7 @@ export function LocationPreview({
   const [copiedLink, setCopiedLink] = useState(false);
   const [localSiteNotes, setLocalSiteNotes] = useState(siteNotes);
   const [hasAutoPopulated, setHasAutoPopulated] = useState(false);
+  const [boundaryDrawerOpen, setBoundaryDrawerOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -298,6 +310,10 @@ export function LocationPreview({
     onSiteNotesChange?.(value);
   }, [onSiteNotesChange]);
 
+  const handleBoundarySave = useCallback((newBoundary: BoundaryCoordinate[], areaAcres: number) => {
+    onBoundaryChange?.(newBoundary, areaAcres);
+  }, [onBoundaryChange]);
+
   const photos = placeDetails?.photos || [];
   const businessInfo = placeDetails?.businessInfo;
   const inferredCategory = businessInfo?.types ? inferBuildingCategory(businessInfo.types) : null;
@@ -333,7 +349,7 @@ export function LocationPreview({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Skeleton className="w-full h-48 rounded-md" />
+          <Skeleton className="w-full h-80 rounded-md" />
         </CardContent>
       </Card>
     );
@@ -369,6 +385,18 @@ export function LocationPreview({
             )}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
+            {onBoundaryChange && locationData?.coordinates && (
+              <Button
+                type="button"
+                variant={boundary && boundary.length > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBoundaryDrawerOpen(true)}
+                data-testid="button-draw-boundary"
+              >
+                <PenTool className="w-3 h-3 mr-1" />
+                {boundary && boundary.length > 0 ? "Edit Boundary" : "Draw Boundary"}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -557,7 +585,7 @@ export function LocationPreview({
               <iframe
                 src={locationData.mapUrl}
                 width="100%"
-                height="200"
+                height="320"
                 style={{ border: 0, borderRadius: "0.375rem" }}
                 allowFullScreen
                 loading="lazy"
@@ -573,7 +601,7 @@ export function LocationPreview({
               <iframe
                 src={locationData.streetViewUrl}
                 width="100%"
-                height="200"
+                height="320"
                 style={{ border: 0, borderRadius: "0.375rem" }}
                 allowFullScreen
                 loading="lazy"
@@ -582,7 +610,7 @@ export function LocationPreview({
                 data-testid="iframe-streetview-embed"
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-center bg-muted/30 rounded-md">
+              <div className="flex flex-col items-center justify-center h-80 text-center bg-muted/30 rounded-md">
                 <Eye className="w-8 h-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
                   Street View not available for this location
@@ -604,13 +632,13 @@ export function LocationPreview({
 
           <TabsContent value="flyover" className="mt-2">
             {isLoadingAerial ? (
-              <Skeleton className="w-full h-48 rounded-md" />
+              <Skeleton className="w-full h-80 rounded-md" />
             ) : aerialView?.hasVideo && aerialView.landscapeUri ? (
               <div className="space-y-2">
                 <video
                   src={aerialView.landscapeUri}
                   controls
-                  className="w-full h-48 rounded-md bg-black"
+                  className="w-full h-80 rounded-md bg-black"
                   data-testid="video-aerial-flyover"
                 >
                   Your browser does not support video playback.
@@ -638,7 +666,7 @@ export function LocationPreview({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-center bg-muted/30 rounded-md">
+              <div className="flex flex-col items-center justify-center h-80 text-center bg-muted/30 rounded-md">
                 <Move3d className="w-8 h-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
                   3D flyover video not available
@@ -670,14 +698,14 @@ export function LocationPreview({
 
           <TabsContent value="photos" className="mt-2">
             {isLoadingPlace ? (
-              <Skeleton className="w-full h-48 rounded-md" />
+              <Skeleton className="w-full h-80 rounded-md" />
             ) : photos.length > 0 ? (
               <div className="space-y-2">
                 <div className="relative">
                   <img
                     src={photos[selectedPhotoIndex]?.url}
                     alt={`Building photo ${selectedPhotoIndex + 1}`}
-                    className="w-full h-48 object-cover rounded-md"
+                    className="w-full h-80 object-cover rounded-md"
                     data-testid={`img-building-photo-${selectedPhotoIndex}`}
                   />
                   {photos.length > 1 && (
@@ -737,7 +765,7 @@ export function LocationPreview({
                 </ScrollArea>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48 text-center">
+              <div className="flex flex-col items-center justify-center h-80 text-center">
                 <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
                   No photos available for this location
@@ -807,6 +835,17 @@ export function LocationPreview({
           </div>
         )}
       </CardContent>
+
+      {locationData?.coordinates && onBoundaryChange && (
+        <BoundaryDrawer
+          open={boundaryDrawerOpen}
+          onOpenChange={setBoundaryDrawerOpen}
+          coordinates={locationData.coordinates}
+          address={debouncedAddress}
+          initialBoundary={boundary}
+          onSave={handleBoundarySave}
+        />
+      )}
     </Card>
   );
 }
