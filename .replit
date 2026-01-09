@@ -50,7 +50,7 @@ VITE_CPQ_URL = "https://cpq.scan2plan.dev"
 APP_URL = "https://scan2plan-os.replit.app"
 
 [userenv.development]
-QUICKBOOKS_REDIRECT_URI = "https://scan2plan-os.replit.app/api/quickbooks/callback"
+QUICKBOOKS_REDIRECT_URI = "https://scan-2-plan-hub--ChaseS2P.replit.app/api/quickbooks/callback"
 
 [userenv.production]
 QUICKBOOKS_REDIRECT_URI = "https://scan2planos.com/api/quickbooks/callback"
