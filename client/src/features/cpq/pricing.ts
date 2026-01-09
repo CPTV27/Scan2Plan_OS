@@ -17,6 +17,13 @@ export interface BoundaryCoordinate {
   lng: number;
 }
 
+// Facade definition for building exteriors
+export interface Facade {
+  id: string;
+  type: "standard" | "ornate" | "curtainwall";
+  lod: string;
+}
+
 // Types for pricing calculations
 export interface Area {
   id: string;
@@ -28,13 +35,32 @@ export interface Area {
   disciplines: string[];
   scope?: string;
   includeCadDeliverable?: boolean;
-  additionalElevations?: string;
-  facades?: Array<{ id: string; label: string }>;
+  additionalElevations?: number;
+  // Mixed scope separate LoDs
+  mixedInteriorLod?: string;
+  mixedExteriorLod?: string;
+  // Discipline-specific LoDs
+  disciplineLods?: Record<string, string>;
+  // Roof/plan count
+  numberOfRoofs?: number;
+  // Facade definitions
+  facades?: Facade[];
+  // Grade around building
+  gradeAroundBuilding?: boolean;
+  gradeLod?: string;
+  // Legacy compatibility
   interiorLod?: string;
   exteriorLod?: string;
   boundary?: BoundaryCoordinate[]; // Landscape area boundary coordinates
   boundaryImageUrl?: string; // Static map image of the boundary for proposals
 }
+
+// Facade type options
+export const FACADE_TYPES = [
+  { id: "standard", label: "Standard" },
+  { id: "ornate", label: "Ornate/Historical" },
+  { id: "curtainwall", label: "Curtain Wall" },
+];
 
 // Landscape area types (measured in acres)
 export const LANDSCAPE_TYPES = [
@@ -518,7 +544,9 @@ export function calculatePricing(
     }
 
     // Additional elevations - NOT eligible for risk premiums
-    const additionalElevations = parseInt(area.additionalElevations || "0") || 0;
+    const additionalElevations = typeof area.additionalElevations === 'number' 
+      ? area.additionalElevations 
+      : parseInt(String(area.additionalElevations || "0")) || 0;
     if (additionalElevations > 0) {
       const elevTotal = calculateAdditionalElevationsPrice(additionalElevations);
       items.push({
@@ -536,7 +564,7 @@ export function calculatePricing(
       facades.forEach((facade) => {
         const facadePrice = architectureBaseTotal * 0.1; // 10% of arch base
         items.push({
-          label: `${area.name} - Facade: ${facade.label || "Unnamed"}`,
+          label: `${area.name} - Facade: ${FACADE_TYPES.find(f => f.id === facade.type)?.label || facade.type || "Unnamed"}`,
           value: Math.round(facadePrice * 100) / 100,
           upteamCost: Math.round(facadePrice * UPTEAM_MULTIPLIER * 100) / 100,
         });

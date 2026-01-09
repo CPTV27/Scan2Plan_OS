@@ -49,6 +49,7 @@ import {
   SCOPE_OPTIONS,
   RISK_FACTORS,
   SERVICE_RATES,
+  FACADE_TYPES,
   calculateMarginPercent,
   passesMarginGate,
   getMarginGateError,
@@ -65,6 +66,7 @@ import {
   type TravelConfig,
   type PricingResult,
   type BoundaryCoordinate,
+  type Facade,
 } from "./pricing";
 
 // Pricing mode type
@@ -142,6 +144,51 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   const [tierAMargin, setTierAMargin] = useState<string>("");
   const [assumedMargin, setAssumedMargin] = useState<string>("");
   const [profitabilityCaveats, setProfitabilityCaveats] = useState("");
+
+  // === PROJECT DETAILS ===
+  const [specificBuilding, setSpecificBuilding] = useState("");
+  const [typeOfBuilding, setTypeOfBuilding] = useState("");
+
+  // === DELIVERABLES ===
+  const [interiorCadElevations, setInteriorCadElevations] = useState("");
+  const [bimDeliverable, setBimDeliverable] = useState<string[]>([]);
+  const [bimDeliverableOther, setBimDeliverableOther] = useState("");
+  const [bimVersion, setBimVersion] = useState("");
+  const [customTemplate, setCustomTemplate] = useState<"yes" | "no" | "other">("no");
+  const [customTemplateOther, setCustomTemplateOther] = useState("");
+
+  // === ACT CEILING (enhanced) ===
+  const [aboveBelowACT, setAboveBelowACT] = useState<"above" | "below" | "both" | "other" | "">(""); 
+  const [aboveBelowACTOther, setAboveBelowACTOther] = useState("");
+  const [actSqft, setActSqft] = useState("");
+
+  // === INTERNAL NOTES ===
+  const [sqftAssumptions, setSqftAssumptions] = useState("");
+  const [assumedGrossMargin, setAssumedGrossMargin] = useState("");
+  const [caveatsProfitability, setCaveatsProfitability] = useState("");
+  const [mixedScope, setMixedScope] = useState("");
+  const [insuranceRequirements, setInsuranceRequirements] = useState("");
+
+  // === CONTACTS ===
+  const [accountContact, setAccountContact] = useState("");
+  const [accountContactEmail, setAccountContactEmail] = useState("");
+  const [accountContactPhone, setAccountContactPhone] = useState("");
+  const [designProContact, setDesignProContact] = useState("");
+  const [designProCompanyContact, setDesignProCompanyContact] = useState("");
+  const [otherContact, setOtherContact] = useState("");
+  const [proofLinks, setProofLinks] = useState("");
+
+  // === LEAD TRACKING ===
+  const [source, setSource] = useState("");
+  const [sourceNote, setSourceNote] = useState("");
+  const [assist, setAssist] = useState("");
+  const [probabilityOfClosing, setProbabilityOfClosing] = useState("");
+  const [projectStatus, setProjectStatus] = useState<"proposal" | "inhand" | "urgent" | "other" | "">("proposal");
+  const [projectStatusOther, setProjectStatusOther] = useState("");
+
+  // === TIMELINE ===
+  const [estimatedTimeline, setEstimatedTimeline] = useState("");
+  const [timelineNotes, setTimelineNotes] = useState("");
   
   // Calculate total sqft for Tier A detection (uses new helper function)
   const totalSqft = useMemo(() => calculateTotalSqft(areas), [areas]);
@@ -286,8 +333,130 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       if (quote.priceAdjustmentPercent != null) {
         setPriceAdjustmentPercent(quote.priceAdjustmentPercent);
       }
+      
+      // Load scoping data
+      if (quote.scopingData) {
+        const sd = quote.scopingData;
+        // Project Details
+        if (sd.specificBuilding) setSpecificBuilding(sd.specificBuilding);
+        if (sd.typeOfBuilding) setTypeOfBuilding(sd.typeOfBuilding);
+        // Deliverables
+        if (sd.interiorCadElevations) setInteriorCadElevations(sd.interiorCadElevations);
+        if (sd.bimDeliverable) setBimDeliverable(sd.bimDeliverable);
+        if (sd.bimDeliverableOther) setBimDeliverableOther(sd.bimDeliverableOther);
+        if (sd.bimVersion) setBimVersion(sd.bimVersion);
+        if (sd.customTemplate) setCustomTemplate(sd.customTemplate);
+        if (sd.customTemplateOther) setCustomTemplateOther(sd.customTemplateOther);
+        // ACT Ceiling
+        if (sd.aboveBelowACT) setAboveBelowACT(sd.aboveBelowACT);
+        if (sd.aboveBelowACTOther) setAboveBelowACTOther(sd.aboveBelowACTOther);
+        if (sd.actSqft) setActSqft(sd.actSqft);
+        // Internal Notes
+        if (sd.sqftAssumptions) setSqftAssumptions(sd.sqftAssumptions);
+        if (sd.assumedGrossMargin) setAssumedGrossMargin(sd.assumedGrossMargin);
+        if (sd.caveatsProfitability) setCaveatsProfitability(sd.caveatsProfitability);
+        if (sd.mixedScope) setMixedScope(sd.mixedScope);
+        if (sd.insuranceRequirements) setInsuranceRequirements(sd.insuranceRequirements);
+        // Contacts
+        if (sd.accountContact) setAccountContact(sd.accountContact);
+        if (sd.accountContactEmail) setAccountContactEmail(sd.accountContactEmail);
+        if (sd.accountContactPhone) setAccountContactPhone(sd.accountContactPhone);
+        if (sd.designProContact) setDesignProContact(sd.designProContact);
+        if (sd.designProCompanyContact) setDesignProCompanyContact(sd.designProCompanyContact);
+        if (sd.otherContact) setOtherContact(sd.otherContact);
+        if (sd.proofLinks) setProofLinks(sd.proofLinks);
+        // Lead Tracking
+        if (sd.source) setSource(sd.source);
+        if (sd.sourceNote) setSourceNote(sd.sourceNote);
+        if (sd.assist) setAssist(sd.assist);
+        if (sd.probabilityOfClosing) setProbabilityOfClosing(sd.probabilityOfClosing);
+        if (sd.projectStatus) setProjectStatus(sd.projectStatus);
+        if (sd.projectStatusOther) setProjectStatusOther(sd.projectStatusOther);
+        // Timeline
+        if (sd.estimatedTimeline) setEstimatedTimeline(sd.estimatedTimeline);
+        if (sd.timelineNotes) setTimelineNotes(sd.timelineNotes);
+      }
     }
   }, [existingQuote]);
+
+  // PostMessage listener for CRM integration - receive CPQ_SCOPING_PAYLOAD
+  useEffect(() => {
+    // Allowed origins for postMessage security
+    const ALLOWED_ORIGINS = [
+      window.location.origin,
+      "https://scan2plan.io",
+      "https://www.scan2plan.io",
+      "https://app.gohighlevel.com",
+      "https://scan2planos.com",
+      "https://crm.scan2plan.io",
+    ];
+    
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin for security
+      if (!ALLOWED_ORIGINS.includes(event.origin)) {
+        console.warn("[CPQ] Blocked postMessage from untrusted origin:", event.origin);
+        return;
+      }
+      
+      // Validate message type
+      if (event.data?.type !== "CPQ_SCOPING_PAYLOAD") return;
+      
+      console.log("[CPQ] Received scoping payload from CRM:", event.data);
+      const payload = event.data.payload;
+      if (!payload || typeof payload !== "object") return;
+      
+      // Populate scoping fields from CRM payload
+      if (payload.specificBuilding) setSpecificBuilding(payload.specificBuilding);
+      if (payload.typeOfBuilding) setTypeOfBuilding(payload.typeOfBuilding);
+      if (payload.interiorCadElevations) setInteriorCadElevations(payload.interiorCadElevations);
+      if (payload.bimDeliverable) setBimDeliverable(payload.bimDeliverable);
+      if (payload.bimDeliverableOther) setBimDeliverableOther(payload.bimDeliverableOther);
+      if (payload.bimVersion) setBimVersion(payload.bimVersion);
+      if (payload.customTemplate) setCustomTemplate(payload.customTemplate);
+      if (payload.customTemplateOther) setCustomTemplateOther(payload.customTemplateOther);
+      if (payload.aboveBelowACT) setAboveBelowACT(payload.aboveBelowACT);
+      if (payload.aboveBelowACTOther) setAboveBelowACTOther(payload.aboveBelowACTOther);
+      if (payload.actSqft) setActSqft(payload.actSqft);
+      if (payload.sqftAssumptions) setSqftAssumptions(payload.sqftAssumptions);
+      if (payload.assumedGrossMargin) setAssumedGrossMargin(payload.assumedGrossMargin);
+      if (payload.caveatsProfitability) setCaveatsProfitability(payload.caveatsProfitability);
+      if (payload.mixedScope) setMixedScope(payload.mixedScope);
+      if (payload.insuranceRequirements) setInsuranceRequirements(payload.insuranceRequirements);
+      if (payload.accountContact) setAccountContact(payload.accountContact);
+      if (payload.accountContactEmail) setAccountContactEmail(payload.accountContactEmail);
+      if (payload.accountContactPhone) setAccountContactPhone(payload.accountContactPhone);
+      if (payload.designProContact) setDesignProContact(payload.designProContact);
+      if (payload.designProCompanyContact) setDesignProCompanyContact(payload.designProCompanyContact);
+      if (payload.otherContact) setOtherContact(payload.otherContact);
+      if (payload.proofLinks) setProofLinks(payload.proofLinks);
+      if (payload.source) setSource(payload.source);
+      if (payload.sourceNote) setSourceNote(payload.sourceNote);
+      if (payload.assist) setAssist(payload.assist);
+      if (payload.probabilityOfClosing) setProbabilityOfClosing(payload.probabilityOfClosing);
+      if (payload.projectStatus) setProjectStatus(payload.projectStatus);
+      if (payload.projectStatusOther) setProjectStatusOther(payload.projectStatusOther);
+      if (payload.estimatedTimeline) setEstimatedTimeline(payload.estimatedTimeline);
+      if (payload.timelineNotes) setTimelineNotes(payload.timelineNotes);
+      
+      // Handle areas if provided
+      if (payload.areas && Array.isArray(payload.areas)) {
+        setAreas(payload.areas);
+      }
+      
+      // Handle travel if provided
+      if (payload.travel) {
+        setTravel(payload.travel);
+      }
+      
+      toast({
+        title: "Scoping data received",
+        description: "Project details have been populated from CRM.",
+      });
+    };
+    
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [toast]);
 
   // Dispatch location addresses for distance calculation
   const DISPATCH_LOCATIONS: Record<string, string> = {
@@ -537,6 +706,47 @@ Thanks!`.trim();
           profitMargin: pricing.profitMargin,
           disciplineTotals: pricing.disciplineTotals,
         },
+        // Scoping Data - All new fields
+        scopingData: {
+          // Project Details
+          specificBuilding,
+          typeOfBuilding,
+          // Deliverables
+          interiorCadElevations,
+          bimDeliverable,
+          bimDeliverableOther,
+          bimVersion,
+          customTemplate,
+          customTemplateOther,
+          // ACT Ceiling
+          aboveBelowACT,
+          aboveBelowACTOther,
+          actSqft,
+          // Internal Notes
+          sqftAssumptions,
+          assumedGrossMargin,
+          caveatsProfitability,
+          mixedScope,
+          insuranceRequirements,
+          // Contacts
+          accountContact,
+          accountContactEmail,
+          accountContactPhone,
+          designProContact,
+          designProCompanyContact,
+          otherContact,
+          proofLinks,
+          // Lead Tracking
+          source,
+          sourceNote,
+          assist,
+          probabilityOfClosing,
+          projectStatus,
+          projectStatusOther,
+          // Timeline
+          estimatedTimeline,
+          timelineNotes,
+        },
       };
 
       if (quoteId) {
@@ -627,6 +837,40 @@ Thanks!`.trim();
           totalUpteamCost: pricing.totalUpteamCost,
           profitMargin: pricing.profitMargin,
           disciplineTotals: pricing.disciplineTotals,
+        },
+        // Scoping Data - All new fields
+        scopingData: {
+          specificBuilding,
+          typeOfBuilding,
+          interiorCadElevations,
+          bimDeliverable,
+          bimDeliverableOther,
+          bimVersion,
+          customTemplate,
+          customTemplateOther,
+          aboveBelowACT,
+          aboveBelowACTOther,
+          actSqft,
+          sqftAssumptions,
+          assumedGrossMargin,
+          caveatsProfitability,
+          mixedScope,
+          insuranceRequirements,
+          accountContact,
+          accountContactEmail,
+          accountContactPhone,
+          designProContact,
+          designProCompanyContact,
+          otherContact,
+          proofLinks,
+          source,
+          sourceNote,
+          assist,
+          probabilityOfClosing,
+          projectStatus,
+          projectStatusOther,
+          estimatedTimeline,
+          timelineNotes,
         },
       };
 
@@ -1507,6 +1751,443 @@ Thanks!`.trim();
                 placeholder="Add any notes about this project..."
                 data-testid="textarea-project-notes"
               />
+            </div>
+
+            <Separator />
+
+            {/* Project Details Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Project Details</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Specific Building/Area</Label>
+                      <Input
+                        value={specificBuilding}
+                        onChange={(e) => setSpecificBuilding(e.target.value)}
+                        placeholder="e.g., Building A - East Wing"
+                        data-testid="input-specific-building"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type of Building</Label>
+                      <Input
+                        value={typeOfBuilding}
+                        onChange={(e) => setTypeOfBuilding(e.target.value)}
+                        placeholder="e.g., 5-story commercial office"
+                        data-testid="input-type-of-building"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator />
+
+            {/* Deliverables Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Deliverables</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Interior CAD Elevations</Label>
+                      <Input
+                        type="number"
+                        value={interiorCadElevations}
+                        onChange={(e) => setInteriorCadElevations(e.target.value)}
+                        placeholder="e.g., 15"
+                        data-testid="input-interior-cad-elevations"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>BIM Version</Label>
+                      <Input
+                        value={bimVersion}
+                        onChange={(e) => setBimVersion(e.target.value)}
+                        placeholder="e.g., Revit 2024"
+                        data-testid="input-bim-version"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>BIM Deliverable Format</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {["Revit", "Archicad", "Sketchup", "Rhino", "Other"].map((format) => (
+                        <Badge
+                          key={format}
+                          variant={bimDeliverable.includes(format) ? "default" : "outline"}
+                          className="cursor-pointer toggle-elevate"
+                          onClick={() => {
+                            setBimDeliverable(prev => 
+                              prev.includes(format) 
+                                ? prev.filter(f => f !== format)
+                                : [...prev, format]
+                            );
+                          }}
+                          data-testid={`badge-bim-${format.toLowerCase()}`}
+                        >
+                          {format}
+                        </Badge>
+                      ))}
+                    </div>
+                    {bimDeliverable.includes("Other") && (
+                      <Input
+                        value={bimDeliverableOther}
+                        onChange={(e) => setBimDeliverableOther(e.target.value)}
+                        placeholder="Specify other BIM format..."
+                        className="mt-2"
+                        data-testid="input-bim-other"
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Custom Template</Label>
+                    <Select value={customTemplate} onValueChange={(v) => setCustomTemplate(v as typeof customTemplate)}>
+                      <SelectTrigger data-testid="select-custom-template">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no">No (Standard S2P Template)</SelectItem>
+                        <SelectItem value="yes">Yes (Client Template)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {customTemplate === "other" && (
+                      <Input
+                        value={customTemplateOther}
+                        onChange={(e) => setCustomTemplateOther(e.target.value)}
+                        placeholder="Describe template requirements..."
+                        className="mt-2"
+                        data-testid="input-custom-template-other"
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator />
+
+            {/* ACT Ceiling Details (Enhanced) */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">ACT Ceiling Details</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Above/Below ACT Scope</Label>
+                      <Select value={aboveBelowACT} onValueChange={(v) => setAboveBelowACT(v as typeof aboveBelowACT)}>
+                        <SelectTrigger data-testid="select-above-below-act">
+                          <SelectValue placeholder="Select scope..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="above">Above Only</SelectItem>
+                          <SelectItem value="below">Below Only</SelectItem>
+                          <SelectItem value="both">Both Above & Below</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {aboveBelowACT === "other" && (
+                        <Input
+                          value={aboveBelowACTOther}
+                          onChange={(e) => setAboveBelowACTOther(e.target.value)}
+                          placeholder="Describe ACT scope..."
+                          className="mt-2"
+                          data-testid="input-act-scope-other"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>ACT Ceiling Square Footage</Label>
+                      <Input
+                        type="number"
+                        value={actSqft}
+                        onChange={(e) => setActSqft(e.target.value)}
+                        placeholder="e.g., 5000"
+                        data-testid="input-act-sqft"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator />
+
+            {/* Internal Notes Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Internal Notes & Assumptions</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Assumed Gross Margin</Label>
+                      <Input
+                        value={assumedGrossMargin}
+                        onChange={(e) => setAssumedGrossMargin(e.target.value)}
+                        placeholder="e.g., 45%"
+                        data-testid="input-assumed-gross-margin"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Insurance Requirements</Label>
+                      <Input
+                        value={insuranceRequirements}
+                        onChange={(e) => setInsuranceRequirements(e.target.value)}
+                        placeholder="e.g., $2M umbrella required"
+                        data-testid="input-insurance-requirements"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Square Footage Assumptions</Label>
+                    <Textarea
+                      value={sqftAssumptions}
+                      onChange={(e) => setSqftAssumptions(e.target.value)}
+                      placeholder="Describe how square footage was determined..."
+                      data-testid="textarea-sqft-assumptions"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Profitability Caveats</Label>
+                    <Textarea
+                      value={caveatsProfitability}
+                      onChange={(e) => setCaveatsProfitability(e.target.value)}
+                      placeholder="Any concerns about profitability..."
+                      data-testid="textarea-caveats-profitability"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mixed Scope Description</Label>
+                    <Input
+                      value={mixedScope}
+                      onChange={(e) => setMixedScope(e.target.value)}
+                      placeholder="Describe mixed scope if applicable..."
+                      data-testid="input-mixed-scope"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator />
+
+            {/* Contacts Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Contacts</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Account Contact</Label>
+                      <Input
+                        value={accountContact}
+                        onChange={(e) => setAccountContact(e.target.value)}
+                        placeholder="Name"
+                        data-testid="input-account-contact"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input
+                        type="email"
+                        value={accountContactEmail}
+                        onChange={(e) => setAccountContactEmail(e.target.value)}
+                        placeholder="Email"
+                        data-testid="input-account-contact-email"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Phone</Label>
+                      <Input
+                        value={accountContactPhone}
+                        onChange={(e) => setAccountContactPhone(e.target.value)}
+                        placeholder="Phone"
+                        data-testid="input-account-contact-phone"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Design Pro Contact</Label>
+                      <Input
+                        value={designProContact}
+                        onChange={(e) => setDesignProContact(e.target.value)}
+                        placeholder="Name"
+                        data-testid="input-design-pro-contact"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Design Pro Company</Label>
+                      <Input
+                        value={designProCompanyContact}
+                        onChange={(e) => setDesignProCompanyContact(e.target.value)}
+                        placeholder="Company name"
+                        data-testid="input-design-pro-company"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Other Contact Info</Label>
+                    <Input
+                      value={otherContact}
+                      onChange={(e) => setOtherContact(e.target.value)}
+                      placeholder="Additional contact info..."
+                      data-testid="input-other-contact"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Proof/Reference Links</Label>
+                    <Input
+                      value={proofLinks}
+                      onChange={(e) => setProofLinks(e.target.value)}
+                      placeholder="Links to proof documents, photos, etc."
+                      data-testid="input-proof-links"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Separator />
+
+            {/* Lead Tracking Section */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-medium">Lead Tracking</h2>
+              <Card>
+                <CardContent className="pt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Lead Source</Label>
+                      <Select value={source} onValueChange={setSource}>
+                        <SelectTrigger data-testid="select-source">
+                          <SelectValue placeholder="Select source..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ABM">ABM</SelectItem>
+                          <SelectItem value="Cold outreach">Cold outreach</SelectItem>
+                          <SelectItem value="Referral - Client">Referral - Client</SelectItem>
+                          <SelectItem value="Referral - Partner">Referral - Partner</SelectItem>
+                          <SelectItem value="Existing customer">Existing customer</SelectItem>
+                          <SelectItem value="CEU">CEU</SelectItem>
+                          <SelectItem value="Proof Vault">Proof Vault</SelectItem>
+                          <SelectItem value="Spec/Standards">Spec/Standards</SelectItem>
+                          <SelectItem value="Podcast">Podcast</SelectItem>
+                          <SelectItem value="Site/SEO">Site/SEO</SelectItem>
+                          <SelectItem value="Permit trigger">Permit trigger</SelectItem>
+                          <SelectItem value="Compliance trigger">Compliance trigger</SelectItem>
+                          <SelectItem value="Procurement trigger">Procurement trigger</SelectItem>
+                          <SelectItem value="Event/Conference">Event/Conference</SelectItem>
+                          <SelectItem value="Social">Social</SelectItem>
+                          <SelectItem value="Vendor Onboarding">Vendor Onboarding</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                          <SelectItem value="Unknown">Unknown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Source Note</Label>
+                      <Input
+                        value={sourceNote}
+                        onChange={(e) => setSourceNote(e.target.value)}
+                        placeholder="Additional source details..."
+                        data-testid="input-source-note"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Assist Attribution</Label>
+                      <Select value={assist} onValueChange={setAssist}>
+                        <SelectTrigger data-testid="select-assist">
+                          <SelectValue placeholder="Select assist..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ABM">ABM</SelectItem>
+                          <SelectItem value="Cold outreach">Cold outreach</SelectItem>
+                          <SelectItem value="Referral - Client">Referral - Client</SelectItem>
+                          <SelectItem value="Referral - Partner">Referral - Partner</SelectItem>
+                          <SelectItem value="Existing customer">Existing customer</SelectItem>
+                          <SelectItem value="CEU">CEU</SelectItem>
+                          <SelectItem value="Proof Vault">Proof Vault</SelectItem>
+                          <SelectItem value="Spec/Standards">Spec/Standards</SelectItem>
+                          <SelectItem value="Podcast">Podcast</SelectItem>
+                          <SelectItem value="Site/SEO">Site/SEO</SelectItem>
+                          <SelectItem value="Event/Conference">Event/Conference</SelectItem>
+                          <SelectItem value="Social">Social</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                          <SelectItem value="Unknown">Unknown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Probability of Closing (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={probabilityOfClosing}
+                        onChange={(e) => setProbabilityOfClosing(e.target.value)}
+                        placeholder="e.g., 75"
+                        data-testid="input-probability-of-closing"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Project Status</Label>
+                      <Select value={projectStatus} onValueChange={(v) => setProjectStatus(v as typeof projectStatus)}>
+                        <SelectTrigger data-testid="select-project-status">
+                          <SelectValue placeholder="Select status..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="proposal">Proposal</SelectItem>
+                          <SelectItem value="inhand">In-Hand</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {projectStatus === "other" && (
+                        <Input
+                          value={projectStatusOther}
+                          onChange={(e) => setProjectStatusOther(e.target.value)}
+                          placeholder="Specify status..."
+                          className="mt-2"
+                          data-testid="input-project-status-other"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Estimated Timeline</Label>
+                      <Select value={estimatedTimeline} onValueChange={setEstimatedTimeline}>
+                        <SelectTrigger data-testid="select-estimated-timeline">
+                          <SelectValue placeholder="Select timeline..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1week">1 Week</SelectItem>
+                          <SelectItem value="2weeks">2 Weeks</SelectItem>
+                          <SelectItem value="3weeks">3 Weeks</SelectItem>
+                          <SelectItem value="4weeks">4 Weeks</SelectItem>
+                          <SelectItem value="5weeks">5 Weeks</SelectItem>
+                          <SelectItem value="6weeks">6 Weeks</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Timeline Notes</Label>
+                    <Textarea
+                      value={timelineNotes}
+                      onChange={(e) => setTimelineNotes(e.target.value)}
+                      placeholder="Any timeline notes or caveats..."
+                      data-testid="textarea-timeline-notes"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
           </div>

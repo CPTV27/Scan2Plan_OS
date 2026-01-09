@@ -173,6 +173,16 @@ FY26_GOALS = {
 1. **CPQ Unified Areas View** - Combined building and landscape areas into single interface
 2. **Price Adjustment Persistence** - Now saved as visible line item in pricingBreakdown
 3. **Test ID Refactoring** - Uses kindIndex for backwards-compatible automation
+4. **CPQ Scoping Fields (CRM Integration)** - Comprehensive scoping data for full CRM integration
+   - Project Details: specificBuilding, typeOfBuilding
+   - Deliverables: interiorCadElevations, BIM formats multi-select, bimVersion, customTemplate
+   - ACT Ceiling: aboveBelowACT scope, actSqft
+   - Internal Notes: sqftAssumptions, assumedGrossMargin, caveatsProfitability, mixedScope, insuranceRequirements
+   - Contacts: account, design pro, other contacts with email/phone, proof links
+   - Lead Tracking: 18 source options, assist attribution, probability, project status
+   - Timeline: estimated timeline, notes
+   - PostMessage handler for CPQ_SCOPING_PAYLOAD (origin-validated security)
+   - All fields persist in `scopingData` JSON field on cpqQuotes table
 
 ---
 
