@@ -238,14 +238,14 @@ function DocumentReviewDialog({
                 <FileText className="h-5 w-5" />
                 Review: {document.pandaDocName}
               </DialogTitle>
-              <DialogDescription className="flex items-center gap-4 mt-1">
+              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                 <span>AI-extracted data ready for review</span>
                 <Badge variant={extracted.confidence >= 80 ? "default" : extracted.confidence >= 50 ? "secondary" : "destructive"}>
                   <Sparkles className="h-3 w-3 mr-1" />
                   {extracted.confidence}% confidence
                 </Badge>
                 <StageBadge stage={document.pandaDocStage} />
-              </DialogDescription>
+              </div>
             </div>
             <Button variant="outline" size="sm" asChild>
                 <a href={`/api/pandadoc/documents/${document.id}/pdf`} target="_blank" rel="noopener noreferrer">
