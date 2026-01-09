@@ -725,9 +725,13 @@ Thanks!`.trim();
     : null;
 
   // Fetch project coordinates for boundary drawing
+  const locationPreviewUrl = lead?.projectAddress 
+    ? `/api/location/preview?address=${encodeURIComponent(lead.projectAddress)}`
+    : null;
+  
   const { data: locationData } = useQuery<{ coordinates?: { lat: number; lng: number } }>({
-    queryKey: ["/api/location/preview", { address: lead?.projectAddress }],
-    enabled: !!lead?.projectAddress,
+    queryKey: [locationPreviewUrl],
+    enabled: !!locationPreviewUrl,
   });
 
   // Get project coordinates from location preview
