@@ -81,13 +81,15 @@ import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
 import CPQCalculator from "@/features/cpq/Calculator";
 import { LocationPreview } from "@/components/LocationPreview";
+import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
+import { Brain } from "lucide-react";
 
 const BUYER_PERSONAS: Record<string, string> = {
-  BP1: "Technical (specs focused)",
-  BP2: "Executive (ROI/Speed)",
-  BP3: "Operations (logistics)",
-  BP4: "Procurement (price/terms)",
+  "BP-A": "Design Principal / Senior Architect",
+  "BP-B": "Project Architect / Manager",
+  "BP-C": "Owner Representative / Developer",
+  "BP-D": "GC / Construction Manager",
 };
 
 // QuickBooks Estimate Status Badge Component
@@ -844,6 +846,10 @@ export default function DealWorkspace() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="ai" className="gap-2" data-testid="tab-ai-assistant">
+              <Brain className="w-4 h-4" />
+              AI Assistant
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -1427,6 +1433,15 @@ export default function DealWorkspace() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        {/* AI Assistant Tab */}
+        <TabsContent value="ai" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full">
+            <div className="p-4">
+              <DealAIAssistant lead={lead} />
             </div>
           </ScrollArea>
         </TabsContent>
