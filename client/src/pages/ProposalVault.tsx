@@ -223,7 +223,7 @@ function DocumentReviewDialog({
   };
 
   const totalSqft = editedAreas.reduce((sum, a) => sum + (a.sqft || 0), 0);
-  const calculatedTotal = editedServices.reduce((sum, s) => sum + ((s.price || 0) * (s.quantity || 1)), 0);
+  const calculatedTotal = editedServices.reduce((sum, s) => sum + (s.price || 0), 0);
   const displayTotal = editedData.totalPrice ?? extracted?.totalPrice ?? calculatedTotal;
 
   if (!document || !extracted) return null;
@@ -469,7 +469,7 @@ function DocumentReviewDialog({
                             </div>
                           </div>
                           <div className="w-28 text-right font-mono text-sm">
-                            ${((service.price || 0) * (service.quantity || 1)).toLocaleString()}
+                            ${(service.price || 0).toLocaleString()}
                           </div>
                           <Button size="icon" variant="ghost" onClick={() => removeService(index)} data-testid={`button-remove-service-${index}`}>
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -528,7 +528,7 @@ function DocumentReviewDialog({
                 {editedServices.map((service, index) => (
                   <div key={index} className="flex justify-between text-sm">
                     <span className="truncate flex-1 mr-2">{service.name}</span>
-                    <span className="font-mono">${((service.price || 0) * (service.quantity || 1)).toLocaleString()}</span>
+                    <span className="font-mono">${(service.price || 0).toLocaleString()}</span>
                   </div>
                 ))}
                 {editedServices.length === 0 && extracted.pricingBreakdown?.map((item, index) => (
