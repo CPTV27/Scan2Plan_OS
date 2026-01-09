@@ -1,8 +1,12 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import { createRequire } from "module";
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
 
-const require = createRequire(import.meta.url);
+const execAsync = promisify(exec);
 
 const ProposalSchema = z.object({
   client: z.object({
@@ -41,6 +45,8 @@ function getOpenAI(): OpenAI {
 
 const VISION_SYSTEM_PROMPT = `You are a Data Entry Clerk specialized in extracting structured data from laser scanning and BIM proposal documents.
 
+IMPORTANT: Focus on finding the "ESTIMATE" page - this is the page that contains the pricing table with all line items.
+
 Analyze these proposal images carefully:
 
 1. Identify the Client:
@@ -51,20 +57,20 @@ Analyze these proposal images carefully:
    - Look for the specific address being scanned
    - Look for project date
 
-3. Extract the Pricing Table:
-   - Find the pricing/services table
-   - CRITICAL: Only extract rows that appear to be "Selected" or "Included"
-   - If there are checkboxes, look for the "X", checkmark, or filled checkbox
+3. Extract the Pricing Table (on the ESTIMATE page):
+   - Find the estimate/pricing table with columns like: Item, Description, Qty, Rate, Amount
+   - CRITICAL: Extract ALL line items with their prices
+   - If there are checkboxes, only include rows with checked boxes (X or checkmark)
    - If it's a standard list, extract all line items with a price
 
 4. For each line item, capture:
-   - Product/Service Name (e.g., "LoD 300 + MEPF", "Scan2Plan Residential")
-   - Description
-   - Quantity (sqft or count)
+   - Title/Name (e.g., "LoD 300 + MEPF", "Scan2Plan Residential", "7.3.1 Plumbing pipe")
+   - Description (may be multi-line)
+   - Quantity (sqft, count, or hours)
    - Rate (per unit price)
-   - Amount/Total
+   - Amount/Total for that line
 
-5. Find the Grand Total at the bottom of the table
+5. Find the Grand Total / Subtotal at the bottom of the table
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -92,37 +98,45 @@ Return ONLY valid JSON matching this exact structure:
 
 Do NOT add markdown fencing or any text outside the JSON.`;
 
-export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 5): Promise<string[]> {
+export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 8): Promise<string[]> {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "pdf-"));
+  const pdfPath = path.join(tmpDir, "input.pdf");
+  const outputPrefix = path.join(tmpDir, "page");
+  
   try {
-    const pdfImgConvert = require("pdf-img-convert");
+    await fs.writeFile(pdfPath, pdfBuffer);
     
-    const options = {
-      width: 1600,
-      height: 2200,
-      page_numbers: Array.from({ length: maxPages }, (_, i) => i + 1),
-    };
+    await execAsync(`pdftoppm -png -r 150 -l ${maxPages} "${pdfPath}" "${outputPrefix}"`);
     
-    const images = await pdfImgConvert.convert(pdfBuffer, options);
+    const files = await fs.readdir(tmpDir);
+    const pngFiles = files.filter(f => f.endsWith(".png")).sort();
     
     const base64Images: string[] = [];
-    for (let i = 0; i < Math.min(images.length, maxPages); i++) {
-      const imageBuffer = Buffer.from(images[i]);
+    for (const pngFile of pngFiles) {
+      const imagePath = path.join(tmpDir, pngFile);
+      const imageBuffer = await fs.readFile(imagePath);
       const base64 = imageBuffer.toString("base64");
       base64Images.push(`data:image/png;base64,${base64}`);
     }
     
-    console.log(`Converted ${base64Images.length} pages to images`);
+    console.log(`Converted ${base64Images.length} pages to images using pdftoppm`);
     return base64Images;
-  } catch (error) {
-    console.error("PDF to image conversion failed:", error);
-    throw error;
+  } finally {
+    try {
+      const files = await fs.readdir(tmpDir);
+      for (const file of files) {
+        await fs.unlink(path.join(tmpDir, file));
+      }
+      await fs.rmdir(tmpDir);
+    } catch (e) {
+    }
   }
 }
 
 export async function extractProposalData(pdfBuffer: Buffer): Promise<ProposalData> {
   console.log("Starting vision-based proposal extraction...");
   
-  const images = await convertPdfToImages(pdfBuffer, 5);
+  const images = await convertPdfToImages(pdfBuffer, 8);
   
   if (images.length === 0) {
     throw new Error("No images extracted from PDF");
@@ -152,7 +166,7 @@ export async function extractProposalData(pdfBuffer: Buffer): Promise<ProposalDa
         content: [
           {
             type: "text",
-            text: "Extract the proposal data from these document pages. Focus on finding the client info, project address, and all selected/included line items with their prices.",
+            text: "Extract the proposal data from these document pages. Look for the ESTIMATE page which contains the pricing table with all services and their prices. Extract client info, project address, and all line items with their quantities, rates, and totals.",
           },
           ...imageContents,
         ],
