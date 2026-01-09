@@ -1927,3 +1927,88 @@ export const pandaDocDocumentsRelations = relations(pandaDocDocuments, ({ one })
     references: [leads.id],
   }),
 }));
+
+// === COGNITIVE BRAND ENGINE TABLES ===
+
+// Brand Personas - Stores the "voice modes" (Executive Signal Mapper, Master Author, etc.)
+export const brandPersonas = pgTable("brand_personas", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  coreIdentity: text("core_identity").notNull(),
+  voiceMode: jsonb("voice_mode"),
+  mantra: text("mantra"),
+  directives: text("directives"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBrandPersonaSchema = createInsertSchema(brandPersonas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BrandPersona = typeof brandPersonas.$inferSelect;
+export type InsertBrandPersona = z.infer<typeof insertBrandPersonaSchema>;
+
+// Governance Red Lines - "Do Not Say" rules for AI content generation
+export const governanceRedLines = pgTable("governance_red_lines", {
+  id: serial("id").primaryKey(),
+  ruleContent: text("rule_content").notNull(),
+  violationCategory: text("violation_category").notNull(),
+  correctionInstruction: text("correction_instruction").notNull(),
+  severity: integer("severity").default(1).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGovernanceRedLineSchema = createInsertSchema(governanceRedLines).omit({
+  id: true,
+  createdAt: true,
+});
+export type GovernanceRedLine = typeof governanceRedLines.$inferSelect;
+export type InsertGovernanceRedLine = z.infer<typeof insertGovernanceRedLineSchema>;
+
+// Standard Definitions - The "Hard Deck" of immutable facts (LoA/LoD, guarantees, etc.)
+export const standardDefinitions = pgTable("standard_definitions", {
+  id: serial("id").primaryKey(),
+  term: text("term").notNull().unique(),
+  definition: text("definition").notNull(),
+  guaranteeText: text("guarantee_text"),
+  category: text("category").default("general"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStandardDefinitionSchema = createInsertSchema(standardDefinitions).omit({
+  id: true,
+  createdAt: true,
+});
+export type StandardDefinition = typeof standardDefinitions.$inferSelect;
+export type InsertStandardDefinition = z.infer<typeof insertStandardDefinitionSchema>;
+
+// Generation Audit Logs - Tracks AI self-correction during content generation
+export const generationAuditLogs = pgTable("generation_audit_logs", {
+  id: serial("id").primaryKey(),
+  promptContext: text("prompt_context").notNull(),
+  buyerType: text("buyer_type"),
+  painPoint: text("pain_point"),
+  situation: text("situation"),
+  initialDraft: text("initial_draft").notNull(),
+  violationCount: integer("violation_count").default(0).notNull(),
+  violationsFound: jsonb("violations_found"),
+  rewriteAttempts: integer("rewrite_attempts").default(0).notNull(),
+  finalOutput: text("final_output").notNull(),
+  personaUsed: text("persona_used"),
+  authorMode: text("author_mode"),
+  processingTimeMs: integer("processing_time_ms"),
+  userId: text("user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertGenerationAuditLogSchema = createInsertSchema(generationAuditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type GenerationAuditLog = typeof generationAuditLogs.$inferSelect;
+export type InsertGenerationAuditLog = z.infer<typeof insertGenerationAuditLogSchema>;
