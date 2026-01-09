@@ -809,7 +809,7 @@ Return ONLY valid JSON.`;
     reviewedBy: string,
     editedData?: Partial<ExtractedQuoteData>,
     reviewNotes?: string
-  ): Promise<{ document: PandaDocDocument; quote?: typeof cpqQuotes.$inferSelect }> {
+  ): Promise<{ document: PandaDocDocument; quote?: typeof cpqQuotes.$inferSelect; lead?: typeof leads.$inferSelect }> {
     const [doc] = await db.select()
       .from(pandaDocDocuments)
       .where(eq(pandaDocDocuments.id, documentId))
@@ -825,7 +825,34 @@ Return ONLY valid JSON.`;
 
     const quoteNumber = `PD-${doc.pandaDocId.substring(0, 8).toUpperCase()}`;
     
+    // Map PandaDoc stage to pipeline deal stage
+    const pandaDocStage = doc.pandaDocStage;
+    let dealStage: string;
+    if (pandaDocStage === "closed_won" || pandaDocStage === "paid") {
+      dealStage = "Closed Won";
+    } else if (pandaDocStage === "closed_lost" || pandaDocStage === "voided" || pandaDocStage === "declined") {
+      dealStage = "Closed Lost";
+    } else if (pandaDocStage === "sent" || pandaDocStage === "viewed") {
+      dealStage = "Proposal";
+    } else {
+      dealStage = "Proposal"; // Default for imported proposals
+    }
+    
+    // First create a lead for the pipeline
+    const [lead] = await db.insert(leads).values({
+      clientName: finalData.clientName || "Unknown Client",
+      projectName: finalData.projectName || doc.pandaDocName || "Imported Project",
+      projectAddress: finalData.projectAddress || "TBD",
+      value: finalData.totalPrice?.toString() || "0",
+      dealStage,
+      probability: dealStage === "Closed Won" ? 100 : dealStage === "Closed Lost" ? 0 : 50,
+      notes: `Imported from PandaDoc: ${doc.pandaDocName}\n${reviewNotes || ""}`,
+      leadSource: "PandaDoc Import",
+    }).returning();
+    
+    // Then create the CPQ quote linked to the lead
     const [quote] = await db.insert(cpqQuotes).values({
+      leadId: lead.id,
       quoteNumber,
       projectName: finalData.projectName || doc.pandaDocName || "Imported Quote",
       projectAddress: finalData.projectAddress || "TBD",
@@ -856,12 +883,15 @@ Return ONLY valid JSON.`;
         reviewNotes,
         extractedData: finalData as any,
         cpqQuoteId: quote.id,
+        leadId: lead.id,
         updatedAt: new Date(),
       })
       .where(eq(pandaDocDocuments.id, documentId))
       .returning();
 
-    return { document: updated, quote };
+    console.log(`PandaDoc approved: Created lead ${lead.id} (${dealStage}) and quote ${quote.id}`);
+
+    return { document: updated, quote, lead };
   }
 
   async rejectDocument(
