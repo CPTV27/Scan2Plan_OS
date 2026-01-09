@@ -740,7 +740,7 @@ Thanks!`.trim();
         {/* Left Panel - Form */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-6 max-w-3xl">
-            {/* Pricing Mode Selector */}
+            {/* Pricing Mode Toggle - Tier A option */}
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h2 className="text-lg font-medium">Pricing Mode</h2>
@@ -753,27 +753,15 @@ Thanks!`.trim();
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button 
-                  variant={pricingMode === "standard" ? "default" : "outline"} 
+                  variant={pricingMode !== "tierA" ? "default" : "outline"} 
                   size="sm"
                   onClick={() => setPricingMode("standard")}
                   data-testid="button-mode-standard"
                 >
                   <Building2 className="h-4 w-4 mr-1" />
-                  Standard Areas
-                  {standardAreas.length > 0 && (
-                    <Badge variant="secondary" className="ml-2">{standardAreas.length}</Badge>
-                  )}
-                </Button>
-                <Button 
-                  variant={pricingMode === "landscape" ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setPricingMode("landscape")}
-                  data-testid="button-mode-landscape"
-                >
-                  <MapPin className="h-4 w-4 mr-1" />
-                  Landscape (Acres)
-                  {landscapeAreas.length > 0 && (
-                    <Badge variant="secondary" className="ml-2">{landscapeAreas.length}</Badge>
+                  Areas
+                  {areas.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{areas.length}</Badge>
                   )}
                 </Button>
                 <Button 
@@ -794,251 +782,236 @@ Thanks!`.trim();
             
             <Separator />
 
-            {/* Standard Areas Section */}
-            {pricingMode === "standard" && (
+            {/* Combined Areas Section (Building + Landscape) */}
+            {pricingMode !== "tierA" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <h2 className="text-lg font-medium flex items-center gap-2">
                     <Building2 className="h-5 w-5" />
-                    Building Areas
+                    Project Areas
                   </h2>
-                  <Button variant="outline" size="sm" onClick={() => addArea("standard")} data-testid="button-add-standard-area">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Building
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => addArea("standard")} data-testid="button-add-standard-area">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Building
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => addArea("landscape")} data-testid="button-add-landscape-area">
+                      <Plus className="h-4 w-4 mr-1" />
+                      <MapPin className="h-4 w-4 mr-1" />
+                      Add Landscape
+                    </Button>
+                  </div>
                 </div>
 
-                {standardAreas.length === 0 && (
+                {areas.length === 0 && (
                   <Card className="border-dashed">
                     <CardContent className="py-8 text-center text-muted-foreground">
                       <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No standard building areas added yet.</p>
-                      <Button variant="outline" size="sm" className="mt-4" onClick={() => addArea("standard")}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add First Building
-                      </Button>
+                      <p>No project areas added yet.</p>
+                      <p className="text-sm mt-1">Add buildings (sqft) or landscape areas (acres).</p>
+                      <div className="flex gap-2 justify-center mt-4">
+                        <Button variant="outline" size="sm" onClick={() => addArea("standard")}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Building
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => addArea("landscape")}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Landscape
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
 
-                {standardAreas.map((area, index) => (
+                {areas.map((area, index) => {
+                  // Calculate kind-specific index for test IDs
+                  const kindIndex = areas.slice(0, index).filter(a => a.kind === area.kind).length;
+                  const isLandscape = area.kind === "landscape";
+                  
+                  return (
                   <Card key={area.id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between gap-2">
-                        <Input
-                          value={area.name}
-                          onChange={(e) => updateArea(area.id, "name", e.target.value)}
-                          className="font-medium max-w-[200px]"
-                          data-testid={`input-area-name-${index}`}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeArea(area.id)}
-                          data-testid={`button-remove-area-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Building Type</Label>
-                          <Select
-                            value={area.buildingType}
-                            onValueChange={(v) => updateArea(area.id, "buildingType", v)}
-                          >
-                            <SelectTrigger data-testid={`select-building-type-${index}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {BUILDING_TYPES.filter(bt => bt.id !== "14" && bt.id !== "15").map((bt) => (
-                                <SelectItem key={bt.id} value={bt.id}>
-                                  {bt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Square Footage</Label>
+                        <div className="flex items-center gap-2">
                           <Input
-                            type="number"
-                            value={area.squareFeet}
-                            onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
-                            placeholder="e.g., 50000"
-                            data-testid={`input-sqft-${index}`}
+                            value={area.name}
+                            onChange={(e) => updateArea(area.id, "name", e.target.value)}
+                            className="font-medium max-w-[200px]"
+                            data-testid={isLandscape ? `input-landscape-name-${kindIndex}` : `input-area-name-${kindIndex}`}
                           />
-                        </div>
-                      </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Level of Detail</Label>
-                        <Select value={area.lod} onValueChange={(v) => updateArea(area.id, "lod", v)}>
-                          <SelectTrigger data-testid={`select-lod-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {LOD_OPTIONS.map((lod) => (
-                              <SelectItem key={lod.id} value={lod.id}>
-                                {lod.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Scope</Label>
-                        <Select
-                          value={area.scope || "full"}
-                          onValueChange={(v) => updateArea(area.id, "scope", v)}
-                        >
-                          <SelectTrigger data-testid={`select-scope-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SCOPE_OPTIONS.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Disciplines</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {DISCIPLINES.map((d) => (
-                          <Badge
-                            key={d.id}
-                            variant={area.disciplines?.includes(d.id) ? "default" : "outline"}
-                            className="cursor-pointer toggle-elevate"
-                            onClick={() => toggleDiscipline(area.id, d.id)}
-                            data-testid={`badge-discipline-${d.id}-${index}`}
-                          >
-                            {d.label}
+                          <Badge variant={isLandscape ? "secondary" : "outline"}>
+                            {isLandscape ? (
+                              <><MapPin className="h-3 w-3 mr-1" />Landscape</>
+                            ) : (
+                              <><Building2 className="h-3 w-3 mr-1" />Building</>
+                            )}
                           </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`cad-${area.id}`}
-                        checked={area.includeCadDeliverable || false}
-                        onCheckedChange={(checked) =>
-                          updateArea(area.id, "includeCadDeliverable", checked)
-                        }
-                        data-testid={`checkbox-cad-${index}`}
-                      />
-                      <Label htmlFor={`cad-${area.id}`} className="text-sm">
-                        Include CAD Deliverable
-                      </Label>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            )}
-
-            {/* Landscape Areas Section */}
-            {pricingMode === "landscape" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <h2 className="text-lg font-medium flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Landscape Areas
-                  </h2>
-                  <Button variant="outline" size="sm" onClick={() => addArea("landscape")} data-testid="button-add-landscape-area">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Landscape
-                  </Button>
-                </div>
-
-                {landscapeAreas.length === 0 && (
-                  <Card className="border-dashed">
-                    <CardContent className="py-8 text-center text-muted-foreground">
-                      <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>No landscape areas added yet.</p>
-                      <p className="text-sm mt-1">Landscape areas are measured in acres.</p>
-                      <Button variant="outline" size="sm" className="mt-4" onClick={() => addArea("landscape")}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add First Landscape
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {landscapeAreas.map((area, index) => (
-                  <Card key={area.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <Input
-                          value={area.name}
-                          onChange={(e) => updateArea(area.id, "name", e.target.value)}
-                          className="font-medium max-w-[200px]"
-                          data-testid={`input-landscape-name-${index}`}
-                        />
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => removeArea(area.id)}
-                          data-testid={`button-remove-landscape-${index}`}
+                          data-testid={isLandscape ? `button-remove-landscape-${kindIndex}` : `button-remove-area-${kindIndex}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Landscape Type</Label>
-                          <Select
-                            value={area.buildingType}
-                            onValueChange={(v) => updateArea(area.id, "buildingType", v)}
-                          >
-                            <SelectTrigger data-testid={`select-landscape-type-${index}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {LANDSCAPE_TYPES.map((lt) => (
-                                <SelectItem key={lt.id} value={lt.id}>
-                                  {lt.label}
-                                </SelectItem>
+                      {/* Building-specific fields */}
+                      {area.kind === "standard" && (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Building Type</Label>
+                              <Select
+                                value={area.buildingType}
+                                onValueChange={(v) => updateArea(area.id, "buildingType", v)}
+                              >
+                                <SelectTrigger data-testid={`select-building-type-${kindIndex}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {BUILDING_TYPES.filter(bt => bt.id !== "14" && bt.id !== "15").map((bt) => (
+                                    <SelectItem key={bt.id} value={bt.id}>
+                                      {bt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Square Footage</Label>
+                              <Input
+                                type="number"
+                                value={area.squareFeet}
+                                onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
+                                placeholder="e.g., 50000"
+                                data-testid={`input-sqft-${kindIndex}`}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Level of Detail</Label>
+                              <Select value={area.lod} onValueChange={(v) => updateArea(area.id, "lod", v)}>
+                                <SelectTrigger data-testid={`select-lod-${kindIndex}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LOD_OPTIONS.map((lod) => (
+                                    <SelectItem key={lod.id} value={lod.id}>
+                                      {lod.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Scope</Label>
+                              <Select
+                                value={area.scope || "full"}
+                                onValueChange={(v) => updateArea(area.id, "scope", v)}
+                              >
+                                <SelectTrigger data-testid={`select-scope-${kindIndex}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {SCOPE_OPTIONS.map((s) => (
+                                    <SelectItem key={s.id} value={s.id}>
+                                      {s.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Disciplines</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {DISCIPLINES.map((d) => (
+                                <Badge
+                                  key={d.id}
+                                  variant={area.disciplines?.includes(d.id) ? "default" : "outline"}
+                                  className="cursor-pointer toggle-elevate"
+                                  onClick={() => toggleDiscipline(area.id, d.id)}
+                                  data-testid={`badge-discipline-${d.id}-${kindIndex}`}
+                                >
+                                  {d.label}
+                                </Badge>
                               ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Acres</Label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={area.squareFeet}
-                            onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
-                            placeholder="e.g., 5"
-                            data-testid={`input-acres-${index}`}
-                          />
-                          {area.squareFeet && (
-                            <p className="text-xs text-muted-foreground">
-                              = {getAreaSqft(area).toLocaleString()} sqft
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">Site Discipline</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          Landscape areas use site discipline only
-                        </span>
-                      </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`cad-${area.id}`}
+                              checked={area.includeCadDeliverable || false}
+                              onCheckedChange={(checked) =>
+                                updateArea(area.id, "includeCadDeliverable", checked)
+                              }
+                              data-testid={`checkbox-cad-${kindIndex}`}
+                            />
+                            <Label htmlFor={`cad-${area.id}`} className="text-sm">
+                              Include CAD Deliverable
+                            </Label>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Landscape-specific fields */}
+                      {area.kind === "landscape" && (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Landscape Type</Label>
+                              <Select
+                                value={area.buildingType}
+                                onValueChange={(v) => updateArea(area.id, "buildingType", v)}
+                              >
+                                <SelectTrigger data-testid={`select-landscape-type-${kindIndex}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LANDSCAPE_TYPES.map((lt) => (
+                                    <SelectItem key={lt.id} value={lt.id}>
+                                      {lt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Acres</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                value={area.squareFeet}
+                                onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
+                                placeholder="e.g., 5"
+                                data-testid={`input-acres-${kindIndex}`}
+                              />
+                              {area.squareFeet && (
+                                <p className="text-xs text-muted-foreground">
+                                  = {getAreaSqft(area).toLocaleString()} sqft
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">Site Discipline</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Landscape areas use site discipline only
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
 
