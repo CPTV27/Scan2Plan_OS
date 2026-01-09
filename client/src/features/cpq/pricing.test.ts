@@ -755,44 +755,51 @@ describe('Risk Premium Tests', () => {
 });
 
 describe('Scope Discount Tests', () => {
+  // Use 50,000 sqft to avoid $3,000 minimum charge affecting ratio calculations
   
-  it('should apply interior-only scope (100% interior, 0% exterior)', () => {
+  it('should apply interior-only scope at 75% of full price (25% discount)', () => {
     const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
     const interiorOnly: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'interior' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'interior' }];
     
     const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
     const interiorResult = calculatePricing(interiorOnly, {}, null, [], 'standard');
     
-    // Interior only should be same as full (100% multiplier applies)
-    expect(interiorResult.totalClientPrice).toBeGreaterThan(0);
+    // Interior only = 75% of full price (25% discount)
+    const expectedRatio = 0.75;
+    const actualRatio = interiorResult.totalClientPrice / fullResult.totalClientPrice;
+    expect(actualRatio).toBeCloseTo(expectedRatio, 2);
   });
   
-  it('should apply exterior-only scope (0% interior, 100% exterior)', () => {
+  it('should apply exterior-only scope at 50% of full price (50% discount)', () => {
     const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
     const exteriorOnly: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'exterior' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'exterior' }];
     
     const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
     const exteriorResult = calculatePricing(exteriorOnly, {}, null, [], 'standard');
     
-    // Exterior should be same price as full (scope multiplier normalizes)
-    expect(exteriorResult.totalClientPrice).toBeGreaterThan(0);
+    // Exterior only = 50% of full price (50% discount)
+    const expectedRatio = 0.50;
+    const actualRatio = exteriorResult.totalClientPrice / fullResult.totalClientPrice;
+    expect(actualRatio).toBeCloseTo(expectedRatio, 2);
   });
   
-  it('should apply roof scope at 10% of full price', () => {
+  it('should apply roof scope at 35% of full price (65% discount)', () => {
     const fullScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'full' }];
     const roofScope: Area[] = [{ id: '1', name: 'Test', kind: 'standard', buildingType: '1',
-      squareFeet: '20000', lod: '300', disciplines: ['architecture'], scope: 'roof' }];
+      squareFeet: '50000', lod: '300', disciplines: ['architecture'], scope: 'roof' }];
     
     const fullResult = calculatePricing(fullScope, {}, null, [], 'standard');
     const roofResult = calculatePricing(roofScope, {}, null, [], 'standard');
     
-    // Roof scope should be significantly less than full
-    expect(roofResult.totalClientPrice).toBeLessThan(fullResult.totalClientPrice);
+    // Roof scope = 35% of full price (65% discount)
+    const expectedRatio = 0.35;
+    const actualRatio = roofResult.totalClientPrice / fullResult.totalClientPrice;
+    expect(actualRatio).toBeCloseTo(expectedRatio, 2);
   });
 });
 

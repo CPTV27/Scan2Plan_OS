@@ -173,11 +173,12 @@ const LOD_MULTIPLIERS: Record<string, number> = {
 };
 
 // Scope multipliers (portion of price applied)
+// Scope Discounts: Interior Only = 75% (25% off), Exterior Only = 50% (50% off), Roof = 35% (65% off)
 const SCOPE_MULTIPLIERS: Record<string, { interior: number; exterior: number }> = {
-  full: { interior: 0.7, exterior: 0.3 },
-  interior: { interior: 1.0, exterior: 0 },
-  exterior: { interior: 0, exterior: 1.0 },
-  roof: { interior: 0, exterior: 0.1 }, // Roof/facades at 10% per item
+  full: { interior: 0.7, exterior: 0.3 },       // 100% - full project
+  interior: { interior: 0.75, exterior: 0 },    // 75% - 25% discount for interior only
+  exterior: { interior: 0, exterior: 0.5 },     // 50% - 50% discount for exterior only
+  roof: { interior: 0, exterior: 0.35 },        // 35% - 65% discount for roof/facades only
 };
 
 // Area tier breaks for pricing adjustments
