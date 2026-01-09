@@ -3,15 +3,26 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedMarketingData } from "./data/seedMarketing";
+import { correlationIdMiddleware } from "./middleware/correlationId";
+import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { SERVER_CONSTANTS } from "./constants";
+import { pool } from "./db";
+import { log } from "./lib/logger";
+
+export { log };
 
 const app = express();
 const httpServer = createServer(app);
+let isShuttingDown = false;
 
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
+
+app.use(correlationIdMiddleware);
 
 app.use(
   express.json({
@@ -23,20 +34,38 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+app.use("/api/", apiLimiter);
+app.use("/api/auth/", authLimiter);
 
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
+app.get("/api/health", async (_req: Request, res: Response) => {
+  if (isShuttingDown) {
+    return res.status(503).json({
+      status: "shutting_down",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  try {
+    await pool.query("SELECT 1");
+    res.json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: "connected",
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: "unhealthy",
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
+  }
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
+  const requestId = req.id || "unknown";
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -48,9 +77,9 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      let logLine = `[${requestId}] ${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse).slice(0, 500)}`;
       }
 
       log(logLine);
@@ -60,20 +89,40 @@ app.use((req, res, next) => {
   next();
 });
 
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  log(`${signal} received, starting graceful shutdown...`, "shutdown");
+
+  httpServer.close(() => {
+    log("HTTP server closed", "shutdown");
+  });
+
+  setTimeout(() => {
+    log("Forcing shutdown after timeout", "shutdown");
+    process.exit(1);
+  }, SERVER_CONSTANTS.GRACEFUL_SHUTDOWN_TIMEOUT_MS);
+
+  try {
+    await pool.end();
+    log("Database connections closed", "shutdown");
+    process.exit(0);
+  } catch (error) {
+    log("Error during shutdown", "shutdown");
+    process.exit(1);
+  }
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  app.use("/api/*", notFoundHandler);
+  app.use(errorHandler);
 
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -81,13 +130,8 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // Seed marketing data (personas and evidence vault hooks)
   await seedMarketingData();
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
     {
