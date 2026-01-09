@@ -3,7 +3,17 @@ import { brandPersonas, governanceRedLines, standardDefinitions, generationAudit
 import { eq } from "drizzle-orm";
 import OpenAI from "openai";
 
-const openai = new OpenAI();
+let _openai: OpenAI | null = null;
+
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return _openai;
+}
 
 export type BuyerMode = "A_Principal" | "B_OwnerDev" | "C_Unknown";
 export type Situation = "1_Pilot" | "2_NoProjectMeeting" | "3_PriorBadExperience";
@@ -156,11 +166,11 @@ export async function runSelfCheckV2(draftText: string): Promise<SelfCheckResult
     if (matches) {
       const definitions = await db.select().from(standardDefinitions).where(eq(standardDefinitions.active, true));
       const allowedGuarantees = definitions
-        .filter(d => d.guaranteeText)
-        .map(d => d.guaranteeText?.toLowerCase() || "");
+        .filter(d => d.guaranteeText !== null && d.guaranteeText !== undefined && d.guaranteeText.trim() !== "")
+        .map(d => (d.guaranteeText as string).toLowerCase());
       
-      const guaranteeContext = draftText.toLowerCase();
-      const hasApprovedGuarantee = allowedGuarantees.some(g => guaranteeContext.includes(g.toLowerCase()));
+      const draftLower = draftText.toLowerCase();
+      const hasApprovedGuarantee = allowedGuarantees.some(g => draftLower.includes(g));
       
       if (!hasApprovedGuarantee) {
         violations.push({
@@ -169,20 +179,6 @@ export async function runSelfCheckV2(draftText: string): Promise<SelfCheckResult
           correction: "Reframe as standards/process/change-control language or use exact canonical guarantee text",
         });
       }
-    }
-  }
-
-  for (const redLine of redLines) {
-    const keywords = redLine.ruleContent.toLowerCase().split(/\s+/).filter(w => w.length > 4);
-    const draftLower = draftText.toLowerCase();
-    const matchCount = keywords.filter(kw => draftLower.includes(kw)).length;
-    
-    if (matchCount >= Math.ceil(keywords.length * 0.3)) {
-      violations.push({
-        category: redLine.violationCategory,
-        rule: redLine.ruleContent,
-        correction: redLine.correctionInstruction,
-      });
     }
   }
 
@@ -283,7 +279,7 @@ Keep it under 200 words. No sales pressure. Mechanism-first.`;
   let allViolations: ViolationResult[] = [];
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
@@ -314,7 +310,7 @@ ${currentDraft}
 
 Remember: No hype, no numbers without cases, no comparisons, mechanism-first.`;
 
-      const rewriteResponse = await openai.chat.completions.create({
+      const rewriteResponse = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },

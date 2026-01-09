@@ -30,6 +30,7 @@ import HelpCenter from "@/pages/HelpCenter";
 import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
 import ProposalVault from "@/pages/ProposalVault";
+import BrandGenerator from "@/pages/BrandGenerator";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -144,6 +145,11 @@ function Router() {
         </RoleGuard>
       </Route>
       <Route path="/help" component={HelpCenter} />
+      <Route path="/brand-engine">
+        <RoleGuard allowedRoles={["ceo", "sales"]}>
+          <BrandGenerator />
+        </RoleGuard>
+      </Route>
       <Route path="/scan-tech" component={ScanTech} />
       <Route path="/test-payload">
         <RoleGuard allowedRoles={["ceo"]}>

@@ -209,6 +209,19 @@ FY26_GOALS = {
    - API: `server/lib/pandadoc-client.ts`, `server/routes/pandadoc.ts`
    - UI: `client/src/pages/ProposalVault.tsx`
 
+8. **Cognitive Brand Engine** - AI writing assistant with brand governance
+   - **Executive Brief Generator:** Creates governance-compliant executive communications
+   - **Buyer Type Adaptation:** Dual-mode openers for Architecture Principals vs Owner/Developers
+   - **Pain Point Selection:** Rework/RFI, Schedule Volatility, Inconsistency, Terms Risk
+   - **Self-Check v2:** AI scans drafts for red-line violations (hype, unsupported claims, comparisons, guarantees)
+   - **Auto-Correction Loop:** Up to 3 rewrites to fix violations before output
+   - **Author Modes:** Twain (concise, stripped adjectives) or Fuller (systems thinking)
+   - **Standard Definitions:** The "Hard Deck" of immutable facts (LoA/LoD tolerances, approved guarantees)
+   - **Audit Log:** Full tracking of generation attempts, violations found, and corrections made
+   - Database: `brand_personas`, `governance_red_lines`, `standard_definitions`, `generation_audit_logs`
+   - API: `server/lib/brand_engine.ts`, `server/routes/brandEngine.ts`
+   - UI: `client/src/pages/BrandGenerator.tsx` (accessible via sidebar)
+
 ---
 
 ## Areas Needing Attention
