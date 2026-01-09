@@ -13,10 +13,8 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
-import { createRequire } from "module";
 import { extractProposalData, convertVisionToExtractedData } from "./proposal-vision";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import pdfParse from "pdf-parse";
 
 const PANDADOC_STATUS_TO_CODE: Record<string, number> = {
   "document.draft": 0,

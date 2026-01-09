@@ -4,8 +4,9 @@ import { rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
+// NOTE: ESM-native packages (openid-client, @google/generative-ai, googleapis) 
+// must NOT be bundled as they use import.meta.url and cause createRequire errors
 const allowlist = [
-  "@google/generative-ai",
   "axios",
   "connect-pg-simple",
   "cors",
@@ -15,7 +16,6 @@ const allowlist = [
   "express",
   "express-rate-limit",
   "express-session",
-  "googleapis",
   "jsonwebtoken",
   "memoizee",
   "memorystore",
@@ -23,7 +23,6 @@ const allowlist = [
   "nanoid",
   "nodemailer",
   "openai",
-  "openid-client",
   "p-limit",
   "p-retry",
   "passport",
