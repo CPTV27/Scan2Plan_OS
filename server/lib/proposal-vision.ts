@@ -247,23 +247,80 @@ export async function extractProposalData(pdfBuffer: Buffer): Promise<ProposalDa
 }
 
 export function convertVisionToExtractedData(visionData: ProposalData) {
+  // Calculate the sum of line item totals to compare against grandTotal
+  const lineItemSum = visionData.lineItems.reduce((sum, item) => {
+    if (item.total > 0) return sum + item.total;
+    return sum + (item.rate * item.qty);
+  }, 0);
+  
+  // If line item sum is wildly different from grandTotal (more than 10x), 
+  // the extraction likely confused sqft with qty and totals with rates
+  const extractionConfused = lineItemSum > visionData.grandTotal * 10 && visionData.grandTotal > 0;
+  
+  if (extractionConfused) {
+    console.log("Vision extraction detected confused data - sqft likely interpreted as qty");
+    console.log(`Line item sum: $${lineItemSum.toLocaleString()}, grandTotal: $${visionData.grandTotal.toLocaleString()}`);
+  }
+  
   return {
     projectName: visionData.project.address,
     projectAddress: visionData.project.address,
     clientName: visionData.client.company || visionData.client.name,
     totalPrice: visionData.grandTotal,
-    confidence: 85,
+    confidence: extractionConfused ? 65 : 85, // Lower confidence if data seems confused
     contacts: [{
       name: visionData.client.name,
       email: visionData.client.email,
       company: visionData.client.company,
     }].filter(c => c.name),
-    services: visionData.lineItems.map(item => ({
-      name: item.title,
-      description: item.description,
-      quantity: item.qty,
-      price: item.total > 0 ? item.total : item.rate * item.qty,
-    })),
+    services: visionData.lineItems.map(item => {
+      // If total is provided and reasonable, use it
+      if (item.total > 0) {
+        // Check if "rate" field actually contains the line total (common misread)
+        // This happens when sqft is put in qty and line total is put in rate
+        const calculatedPrice = item.rate * item.qty;
+        const isRateLikelyLineTotal = calculatedPrice > 100000 && item.rate < 50000 && item.qty > 1000;
+        
+        if (isRateLikelyLineTotal) {
+          // The "rate" field probably contains the actual line item price
+          return {
+            name: item.title,
+            description: item.description,
+            quantity: item.qty, // Keep sqft as informational
+            price: item.rate, // Use "rate" as actual price since it's the line total
+          };
+        }
+        
+        return {
+          name: item.title,
+          description: item.description,
+          quantity: item.qty,
+          price: item.total,
+        };
+      }
+      
+      // Calculate price from rate * qty
+      const calculatedPrice = item.rate * item.qty;
+      
+      // Sanity check: if calculated price is unreasonably high (>$1M for a single line item)
+      // and qty looks like sqft (>1000), the rate is probably the actual line total
+      if (calculatedPrice > 1000000 && item.qty > 1000) {
+        console.log(`Correcting likely misread: "${item.title}" - using rate $${item.rate} as price instead of $${calculatedPrice.toLocaleString()}`);
+        return {
+          name: item.title,
+          description: item.description,
+          quantity: item.qty,
+          price: item.rate, // Rate is actually the line total
+        };
+      }
+      
+      return {
+        name: item.title,
+        description: item.description,
+        quantity: item.qty,
+        price: calculatedPrice,
+      };
+    }),
     areas: [],
     variables: {},
     unmappedFields: [],
