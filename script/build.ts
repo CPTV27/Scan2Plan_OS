@@ -27,6 +27,7 @@ const allowlist = [
   "p-retry",
   "passport",
   "passport-local",
+  "pdf-parse",
   "pg",
   "stripe",
   "uuid",

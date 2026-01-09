@@ -14,7 +14,18 @@ import {
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import { extractProposalData, convertVisionToExtractedData } from "./proposal-vision";
-import pdfParse from "pdf-parse";
+
+// pdf-parse is a CJS-only package
+// In ESM (dev), use dynamic import. In CJS (prod), esbuild bundles it directly.
+let pdfParse: any;
+async function getPdfParse() {
+  if (!pdfParse) {
+    // Dynamic import with interop for CJS default export
+    const mod = await import("pdf-parse");
+    pdfParse = mod.default || mod;
+  }
+  return pdfParse;
+}
 
 const PANDADOC_STATUS_TO_CODE: Record<string, number> = {
   "document.draft": 0,
@@ -225,7 +236,8 @@ export class PandaDocClient {
 
   async extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
     try {
-      const data = await pdfParse(pdfBuffer);
+      const parser = await getPdfParse();
+      const data = await parser(pdfBuffer);
       return data.text;
     } catch (error) {
       console.error("PDF text extraction failed:", error);
