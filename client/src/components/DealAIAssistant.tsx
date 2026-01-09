@@ -62,6 +62,17 @@ const EMAIL_TYPES = [
   { value: "close_attempt", label: "Close / Decision Request" },
 ];
 
+const PROJECT_TYPES = [
+  "Commercial / Office",
+  "Industrial / Warehouse", 
+  "Residential",
+  "Healthcare / Medical",
+  "Education / Campus",
+  "Retail / Hospitality",
+  "Mixed Use",
+  "Historical / Renovation",
+];
+
 export function DealAIAssistant({ lead }: DealAIAssistantProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("proposal");
@@ -70,11 +81,13 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
   const [emailContext, setEmailContext] = useState("");
   const [scopeNotes, setScopeNotes] = useState("");
   const [objection, setObjection] = useState("");
+  const [projectType, setProjectType] = useState("Commercial / Office");
+  const [timeline, setTimeline] = useState("Standard");
 
   const buyerCode = lead.buyerPersona || "BP-A";
 
-  const { data: persona, isLoading: personaLoading } = useQuery<BuyerPersona>({
-    queryKey: ["/api/intelligence/personas", buyerCode],
+  const { data: persona, isLoading: personaLoading, error: personaError } = useQuery<BuyerPersona>({
+    queryKey: [`/api/intelligence/personas/${buyerCode}`],
     enabled: !!buyerCode,
   });
 
@@ -83,9 +96,9 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
       const res = await apiRequest("POST", "/api/intelligence/generate/proposal", {
         buyerCode,
         projectName: lead.projectName || lead.clientName,
-        projectType: "Commercial",
+        projectType,
         squareFootage: lead.sqft?.toString() || "TBD",
-        timeline: "Standard",
+        timeline,
         scopeNotes: scopeNotes || lead.notes || undefined,
       });
       return res.json();
@@ -115,7 +128,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
         contentType: "email",
         projectContext: {
           projectName: lead.projectName || lead.clientName,
-          projectType: "Commercial",
+          projectType,
           squareFootage: lead.sqft?.toString() || "TBD",
         },
         specificRequest: emailPrompts[emailType] + (emailContext ? `\n\nAdditional context: ${emailContext}` : ""),
@@ -258,6 +271,35 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
                 <div>
                   <span className="text-muted-foreground">Stage:</span>
                   <p className="font-medium">{lead.dealStage}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Project Type</Label>
+                  <Select value={projectType} onValueChange={setProjectType}>
+                    <SelectTrigger className="mt-1" data-testid="select-project-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Timeline</Label>
+                  <Select value={timeline} onValueChange={setTimeline}>
+                    <SelectTrigger className="mt-1" data-testid="select-timeline">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Urgent">Urgent (1-2 weeks)</SelectItem>
+                      <SelectItem value="Standard">Standard (2-4 weeks)</SelectItem>
+                      <SelectItem value="Flexible">Flexible (4+ weeks)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
