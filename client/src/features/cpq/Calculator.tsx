@@ -379,6 +379,49 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
   }, [existingQuote]);
 
+  // Auto-calculate distance when quote loads with missing distance but has project address
+  useEffect(() => {
+    // Dispatch location addresses (defined inline to avoid hoisting issues)
+    const dispatchAddresses: Record<string, string> = {
+      WOODSTOCK: "Woodstock, NY 12498",
+      BROOKLYN: "Brooklyn, NY 11201",
+    };
+    
+    // Only run if we have a lead with address, travel dispatch but no distance
+    if (!lead?.projectAddress) return;
+    if (!travel?.dispatchLocation || travel.dispatchLocation === "FLY_OUT") return;
+    if (travel.distance && travel.distance > 0) return;
+    if (isCalculatingDistance) return;
+    
+    const calculateMissingDistance = async () => {
+      const originAddress = dispatchAddresses[travel.dispatchLocation];
+      if (!originAddress) return;
+      
+      setIsCalculatingDistance(true);
+      try {
+        const response = await apiRequest("POST", "/api/travel/calculate", {
+          destination: lead.projectAddress,
+          origin: originAddress,
+        });
+        
+        const distanceResult = await response.json() as { distanceMiles?: number; durationText?: string };
+        if (distanceResult.distanceMiles) {
+          setTravel({
+            dispatchLocation: travel.dispatchLocation,
+            distance: Math.round(distanceResult.distanceMiles),
+          });
+        }
+      } catch (error) {
+        // Silently fail - user can enter manually
+        console.debug("[CPQ] Auto distance calculation failed:", error);
+      } finally {
+        setIsCalculatingDistance(false);
+      }
+    };
+    
+    calculateMissingDistance();
+  }, [lead?.projectAddress, travel?.dispatchLocation, travel?.distance, isCalculatingDistance]);
+
   // PostMessage listener for CRM integration - receive CPQ_SCOPING_PAYLOAD
   useEffect(() => {
     // Allowed origins for postMessage security

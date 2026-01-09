@@ -1721,3 +1721,79 @@ export const insertCompensationSplitSchema = createInsertSchema(compensationSpli
 });
 export type CompensationSplit = typeof compensationSplits.$inferSelect;
 export type InsertCompensationSplit = z.infer<typeof insertCompensationSplitSchema>;
+
+// === AI FEATURES TABLES ===
+
+// Deal Predictions - Track AI prediction accuracy
+export const dealPredictions = pgTable("deal_predictions", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id),
+  predictedProbability: integer("predicted_probability"),
+  predictedOutcome: text("predicted_outcome"), // "won" | "lost"
+  actualOutcome: text("actual_outcome"),
+  predictionDate: timestamp("prediction_date").defaultNow(),
+  outcomeDate: timestamp("outcome_date"),
+});
+
+export const insertDealPredictionSchema = createInsertSchema(dealPredictions).omit({
+  id: true,
+  predictionDate: true,
+});
+export type DealPrediction = typeof dealPredictions.$inferSelect;
+export type InsertDealPrediction = z.infer<typeof insertDealPredictionSchema>;
+
+// CPQ Conversations - Natural language quote builder chat history
+export const cpqConversations = pgTable("cpq_conversations", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id),
+  userId: text("user_id"),
+  messages: jsonb("messages"), // Array of {role, content, timestamp}
+  extractedData: jsonb("extracted_data"), // CPQ fields gathered so far
+  quoteId: integer("quote_id"),
+  status: text("status").default("active"), // "active" | "converted" | "abandoned"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCpqConversationSchema = createInsertSchema(cpqConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type CpqConversation = typeof cpqConversations.$inferSelect;
+export type InsertCpqConversation = z.infer<typeof insertCpqConversationSchema>;
+
+// Project Embeddings - Semantic similarity matching
+export const projectEmbeddings = pgTable("project_embeddings", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id),
+  embedding: text("embedding"), // JSON array of floats
+  projectSummary: text("project_summary"), // Text used for embedding
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProjectEmbeddingSchema = createInsertSchema(projectEmbeddings).omit({
+  id: true,
+  updatedAt: true,
+});
+export type ProjectEmbedding = typeof projectEmbeddings.$inferSelect;
+export type InsertProjectEmbedding = z.infer<typeof insertProjectEmbeddingSchema>;
+
+// AI Analytics - Track AI feature usage
+export const aiAnalytics = pgTable("ai_analytics", {
+  id: serial("id").primaryKey(),
+  feature: text("feature").notNull(), // 'scoping' | 'document' | 'intelligence' | 'proposal' | 'nlp_cpq' | 'matching'
+  userId: text("user_id"),
+  leadId: integer("lead_id"),
+  action: text("action"), // 'generated' | 'accepted' | 'rejected' | 'modified'
+  timeTakenMs: integer("time_taken_ms"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiAnalyticsSchema = createInsertSchema(aiAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+export type AiAnalytic = typeof aiAnalytics.$inferSelect;
+export type InsertAiAnalytic = z.infer<typeof insertAiAnalyticsSchema>;

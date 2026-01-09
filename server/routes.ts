@@ -29,6 +29,7 @@ import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerQuickbooksRoutes } from "./routes/quickbooks";
 import { registerInvoiceRoutes } from "./routes/invoices";
 import { registerAirtableRoutes } from "./routes/airtable";
+import { registerAIRoutes } from "./routes/ai";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -215,6 +216,7 @@ export async function registerRoutes(
   registerQuickbooksRoutes(app);
   registerInvoiceRoutes(app);
   registerAirtableRoutes(app);
+  registerAIRoutes(app);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {
