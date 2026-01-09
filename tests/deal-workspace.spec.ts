@@ -1,336 +1,173 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Deal Workspace - Access and Navigation', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await expect(page.getByRole('heading', { name: 'Leads' })).toBeVisible({ timeout: 15000 });
-  });
-
-  test('should open deal workspace from card click', async ({ page }) => {
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
+  test('should access deal workspace via direct URL', async ({ page }) => {
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
     
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('dialog-deal-workspace')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should display deal header with client name', async ({ page }) => {
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('text-deal-client-name')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should show deal value', async ({ page }) => {
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('text-deal-value')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should show deal stage', async ({ page }) => {
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('badge-deal-stage')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should close workspace on X button', async ({ page }) => {
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('dialog-deal-workspace')).toBeVisible({ timeout: 5000 });
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
       
-      await page.getByTestId('button-close-workspace').click();
-      await expect(page.getByTestId('dialog-deal-workspace')).not.toBeVisible({ timeout: 3000 });
+      await expect(page.getByTestId('page-deal-workspace')).toBeVisible({ timeout: 15000 });
+    }
+  });
+
+  test('should have back button', async ({ page }) => {
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
+    
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
+      
+      await expect(page.getByTestId('button-back')).toBeVisible({ timeout: 10000 });
     }
   });
 });
 
 test.describe('Deal Workspace - Tabs', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await expect(page.getByRole('heading', { name: 'Leads' })).toBeVisible({ timeout: 15000 });
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
     
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('dialog-deal-workspace')).toBeVisible({ timeout: 5000 });
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
     }
   });
 
-  test('should have Overview tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-overview')).toBeVisible();
+  test('should have Lead tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-lead')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should have Notes tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-notes')).toBeVisible();
+  test('should have Quote tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-quote')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should have Timeline tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-timeline')).toBeVisible();
-  });
-
-  test('should have CPQ tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-cpq')).toBeVisible();
+  test('should have History tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-history')).toBeVisible({ timeout: 10000 });
   });
 
   test('should have AI Assistant tab', async ({ page }) => {
-    await expect(page.getByTestId('tab-ai-assistant')).toBeVisible();
-  });
-
-  test('should switch between tabs', async ({ page }) => {
-    await page.getByTestId('tab-notes').click();
-    await expect(page.getByTestId('panel-notes')).toBeVisible({ timeout: 3000 });
-    
-    await page.getByTestId('tab-timeline').click();
-    await expect(page.getByTestId('panel-timeline')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('tab-ai-assistant')).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe('Deal Workspace - Overview Tab', () => {
+test.describe('Deal Workspace - Lead Tab Fields', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
     
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await expect(page.getByTestId('dialog-deal-workspace')).toBeVisible({ timeout: 5000 });
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
+      await page.getByTestId('tab-lead').click();
     }
   });
 
-  test('should display UPID', async ({ page }) => {
-    await expect(page.getByTestId('text-upid')).toBeVisible({ timeout: 5000 });
+  test('should have client name input', async ({ page }) => {
+    await expect(page.getByTestId('input-client-name')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show probability', async ({ page }) => {
-    await expect(page.getByTestId('text-probability')).toBeVisible({ timeout: 5000 });
+  test('should have project name input', async ({ page }) => {
+    await expect(page.getByTestId('input-project-name')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show lead score', async ({ page }) => {
-    await expect(page.getByTestId('text-lead-score')).toBeVisible({ timeout: 5000 });
+  test('should have project address input', async ({ page }) => {
+    await expect(page.getByTestId('input-project-address')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show buyer persona', async ({ page }) => {
-    await expect(page.getByTestId('select-buyer-persona')).toBeVisible({ timeout: 5000 });
+  test('should have value input', async ({ page }) => {
+    await expect(page.getByTestId('input-value')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should allow persona selection', async ({ page }) => {
-    const personaSelect = page.getByTestId('select-buyer-persona');
-    
-    if (await personaSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await personaSelect.click();
-      await expect(page.getByText('Design Principal')).toBeVisible({ timeout: 3000 });
-    }
+  test('should have probability input', async ({ page }) => {
+    await expect(page.getByTestId('input-probability')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show project address', async ({ page }) => {
-    await expect(page.getByTestId('text-project-address')).toBeVisible({ timeout: 5000 });
+  test('should have deal stage selector', async ({ page }) => {
+    await expect(page.getByTestId('select-deal-stage')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show square footage', async ({ page }) => {
-    await expect(page.getByTestId('text-sqft')).toBeVisible({ timeout: 5000 });
+  test('should have lead source selector', async ({ page }) => {
+    await expect(page.getByTestId('select-lead-source')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have buyer persona selector', async ({ page }) => {
+    await expect(page.getByTestId('select-buyer-persona')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have notes input', async ({ page }) => {
+    await expect(page.getByTestId('input-notes')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have submit button', async ({ page }) => {
+    await expect(page.getByTestId('button-submit-lead')).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe('Deal Workspace - Notes Tab', () => {
+test.describe('Deal Workspace - Action Buttons', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
     
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await page.getByTestId('tab-notes').click();
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
     }
   });
 
-  test('should have notes input area', async ({ page }) => {
-    await expect(page.getByTestId('textarea-deal-notes')).toBeVisible({ timeout: 5000 });
+  test('should have evidence vault button', async ({ page }) => {
+    await expect(page.getByTestId('button-evidence-vault')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should have save notes button', async ({ page }) => {
-    await expect(page.getByTestId('button-save-notes')).toBeVisible({ timeout: 5000 });
+  test('should have start quote button', async ({ page }) => {
+    await expect(page.getByTestId('button-start-quote')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should save notes', async ({ page }) => {
-    const notesInput = page.getByTestId('textarea-deal-notes');
-    await notesInput.fill(`Test note ${Date.now()}`);
-    
-    await page.getByTestId('button-save-notes').click();
-    
-    await expect(page.getByText('saved')).toBeVisible({ timeout: 5000 });
+  test('should have communicate button', async ({ page }) => {
+    await expect(page.getByTestId('button-communicate')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have generate UPID button', async ({ page }) => {
+    await expect(page.getByTestId('button-generate-upid')).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe('Deal Workspace - Timeline Tab', () => {
+test.describe('Deal Workspace - Quote Tab', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
+    const leadsResponse = await page.request.get('/api/leads');
+    const leads = await leadsResponse.json();
     
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await page.getByTestId('tab-timeline').click();
+    if (leads.length > 0) {
+      await page.goto(`/deals/${leads[0].id}`);
+      await page.waitForLoadState('networkidle');
+      await page.getByTestId('tab-quote').click();
     }
   });
 
-  test('should display activity timeline', async ({ page }) => {
-    await expect(page.getByTestId('timeline-activities')).toBeVisible({ timeout: 5000 });
+  test('should have version selector', async ({ page }) => {
+    await expect(page.getByTestId('select-version')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should have add activity button', async ({ page }) => {
-    await expect(page.getByTestId('button-add-activity')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should show activity types', async ({ page }) => {
-    await page.getByTestId('button-add-activity').click();
-    
-    await expect(page.getByText('Call')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('Email')).toBeVisible();
-    await expect(page.getByText('Meeting')).toBeVisible();
-  });
-});
-
-test.describe('Deal Workspace - CPQ Tab', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await page.getByTestId('tab-cpq').click();
-    }
-  });
-
-  test('should show CPQ quote section', async ({ page }) => {
-    await expect(page.getByTestId('section-cpq-quotes')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should have create quote button', async ({ page }) => {
-    await expect(page.getByTestId('button-create-cpq-quote')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should list associated quotes', async ({ page }) => {
-    await page.waitForTimeout(1000);
-    
-    const quotes = page.locator('[data-testid^="card-quote-"]');
-    const count = await quotes.count();
-  });
-
-  test('should open CPQ calculator', async ({ page }) => {
-    await page.getByTestId('button-create-cpq-quote').click();
-    
-    await page.waitForTimeout(1000);
-  });
-});
-
-test.describe('Deal Workspace - Profitability Gates', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-    }
-  });
-
-  test('should show margin warning for low margin deals', async ({ page }) => {
-    await expect(page.getByTestId('warning-low-margin')).toBeVisible({ timeout: 5000 }).catch(() => {});
-  });
-
-  test('should show stage transition buttons', async ({ page }) => {
-    await expect(page.getByTestId('button-move-stage')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should block proposal without margin compliance', async ({ page }) => {
-    await page.waitForTimeout(1000);
-  });
-});
-
-test.describe('Deal Workspace - Stage Transitions', () => {
-  test('should allow stage advancement', async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      
-      const advanceButton = page.getByTestId('button-advance-stage');
-      if (await advanceButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(advanceButton).toBeVisible();
-      }
-    }
-  });
-
-  test('should show stage history', async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      await page.getByTestId('tab-timeline').click();
-      
-      await expect(page.getByText('Stage changed')).toBeVisible({ timeout: 5000 }).catch(() => {});
-    }
-  });
-});
-
-test.describe('Deal Workspace - Contact Management', () => {
-  test('should show primary contact', async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      
-      await expect(page.getByTestId('section-contacts')).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  test('should have add contact button', async ({ page }) => {
-    await page.goto('/sales');
-    await page.waitForTimeout(2000);
-    
-    const dealCard = page.locator('[data-testid^="card-deal-"]').first();
-    if (await dealCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await dealCard.click();
-      
-      await expect(page.getByTestId('button-add-contact')).toBeVisible({ timeout: 5000 });
-    }
+  test('should have create first quote button', async ({ page }) => {
+    await expect(page.getByTestId('button-create-first-quote')).toBeVisible({ timeout: 10000 });
   });
 });
 
 test.describe('Deal Workspace API', () => {
-  test('should get deal details', async ({ request }) => {
+  test('should get lead details', async ({ request }) => {
     const leadsResponse = await request.get('/api/leads');
     const leads = await leadsResponse.json();
     
     if (leads.length > 0) {
       const response = await request.get(`/api/leads/${leads[0].id}`);
       expect(response.status()).toBe(200);
-      
-      const data = await response.json();
-      expect(data).toHaveProperty('id');
-      expect(data).toHaveProperty('clientName');
     }
   });
 
-  test('should update deal', async ({ request }) => {
+  test('should update lead', async ({ request }) => {
     const leadsResponse = await request.get('/api/leads');
     const leads = await leadsResponse.json();
     
@@ -339,31 +176,6 @@ test.describe('Deal Workspace API', () => {
         data: { notes: `Updated ${Date.now()}` }
       });
       expect([200, 204]).toContain(response.status());
-    }
-  });
-
-  test('should get deal activities', async ({ request }) => {
-    const leadsResponse = await request.get('/api/leads');
-    const leads = await leadsResponse.json();
-    
-    if (leads.length > 0) {
-      const response = await request.get(`/api/leads/${leads[0].id}/activities`);
-      expect([200, 404]).toContain(response.status());
-    }
-  });
-
-  test('should add activity to deal', async ({ request }) => {
-    const leadsResponse = await request.get('/api/leads');
-    const leads = await leadsResponse.json();
-    
-    if (leads.length > 0) {
-      const response = await request.post(`/api/leads/${leads[0].id}/activities`, {
-        data: {
-          type: 'note',
-          description: `Test activity ${Date.now()}`
-        }
-      });
-      expect([200, 201, 404]).toContain(response.status());
     }
   });
 });

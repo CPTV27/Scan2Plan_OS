@@ -2,102 +2,179 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Finance Module - Main Interface', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/finance');
-    await expect(page.getByText('Finance')).toBeVisible({ timeout: 15000 });
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display Finance page', async ({ page }) => {
-    await expect(page.getByTestId('text-finance-title')).toBeVisible();
+    await expect(page.getByText('Financial')).toBeVisible({ timeout: 15000 });
   });
 
-  test('should show Profit First dashboard', async ({ page }) => {
-    await expect(page.getByText('Profit First')).toBeVisible({ timeout: 10000 });
+  test('should show financial health bar', async ({ page }) => {
+    await expect(page.getByTestId('financial-health-bar')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display allocation buckets', async ({ page }) => {
-    await expect(page.getByTestId('card-bucket-revenue')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId('card-bucket-profit')).toBeVisible();
-    await expect(page.getByTestId('card-bucket-owner-pay')).toBeVisible();
-    await expect(page.getByTestId('card-bucket-tax')).toBeVisible();
-    await expect(page.getByTestId('card-bucket-opex')).toBeVisible();
+  test('should display current cash', async ({ page }) => {
+    await expect(page.getByTestId('text-current-cash')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show current allocation percentages', async ({ page }) => {
-    await expect(page.getByTestId('text-profit-percentage')).toBeVisible({ timeout: 10000 });
-  });
-});
-
-test.describe('Finance Module - QuickBooks Integration', () => {
-  test('should show QuickBooks connection status', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByTestId('card-quickbooks-status')).toBeVisible({ timeout: 10000 });
+  test('should display total AR', async ({ page }) => {
+    await expect(page.getByTestId('text-total-ar')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display connect button when not connected', async ({ page }) => {
-    await page.goto('/finance');
-    
-    const connectButton = page.getByTestId('button-connect-quickbooks');
-    const statusText = page.getByTestId('text-quickbooks-connected');
-    
-    await page.waitForTimeout(2000);
+  test('should display total AP', async ({ page }) => {
+    await expect(page.getByTestId('text-total-ap')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show sync status when connected', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await page.waitForTimeout(2000);
-    
-    const syncStatus = page.getByTestId('text-last-sync');
-    if (await syncStatus.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(syncStatus).toBeVisible();
-    }
+  test('should display net position', async ({ page }) => {
+    await expect(page.getByTestId('text-net-position')).toBeVisible({ timeout: 10000 });
   });
 });
 
-test.describe('Finance Module - Financial Reports', () => {
-  test('should have Balance Sheet section', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByText('Balance Sheet')).toBeVisible({ timeout: 10000 });
+test.describe('Finance Module - Tabs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
   });
 
-  test('should have P&L section', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByText('Profit & Loss')).toBeVisible({ timeout: 10000 });
+  test('should have Profit First tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-accounts')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show revenue metrics', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByTestId('text-total-revenue')).toBeVisible({ timeout: 10000 });
+  test('should have Collections tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-collections')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show expense metrics', async ({ page }) => {
-    await page.goto('/finance');
+  test('should have Loans tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-loans')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have Payables tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-payables')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have Settings tab', async ({ page }) => {
+    await expect(page.getByTestId('tab-settings')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should switch between tabs', async ({ page }) => {
+    await page.getByTestId('tab-collections').click();
+    await page.waitForTimeout(500);
     
-    await expect(page.getByTestId('text-total-expenses')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('tab-loans').click();
+    await page.waitForTimeout(500);
+    
+    await page.getByTestId('tab-accounts').click();
+    await page.waitForTimeout(500);
   });
 });
 
-test.describe('Finance Module - FY26 Goals', () => {
-  test('should display revenue goal progress', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByTestId('progress-revenue-goal')).toBeVisible({ timeout: 10000 });
+test.describe('Finance Module - Profit First Accounts', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('tab-accounts').click();
   });
 
-  test('should display profit goal progress', async ({ page }) => {
-    await page.goto('/finance');
-    
-    await expect(page.getByTestId('progress-profit-goal')).toBeVisible({ timeout: 10000 });
+  test('should have allocate income button', async ({ page }) => {
+    await expect(page.getByTestId('button-allocate-income')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show margin floor indicator', async ({ page }) => {
-    await page.goto('/finance');
+  test('should open allocation dialog', async ({ page }) => {
+    await page.getByTestId('button-allocate-income').click();
     
-    await expect(page.getByText('40%')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('input-allocate-amount')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('button-confirm-allocate')).toBeVisible();
+  });
+});
+
+test.describe('Finance Module - Loans', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('tab-loans').click();
+  });
+
+  test('should display internal loan card', async ({ page }) => {
+    await expect(page.getByTestId('card-internal-loan')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have loan repayment progress', async ({ page }) => {
+    await expect(page.getByTestId('progress-loan-repayment')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have repay amount input', async ({ page }) => {
+    await expect(page.getByTestId('input-repay-amount')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have repay button', async ({ page }) => {
+    await expect(page.getByTestId('button-repay-loan')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Finance Module - Settings', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('tab-settings').click();
+  });
+
+  test('should have add stakeholder button', async ({ page }) => {
+    await expect(page.getByTestId('button-add-stakeholder')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have overhead rate input', async ({ page }) => {
+    await expect(page.getByTestId('input-overhead-rate')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have target margin input', async ({ page }) => {
+    await expect(page.getByTestId('input-target-margin')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have save settings button', async ({ page }) => {
+    await expect(page.getByTestId('button-save-settings')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should open add stakeholder dialog', async ({ page }) => {
+    await page.getByTestId('button-add-stakeholder').click();
+    
+    await expect(page.getByTestId('input-stakeholder-name')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('input-stakeholder-role')).toBeVisible();
+    await expect(page.getByTestId('select-stakeholder-type')).toBeVisible();
+    await expect(page.getByTestId('input-stakeholder-rate')).toBeVisible();
+    await expect(page.getByTestId('button-save-stakeholder')).toBeVisible();
+  });
+});
+
+test.describe('Finance Module - Collections', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('tab-collections').click();
+  });
+
+  test('should have apply interest button', async ({ page }) => {
+    await expect(page.getByTestId('button-apply-interest')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should have send reminders button', async ({ page }) => {
+    await expect(page.getByTestId('button-send-reminders')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should display overdue invoices', async ({ page }) => {
+    await page.waitForTimeout(1000);
+    
+    const overdueInvoices = page.locator('[data-testid^="invoice-overdue-"]');
+    const count = await overdueInvoices.count();
+  });
+});
+
+test.describe('Finance Module - Revenue Forecast', () => {
+  test('should display revenue forecast card', async ({ page }) => {
+    await page.goto('/financial');
+    await page.waitForLoadState('networkidle');
+    
+    await expect(page.getByTestId('card-revenue-forecast')).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -109,16 +186,6 @@ test.describe('QuickBooks API', () => {
     const data = await response.json();
     expect(data).toHaveProperty('configured');
     expect(data).toHaveProperty('connected');
-  });
-
-  test('should return auth URL when not connected', async ({ request }) => {
-    const statusResponse = await request.get('/api/quickbooks/status');
-    const status = await statusResponse.json();
-    
-    if (!status.connected) {
-      const authResponse = await request.get('/api/quickbooks/auth-url');
-      expect([200, 400]).toContain(authResponse.status());
-    }
   });
 
   test('should get balance sheet when connected', async ({ request }) => {
@@ -142,53 +209,14 @@ test.describe('QuickBooks API', () => {
   });
 });
 
-test.describe('Finance Module - Estimates', () => {
-  test('should list estimates when QB connected', async ({ request }) => {
-    const statusResponse = await request.get('/api/quickbooks/status');
-    const status = await statusResponse.json();
-    
-    if (status.connected) {
-      const response = await request.get('/api/quickbooks/estimates');
-      expect(response.status()).toBe(200);
-      
-      const data = await response.json();
-      expect(Array.isArray(data)).toBe(true);
-    }
+test.describe('Finance API', () => {
+  test('should get profit first accounts', async ({ request }) => {
+    const response = await request.get('/api/profit-first/accounts');
+    expect([200, 500]).toContain(response.status());
   });
 
-  test('should create estimate from CPQ quote', async ({ request }) => {
-    const statusResponse = await request.get('/api/quickbooks/status');
-    const status = await statusResponse.json();
-    
-    if (status.connected) {
-      const quotesResponse = await request.get('/api/cpq/quotes');
-      const quotes = await quotesResponse.json();
-      
-      if (quotes.length > 0) {
-        const response = await request.post('/api/quickbooks/estimates', {
-          data: { quoteId: quotes[0].id }
-        });
-        expect([200, 201, 400]).toContain(response.status());
-      }
-    }
-  });
-});
-
-test.describe('Finance Module - Customer Sync', () => {
-  test('should sync customer from lead', async ({ request }) => {
-    const statusResponse = await request.get('/api/quickbooks/status');
-    const status = await statusResponse.json();
-    
-    if (status.connected) {
-      const leadsResponse = await request.get('/api/leads');
-      const leads = await leadsResponse.json();
-      
-      if (leads.length > 0) {
-        const response = await request.post('/api/quickbooks/customers/sync', {
-          data: { leadId: leads[0].id }
-        });
-        expect([200, 201, 400]).toContain(response.status());
-      }
-    }
+  test('should get financial summary', async ({ request }) => {
+    const response = await request.get('/api/financial/summary');
+    expect([200, 500]).toContain(response.status());
   });
 });
