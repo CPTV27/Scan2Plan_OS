@@ -1,0 +1,166 @@
+Scan2Plan Service (Pont Cloud, Photos, Arch Model) - Tier B & C:
+
+3,000 sqft minimum for service
+
+
+Building type / sqft tier / LoD = Unit price x sqft = [base price]
+
+Risk (Arch): +15% Occupied, +25% Hazardous, +20% No Power
+
+If risk, recalculate [base price] x [R%] = [modified base price]
+
+Calculate travel: Travel = $3/mi Troy or $4/mi Brooklyn (one way) + +$300/scan-day when >75 mi and ≥2 days; 
+
+[modified base price] + [travel price] = [total price]
+
+[total price] / [sqft] = [actual price per sqft]
+
+
+Scan2Plan Service (Pont Cloud, Photos, Arch Model) - Tier A >50,000 sq ft
+
+Custom [Modeling Quote] from Uppteam
+
+Custom [Scanning Quote] from BuildScan3D
+
+Risk [Scanning Quote]: +07% Occupied, +12% Hazardous, +15% No Power
+
+If risk, recalculate [Scanning Quote] x [R%] = [modified Scanning Quote]
+
+Calculate travel: Travel = $3/mi Troy or $4/mi Brooklyn (one way) + +$300/scan-day when >75 mi and ≥2 days; 
+
+[modified Scanning Quote] + [travel price] = [Total Scanning Quote]
+
+[Modeling Quote] + [Total Scanning Quote] = [Core Costs]
+
+[Core Costs] x 168% (Reg, PM, QC, overhead) = [Modified Core Costs]
+
+[Modified Core Costs] x 140-200% (GM) = [total price]
+
+[total price] / [sqft] = [actual price per sqft]
+
+INT / EXT & Custom Scopes 
+
+Interior Only - 25% discount (S2P Service Only)
+Exterior Only - 50% discount (S2P Service Only)
+Mixed Scope Int/Ext - INT line item 35% discount / EXT line item 65% discount (Arch Only)
+Roof or Façades Only - 65% discount 
+
+MEPF Structural & Grade Modeling
+
+Building type / sqft tier / LoD = Unit price x sqft = [total price]
+
+
+CAD Conversion
+
+$300 minimum for CAD
+
+1.Determine Tier:
+
+Architecture Only
+Architecture + Structure / Architecture + MEPF 
+Architecture + Structure + MEPF + Grade
+
+2. Determine [sqft band]
+
+3. Find [unit metric]
+
+4. Multiply [unit metric] by [sqft] = [total price]
+
+
+If EXT/INT Standard Package
+Floor Plans
+Exterior Elevations
+Roof Plan
+Up to 4 sections / interior elevations
+
+if MEPF
+Reflected Ceiling Plan
+MEP Plan (if requested)
+
+If INT Package
+Floor Plans
+Up to 8 sections / interior elevations
+Reflected Ceiling Plan
+
+if EXT Only - 50% Discount
+Exterior Elevations
+Roof Plan
+
+Additional Interior Elevations or sections: [amount tier] [price per sheet]
+
+
+Landscape Modeling
+
+Available Fall and Spring Only
+
+
+Under 10 acres (tier B, C): 
+
+Acres / LoD = Unit price x Acres = [total price]
+
+Over 10 acres (tier A): 
+
+Custom [Scanning Quote] from Vendor
+
+ [Scanning Quote]  + [Modeling Cost (Acres / LoD = UppTeam price x Acres)] = [Core Costs]
+
+[Core Costs] x 168% (Reg, PM, QC, overhead) = [Modified Core Costs]
+
+[Modified Core Costs] x 140% - 200% (GM) = [total price]
+
+[total price] / [acres] = [actual price per acre]
+
+
+
+Matterport 
+
+$0.10/sqft
+
+
+Georeferencing
+
+$1,000 per building or site
+
+Scanning & Registration Only
+
+Full Day (up to 10 hrs on-site) - $2,500
+Full Day (up to 4 hrs on-site) - $1,500
+
+Expedited Service
+
+Standard 20% extra to estimate total (buys 1 week)
+
+
+
+
+Special Payment Terms
+
+
+
+
+Net 30 days
+0% interest
+
+
+Net 60 days
+10% interest
+
+
+Net 90 days
+20% interest
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

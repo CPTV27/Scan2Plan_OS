@@ -1,0 +1,1296 @@
+/**
+ * Deal Workspace - Unified Lead + Quote Builder
+ * 
+ * Combines lead CRM fields with inline CPQ quote builder.
+ * Lead Details shown first with consolidated form (no sub-tabs).
+ * Supports quote versioning with history display.
+ */
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useParams } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  ArrowLeft,
+  Briefcase,
+  Building2,
+  Calculator,
+  ChevronDown,
+  Clock,
+  Cloud,
+  DollarSign,
+  ExternalLink,
+  FileText,
+  Folder,
+  FolderCheck,
+  FolderOpen,
+  FolderPlus,
+  HardDrive,
+  History,
+  Loader2,
+  MapPin,
+  MessageSquare,
+  Plus,
+  Save,
+  Sparkles,
+  User,
+  Users,
+  X,
+} from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { apiRequest } from "@/lib/queryClient";
+import type { Lead, CpqQuote, DealAttribution } from "@shared/schema";
+import { insertLeadSchema, TOUCHPOINT_OPTIONS } from "@shared/schema";
+import { useUpdateLead } from "@/hooks/use-leads";
+import { useToast } from "@/hooks/use-toast";
+import CPQCalculator from "@/features/cpq/Calculator";
+import { LocationPreview } from "@/components/LocationPreview";
+import { formatDistanceToNow } from "date-fns";
+
+const BUYER_PERSONAS: Record<string, string> = {
+  BP1: "Technical (specs focused)",
+  BP2: "Executive (ROI/Speed)",
+  BP3: "Operations (logistics)",
+  BP4: "Procurement (price/terms)",
+};
+
+// QuickBooks Estimate Status Badge Component
+function QboEstimateBadge({ lead }: { lead: Lead }) {
+  const { data: estimateData, isLoading } = useQuery<{ 
+    url: string | null; 
+    connected: boolean; 
+    estimateId?: string; 
+    estimateNumber?: string;
+  }>({
+    queryKey: ["/api/quickbooks/estimate-url", lead.id],
+    enabled: !!lead.id,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Badge variant="outline" className="gap-1 text-muted-foreground" data-testid="badge-qbo-loading">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Loading
+      </Badge>
+    );
+  }
+
+  // QBO not connected
+  if (estimateData && !estimateData.connected) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="outline" className="gap-1 text-muted-foreground" data-testid="badge-qbo-not-connected">
+            <DollarSign className="w-3 h-3" />
+            QBO Offline
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>QuickBooks is not connected</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  // No estimate synced yet
+  if (!lead.qboEstimateId && !estimateData?.estimateId) {
+    return (
+      <Badge variant="outline" className="gap-1 text-muted-foreground" data-testid="badge-qbo-not-synced">
+        <DollarSign className="w-3 h-3" />
+        Not Synced
+      </Badge>
+    );
+  }
+
+  // Synced but no URL available (edge case)
+  if (!estimateData?.url) {
+    return (
+      <Badge variant="outline" className="gap-1 border-green-500 text-green-600 dark:text-green-400" data-testid="badge-qbo-synced">
+        <DollarSign className="w-3 h-3" />
+        {lead.qboEstimateNumber || estimateData?.estimateNumber || "Synced"}
+      </Badge>
+    );
+  }
+
+  // Full synced state with clickable link
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <a
+          href={estimateData.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex"
+          data-testid="link-qbo-estimate"
+        >
+          <Badge variant="outline" className="gap-1 cursor-pointer border-green-500 text-green-600 dark:text-green-400">
+            <DollarSign className="w-3 h-3" />
+            {lead.qboEstimateNumber || estimateData.estimateNumber || "QBO"}
+          </Badge>
+        </a>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>View estimate in QuickBooks Online</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// Marketing Influence Widget Component
+function MarketingInfluenceWidget({ leadId }: { leadId: number }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selectedTouchpoint, setSelectedTouchpoint] = useState("");
+
+  // Guard against invalid leadId (NaN or 0)
+  const validLeadId = leadId && !isNaN(leadId);
+
+  const { data: attributions, isLoading } = useQuery<DealAttribution[]>({
+    queryKey: ["/api/leads", leadId, "attributions"],
+    enabled: !!validLeadId,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (touchpoint: string) => {
+      const response = await apiRequest("POST", `/api/leads/${leadId}/attributions`, { touchpoint });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "attributions"] });
+      setSelectedTouchpoint("");
+      toast({ title: "Influence Added", description: "Marketing touchpoint recorded" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (attrId: number) => {
+      await apiRequest("DELETE", `/api/leads/${leadId}/attributions/${attrId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "attributions"] });
+    },
+  });
+
+  const getTouchpointLabel = (value: string) => 
+    TOUCHPOINT_OPTIONS.find(t => t.value === value)?.label || value;
+
+  // Don't render widget for invalid leadId
+  if (!validLeadId) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          Marketing Influence
+        </CardTitle>
+        <CardDescription>Track touchpoints that influenced this deal</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <Select value={selectedTouchpoint} onValueChange={setSelectedTouchpoint}>
+            <SelectTrigger className="flex-1" data-testid="select-touchpoint">
+              <SelectValue placeholder="Select touchpoint" />
+            </SelectTrigger>
+            <SelectContent>
+              {TOUCHPOINT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            size="icon" 
+            variant="default" 
+            disabled={!selectedTouchpoint || addMutation.isPending}
+            onClick={() => selectedTouchpoint && addMutation.mutate(selectedTouchpoint)}
+            data-testid="button-add-touchpoint"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : attributions && attributions.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {attributions.map((attr) => (
+              <Badge 
+                key={attr.id} 
+                variant="secondary" 
+                className="gap-1 pr-1"
+                data-testid={`badge-touchpoint-${attr.id}`}
+              >
+                {getTouchpointLabel(attr.touchpoint)}
+                <Button 
+                  size="icon" 
+                  variant="ghost" 
+                  className="h-4 w-4 p-0 ml-1"
+                  onClick={() => deleteMutation.mutate(attr.id)}
+                  data-testid={`button-remove-touchpoint-${attr.id}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">No touchpoints recorded yet</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const formSchema = insertLeadSchema.extend({
+  clientName: z.string().min(1, "Client name is required"),
+  projectAddress: z.string().min(1, "Project address is required"),
+  dealStage: z.string().min(1, "Deal stage is required"),
+  billingContactName: z.string().min(1, "Billing contact name is required"),
+  billingContactEmail: z.string().email("Valid billing email is required"),
+  billingContactPhone: z.string().optional().nullable(),
+});
+
+type FormData = z.infer<typeof formSchema>;
+
+export default function DealWorkspace() {
+  const params = useParams<{ id: string }>();
+  const leadId = Number(params.id);
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState("lead");
+  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const updateMutation = useUpdateLead();
+
+  const { data: lead, isLoading: leadLoading } = useQuery<Lead>({
+    queryKey: ["/api/leads", leadId],
+    enabled: !!leadId,
+  });
+
+  const { data: quotes, isLoading: quotesLoading } = useQuery<CpqQuote[]>({
+    queryKey: ["/api/leads", leadId, "cpq-quotes"],
+    enabled: !!leadId,
+  });
+
+  const latestQuote = quotes?.find((q) => q.isLatest);
+  const isCreatingNew = selectedVersionId === 0;
+  const currentQuoteId = isCreatingNew ? undefined : (selectedVersionId || latestQuote?.id);
+
+  const generateUpidMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/leads/${leadId}/generate-upid`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ 
+        title: "Project ID Generated", 
+        description: data.driveFolderUrl 
+          ? `${data.upid} - Drive folder created` 
+          : `${data.upid} - Drive folder pending`
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to generate Project ID", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      clientName: "",
+      projectName: "",
+      projectAddress: "",
+      value: 0,
+      dealStage: "Leads",
+      probability: 0,
+      notes: "",
+      quoteNumber: "",
+      timeline: "",
+      paymentTerms: "",
+      leadSource: "",
+      leadPriority: 3,
+      contactName: "",
+      contactEmail: "",
+      contactPhone: "",
+      billingContactName: "",
+      billingContactEmail: "",
+      billingContactPhone: "",
+    },
+  });
+
+  useEffect(() => {
+    if (lead) {
+      form.reset({
+        clientName: lead.clientName,
+        projectName: lead.projectName || "",
+        projectAddress: lead.projectAddress,
+        value: Number(lead.value),
+        dealStage: lead.dealStage,
+        probability: lead.probability || 0,
+        notes: lead.notes || "",
+        quoteNumber: lead.quoteNumber || "",
+        timeline: lead.timeline || "",
+        paymentTerms: lead.paymentTerms || "",
+        leadSource: lead.leadSource || "",
+        leadPriority: lead.leadPriority || 3,
+        contactName: lead.contactName || "",
+        contactEmail: lead.contactEmail || "",
+        contactPhone: lead.contactPhone || "",
+        billingContactName: (lead as any).billingContactName || "",
+        billingContactEmail: (lead as any).billingContactEmail || "",
+        billingContactPhone: (lead as any).billingContactPhone || "",
+        buyerPersona: lead.buyerPersona || "",
+      });
+    }
+  }, [lead, form]);
+
+  async function onSubmit(data: FormData) {
+    try {
+      await updateMutation.mutateAsync({ id: leadId, ...data });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Success", description: "Deal updated successfully" });
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Something went wrong", 
+        variant: "destructive" 
+      });
+    }
+  }
+
+  if (leadLoading) {
+    return (
+      <div className="flex flex-col h-screen bg-background">
+        <header className="flex items-center gap-4 p-4 border-b">
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-8 flex-1" />
+        </header>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-full w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!lead) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-background">
+        <Building2 className="w-16 h-16 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Lead Not Found</h2>
+        <p className="text-muted-foreground mb-4">The requested deal could not be found.</p>
+        <Button onClick={() => setLocation("/sales")}>
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Pipeline
+        </Button>
+      </div>
+    );
+  }
+
+  const isPending = updateMutation.isPending;
+
+  // Helper function to get files status badge info
+  const getFilesStatus = () => {
+    const status = (lead as any).driveFolderStatus;
+    if (!lead.driveFolderId && !lead.driveFolderUrl) {
+      return { color: "bg-muted text-muted-foreground", label: "No Folder", icon: Folder };
+    }
+    if (status === "files_uploaded" || status === "active") {
+      return { color: "bg-green-500/20 text-green-600 border-green-500/30", label: "Files Uploaded", icon: FolderCheck };
+    }
+    // Default: folder created but empty
+    return { color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30", label: "Folder Empty", icon: FolderOpen };
+  };
+  
+  const filesStatus = getFilesStatus();
+
+  // Helper function to get storage links based on storage mode
+  const getStorageLinks = () => {
+    const storageMode = (lead as any).storageMode || "legacy_drive";
+    const gcsBucket = (lead as any).gcsBucket;
+    const gcsPath = (lead as any).gcsPath;
+    const driveFolderUrl = lead.driveFolderUrl;
+    
+    const gcsConsoleUrl = gcsBucket && gcsPath 
+      ? `https://console.cloud.google.com/storage/browser/${gcsBucket}/${gcsPath}`
+      : null;
+    
+    switch (storageMode) {
+      case "hybrid_gcs":
+        return {
+          mode: "hybrid",
+          primary: gcsConsoleUrl ? { url: gcsConsoleUrl, label: "Scan Data (GCS)", icon: Cloud } : null,
+          secondary: driveFolderUrl ? { url: driveFolderUrl, label: "Docs Folder (Drive)", icon: HardDrive } : null,
+        };
+      case "gcs_native":
+        return {
+          mode: "gcs",
+          primary: gcsConsoleUrl ? { url: gcsConsoleUrl, label: "Project Files (GCS)", icon: Cloud } : null,
+          secondary: null,
+        };
+      default: // legacy_drive
+        return {
+          mode: "drive",
+          primary: driveFolderUrl 
+            ? { url: driveFolderUrl, label: "Drive Folder", icon: HardDrive }
+            : { url: `https://drive.google.com/drive/search?q=${encodeURIComponent(lead.projectCode || "")}`, label: "Search Drive", icon: HardDrive },
+          secondary: null,
+        };
+    }
+  };
+
+  const storageLinks = lead.projectCode ? getStorageLinks() : null;
+
+  // Google Static Maps URL for header thumbnail (16:9 aspect ratio)
+  const getStaticMapUrl = (address: string) => {
+    if (!address || address.length < 5) return null;
+    return `/api/location/static-map?address=${encodeURIComponent(address)}&size=320x180&zoom=18&maptype=satellite`;
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-background" data-testid="page-deal-workspace">
+      <header className="flex items-center justify-between gap-4 p-4 border-b bg-card/50 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/sales")} data-testid="button-back">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          
+          {/* Google Maps Satellite Thumbnail - 16:9 aspect ratio */}
+          {lead.projectAddress && lead.projectAddress.length >= 5 ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.projectAddress)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0"
+                >
+                  <div className="w-32 h-[72px] rounded-md overflow-hidden border bg-muted">
+                    <img
+                      src={getStaticMapUrl(lead.projectAddress) || ""}
+                      alt="Project location"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-6 h-6 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7H3l2-4h14l2 4M5 21V10.85M19 21V10.85M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4" /></svg></div>';
+                      }}
+                      data-testid="img-location-thumbnail"
+                    />
+                  </div>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View on Google Maps</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="w-32 h-[72px] rounded-md border bg-muted flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6 text-muted-foreground" />
+            </div>
+          )}
+          
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">{lead.clientName}</h1>
+              {lead.projectCode && (
+                <Badge variant="outline" className="font-mono text-xs">
+                  {lead.projectCode}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">{lead.projectName || lead.projectAddress}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Evidence Vault Button - Purple */}
+          <Button
+            size="sm"
+            className="bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-700 dark:hover:bg-purple-600"
+            onClick={() => {
+              // Navigate to marketing page with this lead's persona context
+              setLocation("/marketing");
+            }}
+            data-testid="button-evidence-vault"
+          >
+            <Briefcase className="w-4 h-4 mr-2" />
+            Evidence Vault
+          </Button>
+          
+          {/* Start Quote Button - Blue (Primary) */}
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => {
+              setSelectedVersionId(0); // Create new quote
+              setActiveTab("quote");
+            }}
+            data-testid="button-start-quote"
+          >
+            <Calculator className="w-4 h-4 mr-2" />
+            Start Quote
+          </Button>
+          
+          {/* Communicate Button - Green */}
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-600"
+            onClick={() => {
+              // Open communications tab or drawer
+              window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${lead.billingContactEmail || lead.contactEmail || ""}`, "_blank");
+            }}
+            data-testid="button-communicate"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Communicate
+          </Button>
+          
+          {/* Files Status Badge - Always show to indicate folder state */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Badge 
+                  variant="outline" 
+                  className={`gap-1 ${filesStatus.color}`}
+                  data-testid="badge-files-status"
+                >
+                  {filesStatus.label === "No Folder" && <Folder className="w-3 h-3" />}
+                  {filesStatus.label === "Files Uploaded" && <FolderCheck className="w-3 h-3" />}
+                  {filesStatus.label === "Folder Empty" && <FolderOpen className="w-3 h-3" />}
+                  {filesStatus.label}
+                </Badge>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Google Drive folder status</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          {lead.projectCode && storageLinks ? (
+            storageLinks.mode === "hybrid" && storageLinks.secondary ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Badge variant="secondary" className="gap-1 cursor-pointer" data-testid="dropdown-storage-links">
+                    <Cloud className="w-3 h-3" />
+                    Open Folder
+                    <ChevronDown className="w-3 h-3 ml-1" />
+                  </Badge>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {storageLinks.primary && (
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={storageLinks.primary.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2"
+                        data-testid="link-gcs-folder"
+                      >
+                        <Cloud className="w-4 h-4" />
+                        {storageLinks.primary.label}
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <a
+                      href={storageLinks.secondary.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2"
+                      data-testid="link-drive-folder"
+                    >
+                      <HardDrive className="w-4 h-4" />
+                      {storageLinks.secondary.label}
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a
+                    href={storageLinks.primary?.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex"
+                    data-testid="link-drive-folder"
+                  >
+                    <Badge variant="secondary" className="gap-1 cursor-pointer">
+                      {storageLinks.mode === "gcs" ? <Cloud className="w-3 h-3" /> : <ExternalLink className="w-3 h-3" />}
+                      {storageLinks.primary?.label || "Open Folder"}
+                    </Badge>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Open project folder for {lead.projectCode}</p>
+                </TooltipContent>
+              </Tooltip>
+            )
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generateUpidMutation.mutate()}
+                  disabled={generateUpidMutation.isPending}
+                  data-testid="button-generate-upid"
+                >
+                  {generateUpidMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <FolderPlus className="w-4 h-4 mr-2" />
+                  )}
+                  Generate Project ID
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generates ID and creates Google Drive folder for scoping files</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          <Badge variant="outline" className="text-xs">
+            {lead.dealStage}
+          </Badge>
+          {lead.value && (
+            <Badge variant="secondary">
+              ${Number(lead.value).toLocaleString()}
+            </Badge>
+          )}
+          {/* QuickBooks Sync Status */}
+          <QboEstimateBadge lead={lead} />
+        </div>
+      </header>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <div className="border-b px-4 bg-card/30">
+          <TabsList className="h-11 bg-transparent">
+            <TabsTrigger value="lead" className="gap-2" data-testid="tab-lead">
+              <FileText className="w-4 h-4" />
+              Lead Details
+            </TabsTrigger>
+            <TabsTrigger value="quote" className="gap-2" data-testid="tab-quote">
+              <Calculator className="w-4 h-4" />
+              Quote Builder
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2" data-testid="tab-history">
+              <History className="w-4 h-4" />
+              Version History
+              {quotes && quotes.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {quotes.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Lead Details Tab - Consolidated form with bordered sections */}
+        <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4">
+                {/* Project Information Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Building2 className="w-4 h-4" />
+                      Project Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="clientName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client / Company *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ashley McGraw Architects" {...field} data-testid="input-client-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="projectName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="4900 Tank Trail, Roofs" {...field} value={field.value || ""} data-testid="input-project-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="projectAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Address *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Industrial Park Dr, City, ST 12345" {...field} value={field.value || ""} data-testid="input-project-address" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <LocationPreview 
+                      address={form.watch("projectAddress") || ""} 
+                      companyName={form.watch("clientName")}
+                      onAddressUpdate={(formattedAddress) => {
+                        form.setValue("projectAddress", formattedAddress);
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Deal Status Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Deal Status
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="value"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Deal Value ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" {...field} data-testid="input-value" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="probability"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Probability (%)</FormLabel>
+                            <FormControl>
+                              <Input type="number" min="0" max="100" {...field} data-testid="input-probability" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="dealStage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Deal Stage *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-deal-stage">
+                                <SelectValue placeholder="Select stage" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Leads">Leads</SelectItem>
+                              <SelectItem value="Contacted">Contacted</SelectItem>
+                              <SelectItem value="Proposal">Proposal</SelectItem>
+                              <SelectItem value="Negotiation">Negotiation</SelectItem>
+                              <SelectItem value="On Hold">On Hold</SelectItem>
+                              <SelectItem value="Closed Won">Closed Won</SelectItem>
+                              <SelectItem value="Closed Lost">Closed Lost</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="leadSource"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lead Source</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-lead-source">
+                                  <SelectValue placeholder="Select source" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Amplifi">Amplifi</SelectItem>
+                                <SelectItem value="Customer Referral">Customer Referral</SelectItem>
+                                <SelectItem value="Website">Website</SelectItem>
+                                <SelectItem value="Social Media">Social Media</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="leadPriority"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Priority</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={String(field.value || 3)}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-lead-priority">
+                                  <SelectValue placeholder="Select priority" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="5">5 - Highest</SelectItem>
+                                <SelectItem value="4">4 - High</SelectItem>
+                                <SelectItem value="3">3 - Medium</SelectItem>
+                                <SelectItem value="2">2 - Low</SelectItem>
+                                <SelectItem value="1">1 - Lowest</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="timeline"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Estimated Timeline</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-timeline">
+                                  <SelectValue placeholder="Select timeline" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="1week">~1 Week</SelectItem>
+                                <SelectItem value="2weeks">~2 Weeks</SelectItem>
+                                <SelectItem value="3weeks">~3 Weeks</SelectItem>
+                                <SelectItem value="4weeks">~4 Weeks</SelectItem>
+                                <SelectItem value="5weeks">~5 Weeks</SelectItem>
+                                <SelectItem value="6weeks">~6 Weeks</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="paymentTerms"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Payment Terms</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-terms">
+                                  <SelectValue placeholder="Select terms" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="partner">Partner (no hold)</SelectItem>
+                                <SelectItem value="owner">Owner (hold if delay)</SelectItem>
+                                <SelectItem value="net30">Net 30 (+5%)</SelectItem>
+                                <SelectItem value="net60">Net 60 (+10%)</SelectItem>
+                                <SelectItem value="net90">Net 90 (+15%)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Contact Information Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Contact Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="contactName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Primary Contact Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Andrew Schuster" {...field} value={field.value || ""} data-testid="input-contact-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="contactEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="email@company.com" {...field} value={field.value || ""} data-testid="input-contact-email" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="contactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Phone</FormLabel>
+                            <FormControl>
+                              <Input type="tel" placeholder="(315) 484-8826" {...field} value={field.value || ""} data-testid="input-contact-phone" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Billing Contact Section */}
+                    <div className="pt-4 border-t">
+                      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4" />
+                        Billing Contact <span className="text-destructive">*</span>
+                      </h4>
+                      <FormField
+                        control={form.control}
+                        name="billingContactName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Billing Contact Name <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input placeholder="Accounts Payable / CFO Name" {...field} value={field.value || ""} data-testid="input-billing-contact-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <FormField
+                          control={form.control}
+                          name="billingContactEmail"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Billing Email <span className="text-destructive">*</span></FormLabel>
+                              <FormControl>
+                                <Input type="email" placeholder="billing@company.com" {...field} value={field.value || ""} data-testid="input-billing-contact-email" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="billingContactPhone"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Billing Phone</FormLabel>
+                              <FormControl>
+                                <Input type="tel" placeholder="(555) 123-4567" {...field} value={field.value || ""} data-testid="input-billing-contact-phone" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="buyerPersona"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Buyer Persona</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-buyer-persona">
+                                <SelectValue placeholder="Select persona" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {Object.entries(BUYER_PERSONAS).map(([id, label]) => (
+                                <SelectItem key={id} value={id}>{id}: {label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs">
+                            Tailors communication style and templates
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Notes Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Notes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Additional details, scope notes, follow-up items..." 
+                              className="min-h-24"
+                              {...field} 
+                              value={field.value || ""} 
+                              data-testid="input-notes" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+
+                {/* Marketing Influence Widget */}
+                <MarketingInfluenceWidget leadId={leadId} />
+
+                {/* Save Button */}
+                <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm py-4 border-t -mx-4 px-4">
+                  <Button type="submit" disabled={isPending} className="w-full" data-testid="button-submit-lead">
+                    <Save className="w-4 h-4 mr-2" />
+                    {isPending ? "Saving..." : "Save Lead Details"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </ScrollArea>
+        </TabsContent>
+
+        {/* Quote Builder Tab */}
+        <TabsContent value="quote" className="flex-1 overflow-hidden m-0">
+          <div className="h-full flex flex-col">
+            {quotes && quotes.length > 0 && (
+              <div className="flex items-center gap-4 px-4 py-2 bg-muted/30 border-b">
+                <span className="text-sm font-medium">Version:</span>
+                <Select
+                  value={isCreatingNew ? "new" : (currentQuoteId?.toString() || "")}
+                  onValueChange={(val) => {
+                    if (val === "new") {
+                      setSelectedVersionId(0);
+                    } else {
+                      setSelectedVersionId(Number(val));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-64" data-testid="select-version">
+                    <SelectValue placeholder="Select version" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="new" data-testid="select-version-new">
+                      <div className="flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        <span>Create New Version</span>
+                      </div>
+                    </SelectItem>
+                    {quotes.map((q) => (
+                      <SelectItem key={q.id} value={q.id.toString()} data-testid={`select-version-${q.id}`}>
+                        <div className="flex items-center gap-2">
+                          <span>v{q.versionNumber}</span>
+                          {q.isLatest && <Badge variant="secondary" className="text-[10px]">Latest</Badge>}
+                          <span className="text-muted-foreground text-xs">
+                            {q.createdAt && formatDistanceToNow(new Date(q.createdAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <ScrollArea className="flex-1">
+              <CPQCalculator
+                leadId={leadId}
+                quoteId={currentQuoteId}
+                onClose={() => setLocation("/sales")}
+              />
+            </ScrollArea>
+          </div>
+        </TabsContent>
+
+        {/* Version History Tab */}
+        <TabsContent value="history" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="w-5 h-5" />
+                    Quote Version History
+                  </CardTitle>
+                  <CardDescription>
+                    Track all quote revisions for this deal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {quotesLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : quotes && quotes.length > 0 ? (
+                    <div className="space-y-3">
+                      {quotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className={`p-4 rounded-lg border transition-colors hover-elevate cursor-pointer ${
+                            currentQuoteId === quote.id ? "border-primary bg-primary/10" : quote.isLatest ? "border-primary/50 bg-primary/5" : "border-border"
+                          }`}
+                          onClick={() => {
+                            setSelectedVersionId(quote.id);
+                            setActiveTab("quote");
+                          }}
+                          data-testid={`version-card-${quote.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-4 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold">Version {quote.versionNumber}</span>
+                              {quote.isLatest && (
+                                <Badge variant="default" className="text-xs">
+                                  Current
+                                </Badge>
+                              )}
+                              {quote.versionName && (
+                                <span className="text-muted-foreground text-sm">
+                                  ({quote.versionName})
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="w-4 h-4" />
+                              {quote.createdAt &&
+                                formatDistanceToNow(new Date(quote.createdAt), { addSuffix: true })}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="text-muted-foreground">
+                              Quote: <span className="font-mono">{quote.quoteNumber}</span>
+                            </span>
+                            {quote.totalPrice && (
+                              <span className="font-medium">
+                                ${Number(quote.totalPrice).toLocaleString()}
+                              </span>
+                            )}
+                            {quote.createdBy && (
+                              <span className="text-muted-foreground">
+                                by {quote.createdBy}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <FileText className="w-12 h-12 text-muted-foreground mb-4" />
+                      <h3 className="font-medium mb-1">No Quotes Yet</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Create your first quote using the Quote Builder tab.
+                      </p>
+                      <Button
+                        variant="default"
+                        onClick={() => setActiveTab("quote")}
+                        data-testid="button-create-first-quote"
+                      >
+                        <Calculator className="w-4 h-4 mr-2" />
+                        Start Quote
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

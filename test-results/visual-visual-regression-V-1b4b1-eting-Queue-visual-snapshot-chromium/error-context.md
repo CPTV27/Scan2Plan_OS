@@ -1,0 +1,136 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e12]:
+          - heading "Scan2Plan-OS" [level=1] [ref=e13]
+          - text: CEO Hub
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e16]
+          - text: Dashboard
+        - link "Sales" [ref=e21] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e22]
+          - text: Sales
+        - link "Production" [ref=e27] [cursor=pointer]:
+          - /url: /production
+          - img [ref=e28]
+          - text: Production
+        - link "Financial" [ref=e30] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e31]
+          - text: Financial
+        - link "Analytics" [ref=e34] [cursor=pointer]:
+          - /url: /analytics
+          - img [ref=e35]
+          - text: Analytics
+        - link "Marketing" [ref=e37] [cursor=pointer]:
+          - /url: /marketing
+          - img [ref=e38]
+          - text: Marketing
+        - link "Regional Intel" [ref=e41] [cursor=pointer]:
+          - /url: /regional-intel
+          - img [ref=e42]
+          - text: Regional Intel
+        - link "Settings" [ref=e44] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e45]
+          - text: Settings
+      - generic [ref=e48]:
+        - generic [ref=e50]:
+          - paragraph [ref=e51]: Playwright Test
+          - paragraph [ref=e52]: playwright@test.local
+        - button "Log Out" [ref=e53] [cursor=pointer]:
+          - img
+          - text: Log Out
+    - main [ref=e55]:
+      - generic [ref=e56]:
+        - heading "Marketing" [level=2] [ref=e57]
+        - paragraph [ref=e58]: Truth Loop content queue and campaign management.
+      - generic [ref=e59]:
+        - tablist [ref=e60]:
+          - tab "Content Queue" [selected] [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+            - text: Content Queue
+          - tab "Posted" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - text: Posted
+          - tab "Evidence Vault" [ref=e68] [cursor=pointer]:
+            - img [ref=e69]
+            - text: Evidence Vault
+        - tabpanel "Content Queue" [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e73]:
+              - heading "Draft Content" [level=3] [ref=e74]
+              - generic [ref=e75]: 2 posts
+            - generic [ref=e76]:
+              - generic [ref=e77]:
+                - generic [ref=e80]:
+                  - img [ref=e81]
+                  - generic [ref=e85]: draft
+                - generic [ref=e87]: Sample post content
+                - generic [ref=e88]:
+                  - button "Copy" [ref=e89] [cursor=pointer]:
+                    - img
+                    - text: Copy
+                  - button "Approve" [ref=e90] [cursor=pointer]:
+                    - img
+                    - text: Approve
+                  - button [ref=e91] [cursor=pointer]:
+                    - img
+              - generic [ref=e92]:
+                - generic [ref=e95]:
+                  - img [ref=e96]
+                  - generic [ref=e98]: approved
+                - generic [ref=e100]: Another post
+                - generic [ref=e101]:
+                  - button "Copy" [ref=e102] [cursor=pointer]:
+                    - img
+                    - text: Copy
+                  - button "Approve" [ref=e103] [cursor=pointer]:
+                    - img
+                    - text: Approve
+                  - button [ref=e104] [cursor=pointer]:
+                    - img
+          - generic [ref=e105]:
+            - generic [ref=e106]:
+              - heading "Approved - Ready to Post" [level=3] [ref=e107]
+              - generic [ref=e108]: 2 posts
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - generic [ref=e113]:
+                  - img [ref=e114]
+                  - generic [ref=e118]: draft
+                - generic [ref=e120]: Sample post content
+                - generic [ref=e121]:
+                  - button "Copy" [ref=e122] [cursor=pointer]:
+                    - img
+                    - text: Copy
+                  - button "Mark Posted" [ref=e123] [cursor=pointer]:
+                    - img
+                    - text: Mark Posted
+                  - button [ref=e124] [cursor=pointer]:
+                    - img
+              - generic [ref=e125]:
+                - generic [ref=e128]:
+                  - img [ref=e129]
+                  - generic [ref=e131]: approved
+                - generic [ref=e133]: Another post
+                - generic [ref=e134]:
+                  - button "Copy" [ref=e135] [cursor=pointer]:
+                    - img
+                    - text: Copy
+                  - button "Mark Posted" [ref=e136] [cursor=pointer]:
+                    - img
+                    - text: Mark Posted
+                  - button [ref=e137] [cursor=pointer]:
+                    - img
+  - region "Notifications (F8)":
+    - list
+```

@@ -1,0 +1,388 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e12]:
+            - heading "Scan2Plan-OS" [level=1] [ref=e13]
+            - text: CEO Hub
+        - navigation [ref=e14]:
+          - link "Dashboard" [ref=e15] [cursor=pointer]:
+            - /url: /
+            - img [ref=e16]
+            - text: Dashboard
+          - link "Sales" [ref=e21] [cursor=pointer]:
+            - /url: /sales
+            - img [ref=e22]
+            - text: Sales
+          - link "Production" [ref=e27] [cursor=pointer]:
+            - /url: /production
+            - img [ref=e28]
+            - text: Production
+          - link "Financial" [ref=e30] [cursor=pointer]:
+            - /url: /financial
+            - img [ref=e31]
+            - text: Financial
+          - link "Analytics" [ref=e34] [cursor=pointer]:
+            - /url: /analytics
+            - img [ref=e35]
+            - text: Analytics
+          - link "Marketing" [ref=e37] [cursor=pointer]:
+            - /url: /marketing
+            - img [ref=e38]
+            - text: Marketing
+          - link "Regional Intel" [ref=e41] [cursor=pointer]:
+            - /url: /regional-intel
+            - img [ref=e42]
+            - text: Regional Intel
+          - link "Settings" [ref=e44] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e45]
+            - text: Settings
+        - generic [ref=e48]:
+          - generic [ref=e50]:
+            - paragraph [ref=e51]: Playwright Test
+            - paragraph [ref=e52]: playwright@test.local
+          - button "Log Out" [ref=e53] [cursor=pointer]:
+            - img
+            - text: Log Out
+      - main [ref=e55]:
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - heading "Production Tracker" [level=2] [ref=e59]
+            - paragraph [ref=e60]: Monitor project status from scanning to delivery.
+          - button "New Project" [ref=e61] [cursor=pointer]:
+            - img
+            - text: New Project
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - heading "Scheduling" [level=3] [ref=e66]
+              - generic [ref=e67]: "7"
+            - generic [ref=e68]:
+              - generic [ref=e69]:
+                - generic [ref=e70]:
+                  - generic [ref=e71]:
+                    - img [ref=e72]
+                    - generic [ref=e74]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e75]: Do not schedule scan until retainer is paid
+                - generic [ref=e76]:
+                  - generic [ref=e77]:
+                    - img [ref=e78]
+                    - text: Medium
+                  - button "Open" [ref=e80] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "TPG Architecture - 412 Maspeth Ave, Brooklyn, NY 11211" [level=4] [ref=e81]
+                - generic [ref=e82]:
+                  - generic [ref=e83]:
+                    - generic [ref=e84]:
+                      - img [ref=e85]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e87]:
+                      - img [ref=e88]
+                      - generic [ref=e91]: Unassigned
+                  - generic [ref=e92]:
+                    - generic "Level of Development" [ref=e93]: LOD 300
+                    - generic "Measured Accuracy" [ref=e94]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e95]: LoA 30
+                  - generic [ref=e96]:
+                    - generic [ref=e97]:
+                      - generic [ref=e98]: Progress
+                      - generic [ref=e99]: 0%
+                    - progressbar [ref=e100]
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - generic [ref=e104]:
+                    - img [ref=e105]
+                    - generic [ref=e107]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e108]: Do not schedule scan until retainer is paid
+                - generic [ref=e109]:
+                  - generic [ref=e110]:
+                    - img [ref=e111]
+                    - text: Medium
+                  - button "Open" [ref=e113] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "Skyline Architects - 450 Main St (Historic)" [level=4] [ref=e114]
+                - generic [ref=e115]:
+                  - generic [ref=e116]:
+                    - generic [ref=e117]:
+                      - img [ref=e118]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e120]:
+                      - img [ref=e121]
+                      - generic [ref=e124]: Unassigned
+                  - generic [ref=e125]:
+                    - generic "Level of Development" [ref=e126]: LOD 300
+                    - generic "Measured Accuracy" [ref=e127]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e128]: LoA 30
+                  - generic [ref=e129]:
+                    - generic [ref=e130]:
+                      - generic [ref=e131]: Progress
+                      - generic [ref=e132]: 0%
+                    - progressbar [ref=e133]
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - generic [ref=e137]:
+                    - img [ref=e138]
+                    - generic [ref=e140]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e141]: Do not schedule scan until retainer is paid
+                - generic [ref=e142]:
+                  - generic [ref=e143]:
+                    - img [ref=e144]
+                    - text: Medium
+                  - button "Open" [ref=e146] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "Ashley McGraw Architects, D.P.C. - Delmar, NY" [level=4] [ref=e147]
+                - generic [ref=e148]:
+                  - generic [ref=e149]:
+                    - generic [ref=e150]:
+                      - img [ref=e151]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e153]:
+                      - img [ref=e154]
+                      - generic [ref=e157]: Unassigned
+                  - generic [ref=e158]:
+                    - generic "Level of Development" [ref=e159]: LOD 300
+                    - generic "Measured Accuracy" [ref=e160]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e161]: LoA 30
+                  - generic [ref=e162]:
+                    - generic [ref=e163]:
+                      - generic [ref=e164]: Progress
+                      - generic [ref=e165]: 0%
+                    - progressbar [ref=e166]
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - generic [ref=e170]:
+                    - img [ref=e171]
+                    - generic [ref=e173]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e174]: Do not schedule scan until retainer is paid
+                - generic [ref=e175]:
+                  - generic [ref=e176]:
+                    - img [ref=e177]
+                    - text: Medium
+                  - button "Open" [ref=e179] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "Brooklyn Defender Services - 177 Livingston St, Brooklyn, NY 11201" [level=4] [ref=e180]
+                - generic [ref=e181]:
+                  - generic [ref=e182]:
+                    - generic [ref=e183]:
+                      - img [ref=e184]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e186]:
+                      - img [ref=e187]
+                      - generic [ref=e190]: Unassigned
+                  - generic [ref=e191]:
+                    - generic "Level of Development" [ref=e192]: LOD 300
+                    - generic "Measured Accuracy" [ref=e193]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e194]: LoA 30
+                  - generic [ref=e195]:
+                    - generic [ref=e196]:
+                      - generic [ref=e197]: Progress
+                      - generic [ref=e198]: 0%
+                    - progressbar [ref=e199]
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - generic [ref=e203]:
+                    - img [ref=e204]
+                    - generic [ref=e206]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e207]: Do not schedule scan until retainer is paid
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - img [ref=e210]
+                    - text: Medium
+                  - button "Open" [ref=e212] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "GARDINER & THEOBALD, LLC - 1 Liberty St, New York, NY 10006" [level=4] [ref=e213]
+                - generic [ref=e214]:
+                  - generic [ref=e215]:
+                    - generic [ref=e216]:
+                      - img [ref=e217]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e219]:
+                      - img [ref=e220]
+                      - generic [ref=e223]: Unassigned
+                  - generic [ref=e224]:
+                    - generic "Level of Development" [ref=e225]: LOD 300
+                    - generic "Measured Accuracy" [ref=e226]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e227]: LoA 30
+                  - generic [ref=e228]:
+                    - generic [ref=e229]:
+                      - generic [ref=e230]: Progress
+                      - generic [ref=e231]: 0%
+                    - progressbar [ref=e232]
+              - generic [ref=e234]:
+                - generic [ref=e235]:
+                  - generic [ref=e236]:
+                    - img [ref=e237]
+                    - generic [ref=e239]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e240]: Do not schedule scan until retainer is paid
+                - generic [ref=e241]:
+                  - generic [ref=e242]:
+                    - img [ref=e243]
+                    - text: Medium
+                  - button "Open" [ref=e245] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "AYON (Partner) - 1511 Brightwater Ave, Brooklyn, NY 11235" [level=4] [ref=e246]
+                - generic [ref=e247]:
+                  - generic [ref=e248]:
+                    - generic [ref=e249]:
+                      - img [ref=e250]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e252]:
+                      - img [ref=e253]
+                      - generic [ref=e256]: Unassigned
+                  - generic [ref=e257]:
+                    - generic "Level of Development" [ref=e258]: LOD 300
+                    - generic "Measured Accuracy" [ref=e259]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e260]: LoA 30
+                  - generic [ref=e261]:
+                    - generic [ref=e262]:
+                      - generic [ref=e263]: Progress
+                      - generic [ref=e264]: 0%
+                    - progressbar [ref=e265]
+              - generic [ref=e267]:
+                - generic [ref=e268]:
+                  - generic [ref=e269]:
+                    - img [ref=e270]
+                    - generic [ref=e272]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e273]: Do not schedule scan until retainer is paid
+                - generic [ref=e274]:
+                  - generic [ref=e275]:
+                    - img [ref=e276]
+                    - text: Medium
+                  - button "Open" [ref=e278] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "Ashley McGraw Architects, D.P.C. - 4900 Tank Trail, Fort Drum NY 13602" [level=4] [ref=e279]
+                - generic [ref=e280]:
+                  - generic [ref=e281]:
+                    - generic [ref=e282]:
+                      - img [ref=e283]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e285]:
+                      - img [ref=e286]
+                      - generic [ref=e289]: Unassigned
+                  - generic [ref=e290]:
+                    - generic "Level of Development" [ref=e291]: LOD 300
+                    - generic "Measured Accuracy" [ref=e292]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e293]: LoA 30
+                  - generic [ref=e294]:
+                    - generic [ref=e295]:
+                      - generic [ref=e296]: Progress
+                      - generic [ref=e297]: 0%
+                    - progressbar [ref=e298]
+          - generic [ref=e300]:
+            - generic [ref=e301]:
+              - heading "Scanning" [level=3] [ref=e302]
+              - generic [ref=e303]: "2"
+            - generic [ref=e304]:
+              - generic [ref=e305]:
+                - generic [ref=e306]:
+                  - generic [ref=e307]:
+                    - img [ref=e308]
+                    - text: Medium
+                  - button "Open" [ref=e310] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "API Test Project" [level=4] [ref=e311]
+                - generic [ref=e312]:
+                  - generic [ref=e313]:
+                    - generic [ref=e314]:
+                      - img [ref=e315]
+                      - text: No deadline
+                    - generic "No technician assigned" [ref=e317]:
+                      - img [ref=e318]
+                      - generic [ref=e321]: Unassigned
+                  - generic [ref=e322]:
+                    - generic "Level of Development" [ref=e323]: LOD 300
+                    - generic "Measured Accuracy" [ref=e324]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e325]: LoA 30
+                  - generic [ref=e326]:
+                    - generic [ref=e327]:
+                      - generic [ref=e328]: Progress
+                      - generic [ref=e329]: 0%
+                    - progressbar [ref=e330]
+              - generic [ref=e332]:
+                - generic [ref=e333]:
+                  - generic [ref=e334]:
+                    - img [ref=e335]
+                    - generic [ref=e337]: RETAINER NOT RECEIVED
+                  - paragraph [ref=e338]: Do not schedule scan until retainer is paid
+                - generic [ref=e339]:
+                  - generic [ref=e340]:
+                    - img [ref=e341]
+                    - text: High
+                  - button "Open" [ref=e343] [cursor=pointer]:
+                    - img
+                    - text: Open
+                - heading "Acme Warehouse Phase 1" [level=4] [ref=e344]
+                - generic [ref=e345]:
+                  - generic [ref=e346]:
+                    - generic [ref=e347]:
+                      - img [ref=e348]
+                      - text: Jan 12, 2026
+                    - generic "No technician assigned" [ref=e350]:
+                      - img [ref=e351]
+                      - generic [ref=e354]: Unassigned
+                  - generic [ref=e355]:
+                    - generic "Level of Development" [ref=e356]: LOD 300
+                    - generic "Measured Accuracy" [ref=e357]: LoA 40
+                    - generic "Modeled Accuracy" [ref=e358]: LoA 30
+                  - generic [ref=e359]:
+                    - generic [ref=e360]:
+                      - generic [ref=e361]: Progress
+                      - generic [ref=e362]: 25%
+                    - progressbar [ref=e363]
+          - generic [ref=e366]:
+            - heading "Registration" [level=3] [ref=e367]
+            - generic [ref=e368]: "0"
+          - generic [ref=e371]:
+            - heading "Modeling" [level=3] [ref=e372]
+            - generic [ref=e373]: "0"
+          - generic [ref=e375]:
+            - generic [ref=e376]:
+              - heading "Quality Control" [level=3] [ref=e377]
+              - generic [ref=e378]: "1"
+            - generic [ref=e380]:
+              - generic [ref=e381]:
+                - generic [ref=e382]:
+                  - img [ref=e383]
+                  - text: Low
+                - button "Open" [ref=e385] [cursor=pointer]:
+                  - img
+                  - text: Open
+              - heading "Test Project Alpha" [level=4] [ref=e386]
+              - generic [ref=e387]:
+                - generic [ref=e388]:
+                  - generic [ref=e389]:
+                    - img [ref=e390]
+                    - text: No deadline
+                  - generic "No technician assigned" [ref=e392]:
+                    - img [ref=e393]
+                    - generic [ref=e396]: Unassigned
+                - generic [ref=e397]:
+                  - generic "Level of Development" [ref=e398]: LOD 300
+                  - generic "Measured Accuracy" [ref=e399]: LoA 40
+                  - generic "Modeled Accuracy" [ref=e400]: LoA 30
+                - generic [ref=e401]:
+                  - generic [ref=e402]:
+                    - generic [ref=e403]: Progress
+                    - generic [ref=e404]: 80%
+                  - progressbar [ref=e405]
+          - generic [ref=e408]:
+            - heading "Delivered" [level=3] [ref=e409]
+            - generic [ref=e410]: "0"
+    - region "Notifications (F8)":
+      - list
+  - generic [ref=e412]: $600k
+```

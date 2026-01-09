@@ -1,0 +1,48 @@
+{
+  "system_metadata": {
+    "version": "1.0",
+    "last_updated": "2026-01-07",
+    "description": "Hard-coded business logic gates for Scan2Plan OS revenue protection."
+  },
+  "workflow_gates": {
+    "scanning_gate": {
+      "stage": "Scanning",
+      "required_fields": ["retainer_paid", "universal_id"],
+      "block_message": "GATE LOCKED: Retainer payment must be confirmed and Universal ID generated before field deployment.",
+      "bypass_roles": ["ceo", "accounting"]
+    },
+    "modeling_gate": {
+      "stage": "Modeling",
+      "required_fields": ["qc_b_validation_status", "registration_rms_verified"],
+      "block_message": "GATE LOCKED: B-Validation and RMS Registration check required before modeling begins.",
+      "bypass_roles": ["production_lead"]
+    },
+    "delivery_gate": {
+      "stage": "Delivered",
+      "required_fields": ["square_foot_audit_cleared", "unpaid_invoices_count"],
+      "conditions": {
+        "unpaid_invoices_count": 0,
+        "square_foot_audit_cleared": true
+      },
+      "block_message": "GATE LOCKED: Delivery blocked due to unpaid invoices or pending Square Foot Audit.",
+      "bypass_roles": ["ceo", "accounting"]
+    }
+  },
+  "audit_parameters": {
+    "square_foot_audit": {
+      "variance_threshold": 0.10,
+      "alert_status": "SQUARE FOOT AUDIT REQUIRED",
+      "auto_flag_on_overage": true
+    },
+    "staleness_engine": {
+      "lead_staleness_days": 14,
+      "probability_reduction_percent": 10
+    }
+  },
+  "roles_permissions": {
+    "ceo": ["ALL"],
+    "accounting": ["billing", "gate_bypass_financial", "audit_clearance"],
+    "production": ["field_data", "gate_bypass_technical", "scan_tech_management"],
+    "sales": ["lead_management", "cpq_access", "communication_center"]
+  }
+}

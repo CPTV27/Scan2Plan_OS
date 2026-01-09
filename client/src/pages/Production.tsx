@@ -1,0 +1,1053 @@
+import { useProjects, useCreateProject, useUpdateProject } from "@/hooks/use-projects";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
+import { Button } from "@/components/ui/button";
+import { Plus, Check, Scan, Layers, Box, ClipboardCheck, Package, CalendarClock, MapPin, Building2, Users, Truck, AlertTriangle, FileText, Phone, Mail, User, HelpCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ProjectCard } from "@/components/ProjectCard";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertProjectSchema } from "@shared/schema";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import type { Project, Lead, CpqArea, CpqScopingData, CpqTravel, Scantech } from "@shared/schema";
+import { CPQ_BUILDING_TYPES, CPQ_SERVICES } from "@shared/schema";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { LocationPreview } from "@/components/LocationPreview";
+import { useQuery } from "@tanstack/react-query";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ProjectFinancials } from "@/components/ProjectFinancials";
+
+const COLUMNS = [
+  { id: "Scheduling", title: "Scheduling", icon: CalendarClock },
+  { id: "Scanning", title: "Scanning", icon: Scan },
+  { id: "Registration", title: "Registration", icon: Layers },
+  { id: "Modeling", title: "Modeling", icon: Box },
+  { id: "QC", title: "Quality Control", icon: ClipboardCheck },
+  { id: "Delivered", title: "Delivered", icon: Package },
+];
+
+const COLUMN_ORDER = COLUMNS.map(c => c.id);
+
+function getNextStatus(current: string): string | null {
+  const idx = COLUMN_ORDER.indexOf(current);
+  if (idx < 0 || idx >= COLUMN_ORDER.length - 1) return null;
+  return COLUMN_ORDER[idx + 1];
+}
+
+const formSchema = insertProjectSchema;
+type FormData = z.infer<typeof formSchema>;
+
+export default function Production() {
+  const { data: projects, isLoading } = useProjects();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  // Group projects by status
+  const groupedProjects = COLUMNS.reduce((acc, col) => {
+    acc[col.id] = projects?.filter(p => p.status === col.id) || [];
+    return acc;
+  }, {} as Record<string, Project[]>);
+
+  return (
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileHeader />
+        <main className="flex-1 flex flex-col h-full overflow-hidden">
+          <header className="p-4 md:p-8 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
+          <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Production Tracker</h2>
+              <p className="text-muted-foreground mt-1 text-sm md:text-base">Monitor project status from scanning to delivery.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid="button-production-help">
+                    <HelpCircle className="w-5 h-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-3">
+                    <h4 className="font-semibold">Digital Twin Viewer</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Projects in QC, Modeling, or Delivered stages can generate a Digital Twin view from point cloud data.
+                    </p>
+                    <div className="text-sm space-y-2">
+                      <p className="font-medium">How to use:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                        <li>Find a project in QC, Modeling, or Delivered</li>
+                        <li>Look for the "Digital Twin Viewer" section</li>
+                        <li>Click "Generate Point Cloud" to start</li>
+                        <li>Wait for processing (button shows status)</li>
+                        <li>Click "View Digital Twin" when ready</li>
+                      </ol>
+                    </div>
+                    <p className="text-xs text-muted-foreground border-t pt-2">
+                      Note: Project must have storage configured (Drive folder or GCS path) before conversion.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button onClick={() => setIsCreateOpen(true)} className="shadow-lg shadow-primary/25" data-testid="button-new-project">
+                <Plus className="w-5 h-5 mr-2" /> New Project
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Field Mode - List View */}
+        <div className="md:hidden flex-1 overflow-y-auto p-4">
+          <MobileFieldView 
+            projects={projects || []} 
+            isLoading={isLoading}
+            onEdit={setEditingProject}
+          />
+        </div>
+
+        {/* Desktop Kanban View */}
+        <div className="hidden md:flex flex-1 overflow-x-auto p-8">
+          <div className="flex gap-6 h-full min-w-[1200px]">
+            {COLUMNS.map(col => (
+              <div key={col.id} className="flex-1 flex flex-col min-w-[280px]">
+                <div className="flex items-center justify-between mb-4 px-1">
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
+                    {col.title}
+                  </h3>
+                  <span className="bg-secondary text-secondary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                    {groupedProjects[col.id]?.length || 0}
+                  </span>
+                </div>
+                
+                <div className="flex-1 bg-secondary/20 rounded-xl p-3 border border-border/50 space-y-3 overflow-y-auto custom-scrollbar">
+                  {isLoading ? (
+                    <div className="h-20 bg-card/50 animate-pulse rounded-lg" />
+                  ) : (
+                    groupedProjects[col.id]?.map(project => (
+                      <ProjectCard 
+                        key={project.id} 
+                        project={project} 
+                        onEdit={setEditingProject}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          </div>
+        </main>
+
+        <ProjectDialog 
+          open={isCreateOpen} 
+          onOpenChange={setIsCreateOpen} 
+          onSuccess={() => setIsCreateOpen(false)}
+        />
+
+        <ProjectDialog 
+          project={editingProject} 
+          open={!!editingProject} 
+          onOpenChange={(open) => !open && setEditingProject(null)} 
+          onSuccess={() => setEditingProject(null)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Reusable Project Form Dialog
+function ProjectDialog({ 
+  project, 
+  open, 
+  onOpenChange,
+  onSuccess 
+}: { 
+  project?: Project | null, 
+  open: boolean, 
+  onOpenChange: (open: boolean) => void,
+  onSuccess?: () => void 
+}) {
+  const { toast } = useToast();
+  const createMutation = useCreateProject();
+  const updateMutation = useUpdateProject();
+  const [activeTab, setActiveTab] = useState("details");
+
+  // Fetch linked lead for address/location data
+  const { data: linkedLead } = useQuery<Lead>({
+    queryKey: ['/api/leads', project?.leadId],
+    enabled: !!project?.leadId,
+  });
+
+  // Fetch scantechs for assignment dropdown
+  const { data: scantechs } = useQuery<Scantech[]>({
+    queryKey: ['/api/scantechs'],
+  });
+
+  // Reset tab to details when dialog opens
+  useEffect(() => {
+    if (open) {
+      setActiveTab("details");
+    }
+  }, [open]);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      status: "Scanning",
+      priority: "Medium",
+      progress: 0,
+      bValidationStatus: "pending",
+      cValidationStatus: "pending",
+      billingAdjustmentApproved: false,
+    },
+  });
+
+  // Reset form when project changes
+  if (project && form.getValues().name !== project.name) {
+    form.reset({
+      name: project.name,
+      status: project.status,
+      priority: project.priority,
+      progress: project.progress || 0,
+      dueDate: project.dueDate ? new Date(project.dueDate) : undefined,
+      bValidationStatus: (project.bValidationStatus as "pending" | "passed" | "failed" | "waived") || "pending",
+      cValidationStatus: (project.cValidationStatus as "pending" | "passed" | "failed" | "waived") || "pending",
+      registrationRms: project.registrationRms ? Number(project.registrationRms) : undefined,
+      assignedTechId: project.assignedTechId || undefined,
+      billingAdjustmentApproved: project.billingAdjustmentApproved || false,
+    });
+  }
+
+  async function onSubmit(data: FormData) {
+    try {
+      if (project) {
+        await updateMutation.mutateAsync({ id: project.id, ...data });
+        toast({ title: "Success", description: "Project updated" });
+      } else {
+        await createMutation.mutateAsync(data);
+        toast({ title: "Success", description: "Project created" });
+      }
+      onSuccess?.();
+    } catch (error: any) {
+      const gateType = error?.gateType;
+      let title = "Error";
+      let description = error?.message || "Failed to save project";
+      
+      if (gateType === "RETAINER_REQUIRED") {
+        title = "Retainer Payment Required";
+      } else if (gateType === "QC_VALIDATION_REQUIRED") {
+        title = "QC Validation Required";
+      } else if (gateType === "QC_RMS_EXCEEDED") {
+        title = "Registration RMS Exceeded";
+      } else if (gateType === "SQFT_AUDIT_REQUIRED") {
+        title = "Square Foot Audit Required";
+      } else if (gateType === "PAYMENT_REQUIRED") {
+        title = "Payment Required";
+      }
+      
+      toast({ 
+        title, 
+        description, 
+        variant: "destructive" 
+      });
+    }
+  }
+
+  const projectAddress = linkedLead?.projectAddress;
+
+  // Render form fields as a reusable component
+  const renderFormFields = () => (
+    <>
+      <FormField
+        control={form.control}
+        name="name"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Project Name</FormLabel>
+            <FormControl>
+              <Input placeholder="Site Scan - Building A" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {COLUMNS.map(col => (
+                    <SelectItem key={col.id} value={col.id}>{col.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="priority"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Priority</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value || "Medium"}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <FormField
+        control={form.control}
+        name="assignedTechId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Assigned ScanTech</FormLabel>
+            <Select 
+              onValueChange={(val) => field.onChange(val === "unassigned" ? null : parseInt(val))} 
+              value={field.value?.toString() || "unassigned"}
+            >
+              <FormControl>
+                <SelectTrigger data-testid="select-assigned-tech">
+                  <User className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Select technician" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {scantechs?.filter(t => t.isActive).map(tech => (
+                  <SelectItem key={tech.id} value={tech.id.toString()}>
+                    {tech.name} ({tech.baseLocation}){tech.canDoTravel && " - Travel OK"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="progress"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Progress (%)</FormLabel>
+            <FormControl>
+              <Input type="number" min="0" max="100" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {(form.watch("status") === "Registration" || form.watch("status") === "Modeling" || project?.status === "Registration" || project?.status === "Modeling") && (
+        <div className="border-t border-border pt-4 mt-4">
+          <h4 className="text-sm font-semibold mb-3 text-muted-foreground">QC Validation (LoA 40 Compliance)</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="bValidationStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>B-Validation</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || "pending"}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="B-Val Status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="passed">Passed</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="waived">Waived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="cValidationStatus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>C-Validation</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || "pending"}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="C-Val Status" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="passed">Passed</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                      <SelectItem value="waived">Waived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="registrationRms"
+            render={({ field }) => (
+              <FormItem className="mt-3">
+                <FormLabel>Registration RMS (inches)</FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.001" min="0" placeholder="0.125" {...field} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground mt-1">LoA 40 requires RMS ≤ 0.125" (0-1/8")</p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      )}
+
+      {/* SQUARE FOOT AUDIT Gate - Show if variance >10% */}
+      {project?.sqftVariance && Math.abs(Number(project.sqftVariance)) > 10 && (
+        <div className="border-t border-border pt-4 mt-4">
+          <h4 className="text-sm font-semibold mb-3 text-orange-500 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            Square Foot Audit Required
+          </h4>
+          <div className="p-3 bg-orange-500/10 rounded-md border border-orange-500/30 mb-3">
+            <p className="text-xs text-muted-foreground">
+              Scanned area {Number(project.sqftVariance) > 0 ? "exceeds" : "is below"} estimate by {Math.abs(Number(project.sqftVariance)).toFixed(1)}%.
+              {project.estimatedSqft && project.actualSqft && (
+                <span className="block mt-1">Est: {project.estimatedSqft.toLocaleString()} sqft | Actual: {project.actualSqft.toLocaleString()} sqft</span>
+              )}
+            </p>
+          </div>
+          <FormField
+            control={form.control}
+            name="billingAdjustmentApproved"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    data-testid="checkbox-billing-adjustment"
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="text-sm font-medium">
+                    Billing Adjustment Approved
+                  </FormLabel>
+                  <p className="text-xs text-muted-foreground">
+                    Sales or Accounting has confirmed billing adjustment for the square footage variance. Required before Modeling.
+                  </p>
+                </div>
+              </FormItem>
+            )}
+          />
+        </div>
+      )}
+
+      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+        {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save Project"}
+      </Button>
+    </>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle>{project ? "Edit Project" : "New Project"}</DialogTitle>
+          {projectAddress && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+              <MapPin className="w-4 h-4" />
+              <span>{projectAddress}</span>
+            </div>
+          )}
+        </DialogHeader>
+        
+        {project && projectAddress ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
+              <TabsTrigger value="scoping" data-testid="tab-project-scoping">Scoping</TabsTrigger>
+              <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
+              <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="details" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pr-4">
+                    {renderFormFields()}
+                  </form>
+                </Form>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="scoping" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <ScopingDetails lead={linkedLead} />
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="financials" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <ProjectFinancials projectId={project.id} />
+              </ScrollArea>
+            </TabsContent>
+            
+            <TabsContent value="location" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <LocationPreview 
+                  address={projectAddress} 
+                  companyName={linkedLead?.clientName}
+                  buildingType={linkedLead?.buildingType || undefined}
+                />
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {renderFormFields()}
+            </form>
+          </Form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Use shared schema constants for building types
+const BUILDING_TYPE_LABELS: Record<string, string> = CPQ_BUILDING_TYPES;
+
+// Discipline Labels
+const DISCIPLINE_LABELS: Record<string, string> = {
+  arch: "Architectural",
+  struct: "Structural",
+  mech: "Mechanical",
+  elec: "Electrical",
+  plumb: "Plumbing",
+  site: "Site/Civil",
+};
+
+// Risk Labels
+const RISK_LABELS: Record<string, string> = {
+  remote: "Remote Location",
+  fastTrack: "Fast Track / Rush",
+  revisions: "High Revision Risk",
+  coordination: "Multi-party Coordination",
+  incomplete: "Incomplete Access",
+  difficult: "Difficult Site Access",
+  multiPhase: "Multi-Phase Project",
+  unionSite: "Union Site",
+  security: "Security Requirements",
+};
+
+// Travel Mode Labels (matches TRAVEL_MODES in schema: local, regional, flyout)
+const TRAVEL_MODE_LABELS: Record<string, string> = {
+  local: "NYC/LI Local",
+  regional: "Greater Northeast (Truck)",
+  flyout: "Fly-out Job",
+};
+
+// Service Labels
+const SERVICE_LABELS: Record<string, string> = {
+  matterport: "Matterport Virtual Tour",
+};
+
+// Scoping Details Component - Shows all CPQ data from sales process
+function ScopingDetails({ lead }: { lead: Lead | undefined }) {
+  if (!lead) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No linked lead found. Scoping information is not available.
+      </div>
+    );
+  }
+
+  const areas = (lead.cpqAreas as CpqArea[]) || [];
+  const risks = (lead.cpqRisks as string[]) || [];
+  const travel = (lead.cpqTravel as CpqTravel | null) || null;
+  const scopingData = (lead.cpqScopingData as CpqScopingData) || {};
+  const services = (lead.cpqServices as Record<string, number> | null) || null;
+
+  return (
+    <div className="space-y-4 pr-4">
+      {/* Contact Information */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Contact Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Client:</span>
+              <p className="font-medium">{lead.clientName}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Project:</span>
+              <p className="font-medium">{lead.projectName || "—"}</p>
+            </div>
+          </div>
+          {(lead.contactName || lead.contactEmail || lead.contactPhone) && (
+            <>
+              <Separator className="my-2" />
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                {lead.contactName && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-muted-foreground" />
+                    <span>{lead.contactName}</span>
+                  </div>
+                )}
+                {lead.contactEmail && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3 h-3 text-muted-foreground" />
+                    <span>{lead.contactEmail}</span>
+                  </div>
+                )}
+                {lead.contactPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3 h-3 text-muted-foreground" />
+                    <span>{lead.contactPhone}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          {/* Billing Contact if available */}
+          {(scopingData.billingContactName || scopingData.billingContactEmail || scopingData.billingContactPhone) && (
+            <>
+              <Separator className="my-2" />
+              <p className="text-xs text-muted-foreground font-medium">Billing Contact</p>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                {scopingData.billingContactName && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-3 h-3 text-muted-foreground" />
+                    <span>{scopingData.billingContactName}</span>
+                  </div>
+                )}
+                {scopingData.billingContactEmail && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3 h-3 text-muted-foreground" />
+                    <span>{scopingData.billingContactEmail}</span>
+                  </div>
+                )}
+                {scopingData.billingContactPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3 h-3 text-muted-foreground" />
+                    <span>{scopingData.billingContactPhone}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Building Areas */}
+      {areas.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Building Areas ({areas.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {areas.map((area, idx) => (
+              <div key={area.id || idx} className="bg-muted/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{area.name}</span>
+                  {area.buildingName && (
+                    <Badge variant="outline" className="text-xs">{area.buildingName}</Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div>
+                    <span>Type:</span>
+                    <p className="text-foreground">{BUILDING_TYPE_LABELS[area.buildingType] || area.buildingType}</p>
+                  </div>
+                  <div>
+                    <span>Size:</span>
+                    <p className="text-foreground">{area.squareFeet ? `${Number(area.squareFeet).toLocaleString()} SF` : "—"}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {area.disciplines?.map(disc => (
+                    <Badge key={disc} variant="secondary" className="text-xs">
+                      {DISCIPLINE_LABELS[disc] || disc}
+                      {area.disciplineLods?.[disc] && ` (LOD ${area.disciplineLods[disc]})`}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Travel Configuration */}
+      {travel && travel.travelMode && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Travel Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Mode:</span>
+                <p className="font-medium">{TRAVEL_MODE_LABELS[travel.travelMode] || travel.travelMode}</p>
+              </div>
+              {travel.scanDays && (
+                <div>
+                  <span className="text-muted-foreground">Scan Days:</span>
+                  <p className="font-medium">{travel.scanDays}</p>
+                </div>
+              )}
+              {lead.dispatchLocation && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Dispatch From:</span>
+                  <p className="font-medium">{lead.dispatchLocation}</p>
+                </div>
+              )}
+              {lead.distance && (
+                <div>
+                  <span className="text-muted-foreground">Distance:</span>
+                  <p className="font-medium">{lead.distance} miles</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Services */}
+      {services && Object.keys(services).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Services
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(services).map(([service, count]) => (
+                <Badge key={service} variant="secondary" className="text-xs">
+                  {SERVICE_LABELS[service] || service} {count > 1 && `(${count})`}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Risk Factors */}
+      {risks.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Risk Factors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {risks.map(risk => (
+                <Badge key={risk} variant="destructive" className="text-xs">
+                  {RISK_LABELS[risk] || risk}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Scoping Notes */}
+      {(lead.notes || scopingData.projectNotes || scopingData.insuranceRequirements) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Notes & Special Requirements
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {lead.notes && (
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">General Notes</p>
+                <p className="whitespace-pre-wrap">{lead.notes}</p>
+              </div>
+            )}
+            {scopingData.projectNotes && (
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">Project Notes</p>
+                <p className="whitespace-pre-wrap">{scopingData.projectNotes}</p>
+              </div>
+            )}
+            {scopingData.insuranceRequirements && (
+              <div>
+                <p className="text-muted-foreground text-xs mb-1">Insurance Requirements</p>
+                <p>{scopingData.insuranceRequirements}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Deliverables */}
+      {(scopingData.bimDeliverable && scopingData.bimDeliverable.length > 0) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Deliverables
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {scopingData.bimDeliverable.map((deliverable: string) => (
+                <Badge key={deliverable} variant="secondary">{deliverable}</Badge>
+              ))}
+            </div>
+            {(lead.bimVersion || scopingData.bimVersion) && (
+              <p className="text-sm text-muted-foreground mt-2">BIM Version: {lead.bimVersion || scopingData.bimVersion}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Deal Value */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Deal Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <span className="text-muted-foreground">Quote Value:</span>
+              <p className="font-medium text-lg">${Number(lead.value).toLocaleString()}</p>
+            </div>
+            {lead.quoteNumber && (
+              <div>
+                <span className="text-muted-foreground">Quote #:</span>
+                <p className="font-medium">{lead.quoteNumber}</p>
+              </div>
+            )}
+            {lead.timeline && (
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Timeline:</span>
+                <p className="font-medium">{lead.timeline}</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Mobile Field Mode - Large Touch Targets for Technicians
+function MobileFieldView({ 
+  projects, 
+  isLoading,
+  onEdit 
+}: { 
+  projects: Project[]; 
+  isLoading: boolean;
+  onEdit: (project: Project) => void;
+}) {
+  const { toast } = useToast();
+  const updateMutation = useUpdateProject();
+  const [advancing, setAdvancing] = useState<number | null>(null);
+
+  async function advanceStatus(project: Project) {
+    const nextStatus = getNextStatus(project.status);
+    if (!nextStatus) return;
+    
+    setAdvancing(project.id);
+    try {
+      await updateMutation.mutateAsync({ 
+        id: project.id, 
+        name: project.name,
+        status: nextStatus,
+        priority: project.priority,
+        progress: project.progress ?? 0,
+      });
+      toast({ title: "Status Updated", description: `Moved to ${nextStatus}` });
+    } catch (err: any) {
+      const gateType = err?.gateType;
+      let title = "Cannot Advance Project";
+      let description = err?.message || "Failed to update status";
+      
+      // Provide specific gate feedback
+      if (gateType === "RETAINER_REQUIRED") {
+        title = "Retainer Payment Required";
+      } else if (gateType === "QC_VALIDATION_REQUIRED") {
+        title = "QC Validation Required";
+      } else if (gateType === "QC_RMS_EXCEEDED") {
+        title = "Registration RMS Exceeded";
+      } else if (gateType === "SQFT_AUDIT_REQUIRED") {
+        title = "Square Foot Audit Required";
+      } else if (gateType === "PAYMENT_REQUIRED") {
+        title = "Payment Required";
+      }
+      
+      toast({ title, description, variant: "destructive" });
+    } finally {
+      setAdvancing(null);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-24 bg-card/50 animate-pulse rounded-xl" />
+        ))}
+      </div>
+    );
+  }
+
+  // Sort projects by status order, then by priority
+  const sortedProjects = [...projects].sort((a, b) => {
+    const aIdx = COLUMN_ORDER.indexOf(a.status);
+    const bIdx = COLUMN_ORDER.indexOf(b.status);
+    if (aIdx !== bIdx) return aIdx - bIdx;
+    const priorityOrder = { High: 0, Medium: 1, Low: 2 };
+    return (priorityOrder[a.priority as keyof typeof priorityOrder] || 1) - 
+           (priorityOrder[b.priority as keyof typeof priorityOrder] || 1);
+  });
+
+  return (
+    <div className="space-y-3">
+      {sortedProjects.map(project => {
+        const col = COLUMNS.find(c => c.id === project.status);
+        const Icon = col?.icon || Box;
+        const nextStatus = getNextStatus(project.status);
+        const isAdvancing = advancing === project.id;
+
+        return (
+          <div 
+            key={project.id} 
+            className="bg-card rounded-xl border border-border p-4 active:bg-secondary/50 transition-colors"
+            data-testid={`mobile-project-${project.id}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="bg-accent/10 rounded-lg p-3 shrink-0">
+                <Icon className="w-6 h-6 text-accent" />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 className="font-semibold text-base truncate">{project.name}</h3>
+                  <Badge 
+                    variant={project.priority === "High" ? "destructive" : "secondary"}
+                    className="text-xs"
+                  >
+                    {project.priority}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <span className="font-medium">{col?.title}</span>
+                  {(project.progress ?? 0) > 0 && (
+                    <>
+                      <span className="text-border">|</span>
+                      <span>{project.progress}%</span>
+                    </>
+                  )}
+                </div>
+                
+                <Progress value={project.progress || 0} className="h-2" />
+              </div>
+            </div>
+            
+            {/* Large Touch Action Buttons */}
+            <div className="flex gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1 h-12 text-base"
+                onClick={() => onEdit(project)}
+                data-testid={`button-edit-project-${project.id}`}
+              >
+                Edit
+              </Button>
+              
+              {nextStatus && (
+                <Button 
+                  className="flex-1 h-12 text-base bg-accent"
+                  onClick={() => advanceStatus(project)}
+                  disabled={isAdvancing}
+                  data-testid={`button-advance-project-${project.id}`}
+                >
+                  {isAdvancing ? (
+                    "Updating..."
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5 mr-2" />
+                      Mark {nextStatus}
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      
+      {projects.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No projects yet. Tap "New Project" to get started.</p>
+        </div>
+      )}
+    </div>
+  );
+}

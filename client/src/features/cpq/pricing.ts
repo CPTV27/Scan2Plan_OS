@@ -1,0 +1,855 @@
+/**
+ * CPQ Pricing Engine - Client-Side Calculation Module
+ * 
+ * This module contains all pricing calculation logic for the CPQ system.
+ * Calculations happen entirely in the browser for instant feedback.
+ * Only quote persistence uses server API calls.
+ */
+
+import { FY26_GOALS, validateMarginGate, getMarginStatus } from '@shared/businessGoals';
+
+// Area Kind - distinguishes between standard building areas and landscape areas
+export type AreaKind = "standard" | "landscape";
+
+// Types for pricing calculations
+export interface Area {
+  id: string;
+  name: string;
+  kind: AreaKind; // "standard" or "landscape"
+  buildingType: string;
+  squareFeet: string; // For standard: sqft, for landscape: acres
+  lod: string;
+  disciplines: string[];
+  scope?: string;
+  includeCadDeliverable?: boolean;
+  additionalElevations?: string;
+  facades?: Array<{ id: string; label: string }>;
+  interiorLod?: string;
+  exteriorLod?: string;
+}
+
+// Landscape area types (measured in acres)
+export const LANDSCAPE_TYPES = [
+  { id: "landscape_built", label: "Landscape - Built (Hardscape, Structures)" },
+  { id: "landscape_natural", label: "Landscape - Natural (Terrain, Vegetation)" },
+  { id: "landscape_mixed", label: "Landscape - Mixed (Built + Natural)" },
+];
+
+// Acres to sqft conversion constant
+export const ACRES_TO_SQFT = 43560;
+
+export interface TravelConfig {
+  dispatchLocation: string;
+  distance: number;
+  customCost?: number;
+}
+
+export interface PricingLineItem {
+  label: string;
+  value: number;
+  editable?: boolean;
+  isDiscount?: boolean;
+  isTotal?: boolean;
+  upteamCost?: number;
+}
+
+export interface PricingResult {
+  items: PricingLineItem[];
+  subtotal: number;
+  totalClientPrice: number;
+  totalUpteamCost: number;
+  profitMargin: number;
+  // Discipline breakdowns for deterministic QBO estimate sync
+  disciplineTotals: {
+    architecture: number;
+    mep: number;
+    structural: number;
+    site: number;
+    travel: number;
+    services: number;  // CAD, Matterport, elevations, etc.
+    risk: number;      // Risk premiums
+  };
+}
+
+// Static pricing configuration
+// These rates are embedded in the client for instant calculations
+
+export const BUILDING_TYPES = [
+  { id: "1", label: "Office/Commercial" },
+  { id: "2", label: "Residential Single Family" },
+  { id: "3", label: "Residential Multi-Family" },
+  { id: "4", label: "Industrial/Warehouse" },
+  { id: "5", label: "Retail" },
+  { id: "6", label: "Healthcare" },
+  { id: "7", label: "Education K-12" },
+  { id: "8", label: "Higher Education" },
+  { id: "9", label: "Hospitality" },
+  { id: "10", label: "Mixed Use" },
+  { id: "11", label: "Religious/Cultural" },
+  { id: "12", label: "Government/Civic" },
+  { id: "13", label: "Data Center" },
+  { id: "14", label: "Landscape - Built" },
+  { id: "15", label: "Landscape - Natural" },
+  { id: "16", label: "ACT Modeling" },
+];
+
+export const DISCIPLINES = [
+  { id: "architecture", label: "Architecture" },
+  { id: "mepf", label: "MEP/F" },
+  { id: "structure", label: "Structure" },
+  { id: "site", label: "Site" },
+];
+
+export const LOD_OPTIONS = [
+  { id: "200", label: "LOD 200" },
+  { id: "300", label: "LOD 300" },
+  { id: "350", label: "LOD 350" },
+];
+
+export const SCOPE_OPTIONS = [
+  { id: "full", label: "Full (Interior + Exterior)" },
+  { id: "interior", label: "Interior Only" },
+  { id: "exterior", label: "Exterior Only" },
+  { id: "roof", label: "Roof & Facades" },
+];
+
+// Base rates per sqft by building type and discipline (LOD 200)
+// Format: { buildingTypeId: { discipline: rate } }
+const BASE_RATES: Record<string, Record<string, number>> = {
+  "1": { architecture: 0.25, mepf: 0.30, structure: 0.20, site: 0.15 },
+  "2": { architecture: 0.20, mepf: 0.25, structure: 0.18, site: 0.12 },
+  "3": { architecture: 0.22, mepf: 0.28, structure: 0.19, site: 0.13 },
+  "4": { architecture: 0.18, mepf: 0.22, structure: 0.15, site: 0.10 },
+  "5": { architecture: 0.24, mepf: 0.28, structure: 0.18, site: 0.14 },
+  "6": { architecture: 0.35, mepf: 0.45, structure: 0.25, site: 0.18 },
+  "7": { architecture: 0.26, mepf: 0.32, structure: 0.20, site: 0.15 },
+  "8": { architecture: 0.28, mepf: 0.35, structure: 0.22, site: 0.16 },
+  "9": { architecture: 0.27, mepf: 0.33, structure: 0.21, site: 0.15 },
+  "10": { architecture: 0.26, mepf: 0.32, structure: 0.20, site: 0.14 },
+  "11": { architecture: 0.30, mepf: 0.35, structure: 0.22, site: 0.16 },
+  "12": { architecture: 0.28, mepf: 0.34, structure: 0.21, site: 0.15 },
+  "13": { architecture: 0.35, mepf: 0.50, structure: 0.28, site: 0.18 },
+};
+
+// LOD multipliers
+const LOD_MULTIPLIERS: Record<string, number> = {
+  "200": 1.0,
+  "300": 1.3,
+  "350": 1.5,
+};
+
+// Scope multipliers (portion of price applied)
+const SCOPE_MULTIPLIERS: Record<string, { interior: number; exterior: number }> = {
+  full: { interior: 0.7, exterior: 0.3 },
+  interior: { interior: 1.0, exterior: 0 },
+  exterior: { interior: 0, exterior: 1.0 },
+  roof: { interior: 0, exterior: 0.1 }, // Roof/facades at 10% per item
+};
+
+// Area tier breaks for pricing adjustments
+const AREA_TIERS = [
+  { min: 0, max: 5000, tier: "0-5k", multiplier: 1.0 },
+  { min: 5000, max: 10000, tier: "5k-10k", multiplier: 0.95 },
+  { min: 10000, max: 20000, tier: "10k-20k", multiplier: 0.90 },
+  { min: 20000, max: 30000, tier: "20k-30k", multiplier: 0.85 },
+  { min: 30000, max: 40000, tier: "30k-40k", multiplier: 0.82 },
+  { min: 40000, max: 50000, tier: "40k-50k", multiplier: 0.80 },
+  { min: 50000, max: 75000, tier: "50k-75k", multiplier: 0.78 },
+  { min: 75000, max: 100000, tier: "75k-100k", multiplier: 0.75 },
+  { min: 100000, max: Infinity, tier: "100k+", multiplier: 0.72 },
+];
+
+// Landscape rates (per acre by LOD)
+const LANDSCAPE_RATES: Record<string, Record<string, number[]>> = {
+  built: {
+    "200": [875, 625, 375, 250, 160],
+    "300": [1000, 750, 500, 375, 220],
+    "350": [1250, 1000, 750, 500, 260],
+  },
+  natural: {
+    "200": [625, 375, 250, 200, 140],
+    "300": [750, 500, 375, 275, 200],
+    "350": [1000, 750, 500, 325, 240],
+  },
+};
+
+// Brooklyn Tiered Travel Logic - Gold Standard from CPQ Logic Export
+// Dispatch Location determines base fee structure, Project Size determines tier
+const BROOKLYN_TRAVEL_TIERS = {
+  tierA: { minSqft: 50000, baseFee: 0 },      // >= 50,000 sqft: No base fee
+  tierB: { minSqft: 10000, baseFee: 300 },    // 10,000 - 49,999 sqft: $300 base
+  tierC: { minSqft: 0, baseFee: 150 },        // < 10,000 sqft: $150 base
+};
+
+// Other locations (non-Brooklyn) use per-mile calculation
+// Base $0 + $3/mile for all distances
+const OTHER_DISPATCH_BASE_FEE = 0;
+const OTHER_DISPATCH_PER_MILE_RATE = 3;
+
+// Mileage rate applies after 20 miles for Brooklyn dispatch
+const BROOKLYN_MILEAGE_THRESHOLD = 20;
+const BROOKLYN_PER_MILE_RATE = 4;
+
+// Additional services rates
+export const SERVICE_RATES = {
+  matterport: { rate: 0.10, unit: "sqft", label: "Matterport Capture" },
+  georeferencing: { rate: 500, unit: "flat", label: "Georeferencing" },
+  scanningFullDay: { rate: 2500, unit: "day", label: "Scanning - Full Day" },
+  scanningHalfDay: { rate: 1500, unit: "half-day", label: "Scanning - Half Day" },
+};
+
+// CAD deliverable base rates
+const CAD_BASE_RATES: Record<string, number> = {
+  basic_architecture: 0.03,
+  a_s_site: 0.05,
+  a_s_mep_site: 0.07,
+};
+
+// Risk premium factors (Applied ONLY to Architecture discipline)
+// Gold Standard rates from CPQ Logic Export
+export const RISK_FACTORS = [
+  { id: "hazardous", label: "Hazardous Conditions", premium: 0.25 },
+  { id: "noPower", label: "No Power/HVAC", premium: 0.20 },
+  { id: "occupied", label: "Occupied Building", premium: 0.15 },
+  { id: "security", label: "High Security Facility", premium: 0.10 },
+  { id: "historic", label: "Historic Preservation", premium: 0.12 },
+  { id: "height", label: "High-Rise (10+ floors)", premium: 0.10 },
+];
+
+// Upteam (vendor) cost multiplier
+const UPTEAM_MULTIPLIER = 0.65;
+
+// Minimum project charge
+const MINIMUM_PROJECT_CHARGE = 3000;
+
+// Helper: Get area tier info
+export function getAreaTier(sqft: number): { tier: string; multiplier: number } {
+  for (const tier of AREA_TIERS) {
+    if (sqft >= tier.min && sqft < tier.max) {
+      return { tier: tier.tier, multiplier: tier.multiplier };
+    }
+  }
+  return { tier: "100k+", multiplier: 0.72 };
+}
+
+// Helper: Get base pricing rate
+export function getPricingRate(
+  buildingTypeId: string,
+  sqft: number,
+  discipline: string,
+  lod: string
+): number {
+  const buildingRates = BASE_RATES[buildingTypeId] || BASE_RATES["1"];
+  const baseRate = buildingRates[discipline] || 0.25;
+  const lodMultiplier = LOD_MULTIPLIERS[lod] || 1.0;
+  const { multiplier: tierMultiplier } = getAreaTier(sqft);
+
+  return baseRate * lodMultiplier * tierMultiplier;
+}
+
+// Helper: Get upteam (vendor) pricing rate
+export function getUpteamPricingRate(
+  buildingTypeId: string,
+  sqft: number,
+  discipline: string,
+  lod: string
+): number {
+  const clientRate = getPricingRate(buildingTypeId, sqft, discipline, lod);
+  return clientRate * UPTEAM_MULTIPLIER;
+}
+
+// Landscape type normalization - resolves buildingType to canonical landscape kind
+export type LandscapeKind = "built" | "natural" | "mixed";
+
+export function resolveLandscapeKind(buildingType: string): LandscapeKind {
+  // Support both new landscape type IDs and legacy buildingType IDs
+  if (buildingType === "14" || buildingType === "landscape_built") return "built";
+  if (buildingType === "15" || buildingType === "landscape_natural") return "natural";
+  if (buildingType === "landscape_mixed") return "mixed";
+  // Default to built for any unknown landscape type
+  return "built";
+}
+
+// Helper: Get acreage tier index for rate lookup
+function getAcreageTierIndex(acres: number): number {
+  if (acres >= 100) return 4;
+  if (acres >= 50) return 3;
+  if (acres >= 20) return 2;
+  if (acres >= 5) return 1;
+  return 0;
+}
+
+// Helper: Get landscape per-acre rate
+export function getLandscapePerAcreRate(
+  buildingType: string,
+  acres: number,
+  lod: string
+): number {
+  const landscapeKind = resolveLandscapeKind(buildingType);
+  const tierIndex = getAcreageTierIndex(acres);
+  
+  if (landscapeKind === "mixed") {
+    // Mixed uses average of built and natural rates
+    const builtRates = LANDSCAPE_RATES.built[lod] || LANDSCAPE_RATES.built["200"];
+    const naturalRates = LANDSCAPE_RATES.natural[lod] || LANDSCAPE_RATES.natural["200"];
+    return (builtRates[tierIndex] + naturalRates[tierIndex]) / 2;
+  }
+  
+  const rates = landscapeKind === "built" 
+    ? LANDSCAPE_RATES.built 
+    : LANDSCAPE_RATES.natural;
+  const lodRates = rates[lod] || rates["200"];
+  return lodRates[tierIndex];
+}
+
+// Helper: Get CAD package type
+export function getCadPackageType(disciplineCount: number): string {
+  if (disciplineCount >= 3) return "a_s_mep_site";
+  if (disciplineCount === 2) return "a_s_site";
+  return "basic_architecture";
+}
+
+// Helper: Get CAD pricing rate
+export function getCadPricingRate(sqft: number, disciplineCount: number): number {
+  const packageType = getCadPackageType(disciplineCount);
+  const baseRate = CAD_BASE_RATES[packageType] || 0.03;
+  const { multiplier: tierMultiplier } = getAreaTier(sqft);
+  return baseRate * tierMultiplier;
+}
+
+// Helper: Calculate additional elevations price (tiered)
+export function calculateAdditionalElevationsPrice(quantity: number): number {
+  if (quantity <= 0) return 0;
+
+  let total = 0;
+  let remaining = quantity;
+
+  // First 10 at $25/ea
+  const tier1 = Math.min(remaining, 10);
+  total += tier1 * 25;
+  remaining -= tier1;
+
+  // Next 10 (10-20) at $20/ea
+  if (remaining > 0) {
+    const tier2 = Math.min(remaining, 10);
+    total += tier2 * 20;
+    remaining -= tier2;
+  }
+
+  // Next 80 (20-100) at $15/ea
+  if (remaining > 0) {
+    const tier3 = Math.min(remaining, 80);
+    total += tier3 * 15;
+    remaining -= tier3;
+  }
+
+  // Next 200 (100-300) at $10/ea
+  if (remaining > 0) {
+    const tier4 = Math.min(remaining, 200);
+    total += tier4 * 10;
+    remaining -= tier4;
+  }
+
+  // Remaining (300+) at $5/ea
+  if (remaining > 0) {
+    total += remaining * 5;
+  }
+
+  return total;
+}
+
+// Helper: Calculate travel cost with Brooklyn tiered logic
+// Brooklyn dispatch uses project-size-based tiers + per-mile after 20 miles
+// Other locations use flat distance-based rates
+export function calculateTravelCost(
+  distance: number,
+  dispatchLocation: string,
+  projectTotalSqft: number,
+  customCost?: number
+): number {
+  if (customCost !== undefined && customCost > 0) {
+    return customCost;
+  }
+
+  // Check if Brooklyn dispatch (case-insensitive match)
+  const isBrooklyn = dispatchLocation.toLowerCase().includes("brooklyn");
+
+  if (isBrooklyn) {
+    // Brooklyn tiered pricing based on project size
+    let baseFee = BROOKLYN_TRAVEL_TIERS.tierC.baseFee; // Default: < 10k sqft
+    
+    if (projectTotalSqft >= BROOKLYN_TRAVEL_TIERS.tierA.minSqft) {
+      baseFee = BROOKLYN_TRAVEL_TIERS.tierA.baseFee; // >= 50k: $0
+    } else if (projectTotalSqft >= BROOKLYN_TRAVEL_TIERS.tierB.minSqft) {
+      baseFee = BROOKLYN_TRAVEL_TIERS.tierB.baseFee; // 10k-49,999: $300
+    }
+
+    // Add per-mile rate for distance over threshold
+    const additionalMiles = Math.max(0, distance - BROOKLYN_MILEAGE_THRESHOLD);
+    const mileageCost = additionalMiles * BROOKLYN_PER_MILE_RATE;
+
+    return baseFee + mileageCost;
+  }
+
+  // Non-Brooklyn: $0 base + $3/mile for all distances
+  return OTHER_DISPATCH_BASE_FEE + (distance * OTHER_DISPATCH_PER_MILE_RATE);
+}
+
+// Main pricing calculation function
+// NOTE: Risk premiums (Occupied/Hazardous) apply ONLY to Architecture discipline.
+// MEPF, Structure, Site, Travel, and other ancillary costs are explicitly EXCLUDED.
+export function calculatePricing(
+  areas: Area[],
+  services: Record<string, number>,
+  travel: TravelConfig | null,
+  risks: string[],
+  paymentTerms: string = "standard"
+): PricingResult {
+  const items: PricingLineItem[] = [];
+  
+  // Separate tracking for risk-eligible vs risk-exempt costs
+  let architectureBaseTotal = 0;  // Architecture discipline ONLY - eligible for risk premiums
+  let mepfTotal = 0;              // MEP/F discipline - EXCLUDED from risk premiums
+  let structureTotal = 0;         // Structure discipline - EXCLUDED from risk premiums
+  let siteTotal = 0;              // Site discipline - EXCLUDED from risk premiums
+  let otherCostsTotal = 0;        // CAD, elevations, services, etc. - EXCLUDED from risk premiums
+  let travelTotal = 0;            // Travel costs - EXCLUDED from risk premiums
+  let riskPremiumTotal = 0;       // Accumulated risk premiums
+  let upteamCost = 0;
+
+  // Process each area
+  areas.forEach((area) => {
+    // Check both kind property (new) and buildingType (legacy) for landscape
+    const isLandscape = area.kind === "landscape" || area.buildingType === "14" || area.buildingType === "15";
+    const isACT = area.buildingType === "16";
+    // For landscape: squareFeet contains acres, for standard: contains sqft
+    const inputValue = isLandscape
+      ? parseFloat(area.squareFeet) || 0
+      : parseInt(area.squareFeet) || 0;
+
+    const scope = area.scope || "full";
+    const disciplines = isLandscape
+      ? ["site"]
+      : isACT
+      ? ["mepf"]
+      : area.disciplines.length > 0
+      ? area.disciplines
+      : [];
+
+    disciplines.forEach((discipline) => {
+      const lod = area.lod || "200";
+      let lineTotal = 0;
+      let upteamLineCost = 0;
+      let areaLabel = "";
+
+      if (isLandscape) {
+        const acres = inputValue;
+        const sqft = Math.round(acres * 43560);
+        const perAcreRate = getLandscapePerAcreRate(area.buildingType, acres, lod);
+        lineTotal = acres * perAcreRate;
+        areaLabel = `${acres} acres (${sqft.toLocaleString()} sqft)`;
+        upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+      } else if (isACT) {
+        const sqft = Math.max(inputValue, 3000);
+        lineTotal = sqft * 2.0;
+        areaLabel = `${sqft.toLocaleString()} sqft`;
+        upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+      } else {
+        const sqft = Math.max(inputValue, 3000);
+        const ratePerSqft = getPricingRate(area.buildingType, sqft, discipline, lod);
+        const scopeMultiplier = SCOPE_MULTIPLIERS[scope] || SCOPE_MULTIPLIERS.full;
+        const effectiveMultiplier = scopeMultiplier.interior + scopeMultiplier.exterior;
+
+        lineTotal = sqft * ratePerSqft * effectiveMultiplier;
+        areaLabel = `${sqft.toLocaleString()} sqft`;
+        upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+      }
+
+      if (lineTotal > 0) {
+        const disciplineLabel = DISCIPLINES.find((d) => d.id === discipline)?.label || discipline;
+        items.push({
+          label: `${area.name} - ${disciplineLabel} LOD ${lod} (${areaLabel})`,
+          value: Math.round(lineTotal * 100) / 100,
+          upteamCost: Math.round(upteamLineCost * 100) / 100,
+        });
+
+        // Route costs to appropriate bucket based on discipline
+        // ONLY architecture is eligible for risk premium multipliers
+        switch (discipline) {
+          case "architecture":
+            architectureBaseTotal += lineTotal;
+            break;
+          case "mepf":
+            mepfTotal += lineTotal;
+            break;
+          case "structure":
+            structureTotal += lineTotal;
+            break;
+          case "site":
+            siteTotal += lineTotal;
+            break;
+          default:
+            otherCostsTotal += lineTotal;
+        }
+        upteamCost += upteamLineCost;
+      }
+    });
+
+    // CAD deliverable - NOT eligible for risk premiums
+    if (area.includeCadDeliverable) {
+      const sqft = Math.max(parseInt(area.squareFeet) || 0, 3000);
+      const cadRate = getCadPricingRate(sqft, disciplines.length);
+      const cadTotal = Math.max(sqft * cadRate, 250); // Minimum $250
+      items.push({
+        label: `${area.name} - CAD Deliverable`,
+        value: Math.round(cadTotal * 100) / 100,
+        upteamCost: Math.round(cadTotal * UPTEAM_MULTIPLIER * 100) / 100,
+      });
+      otherCostsTotal += cadTotal;
+      upteamCost += cadTotal * UPTEAM_MULTIPLIER;
+    }
+
+    // Additional elevations - NOT eligible for risk premiums
+    const additionalElevations = parseInt(area.additionalElevations || "0") || 0;
+    if (additionalElevations > 0) {
+      const elevTotal = calculateAdditionalElevationsPrice(additionalElevations);
+      items.push({
+        label: `${area.name} - Additional Elevations (${additionalElevations})`,
+        value: elevTotal,
+        upteamCost: Math.round(elevTotal * UPTEAM_MULTIPLIER * 100) / 100,
+      });
+      otherCostsTotal += elevTotal;
+      upteamCost += elevTotal * UPTEAM_MULTIPLIER;
+    }
+
+    // Facades (for roof scope) - NOT eligible for risk premiums
+    const facades = area.facades || [];
+    if (scope === "roof" && facades.length > 0) {
+      facades.forEach((facade) => {
+        const facadePrice = architectureBaseTotal * 0.1; // 10% of arch base
+        items.push({
+          label: `${area.name} - Facade: ${facade.label || "Unnamed"}`,
+          value: Math.round(facadePrice * 100) / 100,
+          upteamCost: Math.round(facadePrice * UPTEAM_MULTIPLIER * 100) / 100,
+        });
+        otherCostsTotal += facadePrice;
+        upteamCost += facadePrice * UPTEAM_MULTIPLIER;
+      });
+    }
+  });
+
+  // Additional services - NOT eligible for risk premiums
+  Object.entries(services).forEach(([serviceId, quantity]) => {
+    if (quantity <= 0) return;
+    const service = SERVICE_RATES[serviceId as keyof typeof SERVICE_RATES];
+    if (!service) return;
+
+    let serviceTotal = 0;
+    if (service.unit === "sqft") {
+      serviceTotal = quantity * service.rate;
+    } else {
+      serviceTotal = quantity * service.rate;
+    }
+
+    if (serviceTotal > 0) {
+      items.push({
+        label: `${service.label}${quantity > 1 ? ` x ${quantity}` : ""}`,
+        value: Math.round(serviceTotal * 100) / 100,
+        upteamCost: Math.round(serviceTotal * UPTEAM_MULTIPLIER * 100) / 100,
+      });
+      otherCostsTotal += serviceTotal;
+      upteamCost += serviceTotal * UPTEAM_MULTIPLIER;
+    }
+  });
+
+  // RISK PREMIUMS - Applied ONLY to Architecture discipline base cost
+  // Explicitly EXCLUDES: MEPF, Structure, Site, Travel, and all other costs
+  // Each risk factor is calculated independently against the base (non-compounding)
+  if (risks.length > 0 && architectureBaseTotal > 0) {
+    risks.forEach((riskId) => {
+      const risk = RISK_FACTORS.find((r) => r.id === riskId);
+      if (risk) {
+        // Calculate premium against Architecture base only (not against other risks)
+        const individualPremium = Math.round(architectureBaseTotal * risk.premium * 100) / 100;
+        
+        // Add line item for this risk
+        items.push({
+          label: `Risk Premium: ${risk.label} (Architecture only)`,
+          value: individualPremium,
+          upteamCost: 0, // Risk premiums are pure profit margin
+        });
+        
+        // Accumulate premium total (using same rounded value as line item)
+        riskPremiumTotal += individualPremium;
+      }
+    });
+  }
+
+  // Calculate total project sqft for travel tier determination
+  const projectTotalSqft = areas.reduce((sum, area) => {
+    const isLandscape = area.buildingType === "14" || area.buildingType === "15";
+    if (isLandscape) {
+      const acres = parseFloat(area.squareFeet) || 0;
+      return sum + Math.round(acres * 43560); // Convert acres to sqft
+    }
+    return sum + (parseInt(area.squareFeet) || 0);
+  }, 0);
+
+  // Travel costs - NOT eligible for risk premiums (tracked separately)
+  // Uses Brooklyn tiered logic for Brooklyn dispatch, flat rates for other locations
+  if (travel && travel.distance > 0) {
+    const travelCost = calculateTravelCost(
+      travel.distance,
+      travel.dispatchLocation || "",
+      projectTotalSqft,
+      travel.customCost
+    );
+    if (travelCost > 0) {
+      const isBrooklyn = (travel.dispatchLocation || "").toLowerCase().includes("brooklyn");
+      let travelLabel = `Travel (${travel.distance} mi from ${travel.dispatchLocation}`;
+      
+      if (isBrooklyn) {
+        // Brooklyn: Show tier and mileage breakdown
+        const tierLabel = projectTotalSqft >= 50000 ? "Tier A" : projectTotalSqft >= 10000 ? "Tier B" : "Tier C";
+        const additionalMiles = Math.max(0, travel.distance - BROOKLYN_MILEAGE_THRESHOLD);
+        if (additionalMiles > 0) {
+          travelLabel += ` - ${tierLabel}, +$${BROOKLYN_PER_MILE_RATE}/mi x ${additionalMiles} mi`;
+        } else {
+          travelLabel += ` - ${tierLabel}`;
+        }
+      } else {
+        // Non-Brooklyn: Show per-mile calculation
+        travelLabel += ` @ $${OTHER_DISPATCH_PER_MILE_RATE}/mi`;
+      }
+      travelLabel += ")";
+      
+      items.push({
+        label: travelLabel,
+        value: travelCost,
+        upteamCost: Math.round(travelCost * 0.8 * 100) / 100, // Travel has higher margin
+      });
+      travelTotal = travelCost;
+      upteamCost += travelCost * 0.8;
+    }
+  }
+
+  // Calculate subtotal with explicit separation:
+  // Architecture (with risk) + MEPF + Structure + Site + Other + Travel
+  const architectureWithRisk = architectureBaseTotal + riskPremiumTotal;
+  const riskExemptTotal = mepfTotal + structureTotal + siteTotal + otherCostsTotal + travelTotal;
+  let subtotal = architectureWithRisk + riskExemptTotal;
+
+  // Apply minimum charge
+  if (subtotal < MINIMUM_PROJECT_CHARGE && subtotal > 0) {
+    const adjustment = MINIMUM_PROJECT_CHARGE - subtotal;
+    items.push({
+      label: "Minimum Project Charge Adjustment",
+      value: adjustment,
+      upteamCost: 0,
+    });
+    subtotal = MINIMUM_PROJECT_CHARGE;
+  }
+
+  // Payment term adjustments
+  let paymentAdjustment = 0;
+  if (paymentTerms === "prepaid") {
+    paymentAdjustment = -subtotal * 0.05; // 5% discount for prepaid
+    items.push({
+      label: "Prepaid Discount (5%)",
+      value: paymentAdjustment,
+      isDiscount: true,
+    });
+  } else if (paymentTerms === "net60") {
+    paymentAdjustment = subtotal * 0.03; // 3% surcharge for extended terms
+    items.push({
+      label: "Extended Terms Surcharge (3%)",
+      value: paymentAdjustment,
+    });
+  }
+
+  const totalClientPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
+  const totalUpteamCost = Math.round(upteamCost * 100) / 100;
+  const profitMargin = totalClientPrice - totalUpteamCost;
+
+  // Add total line
+  items.push({
+    label: "Total",
+    value: totalClientPrice,
+    isTotal: true,
+  });
+
+  return {
+    items,
+    subtotal: Math.round(subtotal * 100) / 100,
+    totalClientPrice,
+    totalUpteamCost,
+    profitMargin: Math.round(profitMargin * 100) / 100,
+    // Discipline breakdowns for deterministic QBO estimate sync
+    disciplineTotals: {
+      architecture: Math.round(architectureBaseTotal * 100) / 100,
+      mep: Math.round(mepfTotal * 100) / 100,
+      structural: Math.round(structureTotal * 100) / 100,
+      site: Math.round(siteTotal * 100) / 100,
+      travel: Math.round(travelTotal * 100) / 100,
+      services: Math.round(otherCostsTotal * 100) / 100,
+      risk: Math.round(riskPremiumTotal * 100) / 100,
+    },
+  };
+}
+
+// Export types for components
+export type { PricingLineItem as LineItem };
+
+// ============================================
+// GM HARD GATE - FY26 Governance Rules
+// ============================================
+export { FY26_GOALS, validateMarginGate, getMarginStatus };
+
+/**
+ * Calculate margin percentage from pricing result
+ */
+export function calculateMarginPercent(pricing: PricingResult): number {
+  if (pricing.totalClientPrice <= 0) return 0;
+  return ((pricing.totalClientPrice - pricing.totalUpteamCost) / pricing.totalClientPrice) * 100;
+}
+
+/**
+ * Check if the quote passes the GM Hard Gate (40% minimum margin)
+ * Returns true if margin is at or above the floor, false otherwise
+ */
+export function passesMarginGate(pricing: PricingResult): boolean {
+  const marginPercent = calculateMarginPercent(pricing);
+  return marginPercent >= (FY26_GOALS.MARGIN_FLOOR * 100);
+}
+
+/**
+ * Get margin gate validation result
+ * Returns null if passed, error message if blocked
+ */
+export function getMarginGateError(pricing: PricingResult): string | null {
+  const marginPercent = calculateMarginPercent(pricing);
+  return validateMarginGate(marginPercent);
+}
+
+// ============================================
+// TIER A PRICING - Large Projects (≥50,000 sqft)
+// ============================================
+import { TIER_A_THRESHOLD, TIER_A_SCANNING_COSTS, TIER_A_MARGINS, TRAVEL_TIERS } from '@shared/schema';
+
+export { TIER_A_THRESHOLD, TIER_A_SCANNING_COSTS, TIER_A_MARGINS, TRAVEL_TIERS };
+
+export interface TierAPricingConfig {
+  scanningCost: keyof typeof TIER_A_SCANNING_COSTS | 'other' | '' | null;
+  scanningCostOther?: number;
+  modelingCost: number;
+  margin: keyof typeof TIER_A_MARGINS | '' | null;
+}
+
+export interface TierAPricingResult {
+  scanningCost: number;
+  modelingCost: number;
+  subtotal: number;
+  margin: number;
+  marginLabel: string;
+  clientPrice: number;
+  travelCost: number;
+  totalWithTravel: number;
+}
+
+/**
+ * Check if a project qualifies for Tier A pricing (≥50,000 sqft)
+ */
+export function isTierAProject(totalSqft: number): boolean {
+  return totalSqft >= TIER_A_THRESHOLD;
+}
+
+/**
+ * Get square feet from an area, converting acres to sqft for landscape areas
+ */
+export function getAreaSqft(area: Area): number {
+  const value = parseFloat(area.squareFeet) || 0;
+  if (area.kind === "landscape") {
+    return Math.round(value * ACRES_TO_SQFT);
+  }
+  return value;
+}
+
+/**
+ * Calculate total sqft from all areas (standard + landscape)
+ */
+export function calculateTotalSqft(areas: Area[]): number {
+  return areas.reduce((sum, area) => sum + getAreaSqft(area), 0);
+}
+
+/**
+ * Calculate Tier A travel cost based on project size and distance
+ * Tier A: $0 base + $4/mile over 20 miles
+ */
+export function calculateTierATravelCost(distanceMiles: number): number {
+  const { base, perMileOver, mileThreshold } = TRAVEL_TIERS.TIER_A;
+  const additionalMiles = Math.max(0, distanceMiles - mileThreshold);
+  return base + (additionalMiles * perMileOver);
+}
+
+/**
+ * Calculate Tier A pricing using the specialized formula:
+ * Client Price = (Scanning Cost + Modeling Cost) × Margin Multiplier
+ */
+export function calculateTierAPricing(
+  config: TierAPricingConfig,
+  distanceMiles: number = 0
+): TierAPricingResult {
+  // Get scanning cost
+  let scanningCost = 0;
+  const scanCostValue = config.scanningCost;
+  if (scanCostValue === 'other' && config.scanningCostOther) {
+    scanningCost = config.scanningCostOther;
+  } else if (scanCostValue && scanCostValue !== 'other') {
+    scanningCost = TIER_A_SCANNING_COSTS[scanCostValue as keyof typeof TIER_A_SCANNING_COSTS] || 0;
+  }
+
+  const modelingCost = config.modelingCost || 0;
+  const subtotal = scanningCost + modelingCost;
+
+  // Get margin multiplier
+  let margin = 1;
+  let marginLabel = 'No Margin Selected';
+  const marginValue = config.margin;
+  if (marginValue) {
+    const marginConfig = TIER_A_MARGINS[marginValue as keyof typeof TIER_A_MARGINS];
+    if (marginConfig) {
+      margin = marginConfig.value;
+      marginLabel = marginConfig.label;
+    }
+  }
+
+  const clientPrice = Math.round(subtotal * margin * 100) / 100;
+  
+  // Calculate Tier A travel
+  const travelCost = calculateTierATravelCost(distanceMiles);
+  const totalWithTravel = clientPrice + travelCost;
+
+  return {
+    scanningCost,
+    modelingCost,
+    subtotal,
+    margin,
+    marginLabel,
+    clientPrice,
+    travelCost,
+    totalWithTravel: Math.round(totalWithTravel * 100) / 100,
+  };
+}
+
+/**
+ * Get travel tier info based on project sqft
+ */
+export function getTravelTier(sqft: number): { tier: 'A' | 'B' | 'C'; baseFee: number; perMile: number; mileThreshold: number } {
+  if (sqft >= TRAVEL_TIERS.TIER_A.minSqft) {
+    return { tier: 'A', baseFee: TRAVEL_TIERS.TIER_A.base, perMile: TRAVEL_TIERS.TIER_A.perMileOver, mileThreshold: TRAVEL_TIERS.TIER_A.mileThreshold };
+  }
+  if (sqft >= TRAVEL_TIERS.TIER_B.minSqft) {
+    return { tier: 'B', baseFee: TRAVEL_TIERS.TIER_B.base, perMile: 0, mileThreshold: 0 };
+  }
+  return { tier: 'C', baseFee: TRAVEL_TIERS.TIER_C.base, perMile: 0, mileThreshold: 0 };
+}

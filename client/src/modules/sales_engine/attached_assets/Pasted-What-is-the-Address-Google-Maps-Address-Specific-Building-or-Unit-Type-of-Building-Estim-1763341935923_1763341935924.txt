@@ -1,0 +1,155 @@
+What is the Address 
+*
+Google Maps Address
+Specific Building or Unit?
+Type of Building
+*
+Estimated Total Square Footage
+*
+Int / Ext?
+*
+Full Building
+Interior Only
+Exterior Only
+Other:
+Which LoD Standard?
+*
+LoD 200
+LoD 300
+LoD 350
+LoD 350+
+Other:
+Is there a Basement / Attic?
+*
+Basement
+Attic
+No
+Other:
+Estimated Sq Footage of Basement / Attic
+Structural Modeling? (for exposed Structure)
+Yes
+No
+Other:
+Scope of Structural Modeling (sqft)
+MEPF Modeling? (for any visable Mechanical, Electrical. Plumbing  & Fire Safety elements & systems)
+Yes
+No
+Other:
+Scope of MEPF Modeling (sqft)
+Grade Around Building? (~20' topography)
+Yes
+No
+Other:
+Landscape Modeling?
+Landscape LoD 200
+Landscape LoD 300
+Landscape LoD 350
+Other:
+How many acres of Landscape?
+Georeferencing?
+Yes
+No
+Other:
+CAD Deliverable? (PDF & DWG)
+Yes
+No
+Other:
+Interior CAD Elevations? How Many?
+Matterport 3D Tour?
+Yes
+No
+Other:
+Scanning & Modeling above and below Acoustic Ceiling Tile? (where appropriate)
+Yes
+No
+Other:
+Scope of aACT (sqft)
+BIM Deliverable
+Revit
+Archicad
+Sketchup
+Rhino
+Other:
+Version / Year of BIM Software?
+Cusom Template / Standard?
+Yes
+No
+Other:
+Upload Custom Template / Standard
+Upload up to 10 supported files. Max 100 MB per file.
+Risk Factors
+Occupied
+Fire / Flood
+No Power
+No Lighting
+Expedited Service?
+Yes
+No
+Other:
+Upload Screen Shots for Sq Ft assumptions
+*
+Upload up to 10 supported files. Max 1 GB per file.
+Assumptions On Sqft Estimate
+Upload Scoping Documents
+Upload up to 10 supported files. Max 10 MB per file.
+Assumed Gross Margin - & reasoning
+*
+Caveats on Profitability
+Notes on Project
+Mixed Scope / Special Priorities
+Insurance Requirements
+Tier-A Scanning Cost
+$3,500
+$7,000
+$10,500
+15,000
+18,500
+Other:
+Tier-A Modeling Cost 
+https://docs.google.com/spreadsheets/d/192MhTytrT01h05V3xOugBXm7dFcxl4ZMxcwuVUCQAuo/edit?usp=sharing
+Tier-A Margin
+2.352X (1.68 overhead X 1.4 min GM)
+2.5 X
+3X
+3.5X
+4X
+Estimated Timeline (from scan completion)
+*
+~1 week
+~2 weeks
+~3 weeks
+~4 weeks
+~5 weeks
+~6 weeks
+Other:
+Notes on Timeline
+Payment Terms
+*
+Partner (no hold on production)
+Owner (hold if delay)
+Net 30 + 5%
+Net 60 +10%
+Net 90 + 15%
+Other:
+Payment Notes
+Account/Company Contact Info
+Design Pro Company Contact Info (if not client) 
+Other Contact Info
+Proof Links
+NDA
+Upload up to 5 supported files. Max 10 MB per file.
+Source  (origin)
+*
+ 
+This is a required question
+Source Note
+Assist  (influence)
+Probability of Closing
+*
+ 
+This is a required question
+Project Status
+Proposal Phase
+In Hand
+Urgent
+Other:

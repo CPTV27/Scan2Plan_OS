@@ -1,0 +1,173 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e7]
+        - generic [ref=e12]:
+          - heading "Scan2Plan-OS" [level=1] [ref=e13]
+          - text: CEO Hub
+      - navigation [ref=e14]:
+        - link "Dashboard" [ref=e15] [cursor=pointer]:
+          - /url: /
+          - img [ref=e16]
+          - text: Dashboard
+        - link "Sales" [ref=e21] [cursor=pointer]:
+          - /url: /sales
+          - img [ref=e22]
+          - text: Sales
+        - link "Production" [ref=e27] [cursor=pointer]:
+          - /url: /production
+          - img [ref=e28]
+          - text: Production
+        - link "Financial" [ref=e30] [cursor=pointer]:
+          - /url: /financial
+          - img [ref=e31]
+          - text: Financial
+        - link "Analytics" [ref=e34] [cursor=pointer]:
+          - /url: /analytics
+          - img [ref=e35]
+          - text: Analytics
+        - link "Marketing" [ref=e37] [cursor=pointer]:
+          - /url: /marketing
+          - img [ref=e38]
+          - text: Marketing
+        - link "Regional Intel" [ref=e41] [cursor=pointer]:
+          - /url: /regional-intel
+          - img [ref=e42]
+          - text: Regional Intel
+        - link "Settings" [ref=e44] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e45]
+          - text: Settings
+      - generic [ref=e48]:
+        - generic [ref=e50]:
+          - paragraph [ref=e51]: Playwright Test
+          - paragraph [ref=e52]: playwright@test.local
+        - button "Log Out" [ref=e53] [cursor=pointer]:
+          - img
+          - text: Log Out
+    - main [ref=e55]:
+      - generic [ref=e56]:
+        - heading "Marketing" [level=2] [ref=e57]
+        - paragraph [ref=e58]: Truth Loop content queue and campaign management.
+      - generic [ref=e59]:
+        - tablist [ref=e60]:
+          - tab "Content Queue" [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+            - text: Content Queue
+          - tab "Posted" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - text: Posted
+          - tab "Evidence Vault" [active] [selected] [ref=e68] [cursor=pointer]:
+            - img [ref=e69]
+            - text: Evidence Vault
+        - tabpanel "Evidence Vault" [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e74]:
+              - generic [ref=e76]:
+                - img [ref=e77]
+                - generic [ref=e79]: How the Evidence Vault Works
+              - generic [ref=e80]:
+                - paragraph [ref=e81]:
+                  - text: This is the
+                  - strong [ref=e82]: "\"Ammo Dump\""
+                  - text: for your Growth Engine. The system reads from this list to write your sales emails automatically.
+                - list [ref=e83]:
+                  - listitem [ref=e84]:
+                    - strong [ref=e85]: "Input:"
+                    - text: Add your best "Hero Stats" here (e.g.,
+                    - emphasis [ref=e86]: "\"Saved $40k in rework\""
+                    - text: ).
+                  - listitem [ref=e87]:
+                    - strong [ref=e88]: "Tag:"
+                    - text: Assign a Persona (e.g.,
+                    - emphasis [ref=e89]: The Architect
+                    - text: ) and an EWS Score (1-5 stars).
+                  - listitem [ref=e90]:
+                    - strong [ref=e91]: "Automate:"
+                    - text: When you click "Sync to HubSpot," the engine automatically grabs the
+                    - strong [ref=e92]: highest-rated hook
+                    - text: for that lead's persona.
+                - paragraph [ref=e93]: "*Tip: Higher EWS scores (4-5) will be prioritized in outreach scripts."
+            - generic [ref=e94]:
+              - generic [ref=e95]:
+                - heading "Evidence Vault" [level=3] [ref=e96]
+                - paragraph [ref=e97]: High-converting hooks mined from archives, organized by buyer persona.
+              - button "Add Hook" [ref=e98] [cursor=pointer]:
+                - img
+                - text: Add Hook
+            - table [ref=e102]:
+              - rowgroup [ref=e103]:
+                - row "Hook Content Persona EWS Score Uses Actions" [ref=e104]:
+                  - columnheader "Hook Content" [ref=e105]
+                  - columnheader "Persona" [ref=e106]
+                  - columnheader "EWS Score" [ref=e107]
+                  - columnheader "Uses" [ref=e108]
+                  - columnheader "Actions" [ref=e109]
+              - rowgroup [ref=e110]:
+                - row "Sample hook 1 BP1 0" [ref=e111]:
+                  - cell "Sample hook 1" [ref=e112]:
+                    - generic [ref=e114]: Sample hook 1
+                  - cell "BP1" [ref=e115]:
+                    - generic [ref=e116]: BP1
+                  - cell [ref=e117]:
+                    - generic [ref=e118]:
+                      - img [ref=e119]
+                      - img [ref=e121]
+                      - img [ref=e123]
+                      - img [ref=e125]
+                      - img [ref=e127]
+                  - cell "0" [ref=e129]:
+                    - generic [ref=e130]: "0"
+                  - cell [ref=e131]:
+                    - generic [ref=e132]:
+                      - button [ref=e133] [cursor=pointer]:
+                        - img
+                      - button [ref=e134] [cursor=pointer]:
+                        - img
+                - row "Sample hook 2 BP5 0" [ref=e135]:
+                  - cell "Sample hook 2" [ref=e136]:
+                    - generic [ref=e138]: Sample hook 2
+                  - cell "BP5" [ref=e139]:
+                    - generic [ref=e140]: BP5
+                  - cell [ref=e141]:
+                    - generic [ref=e142]:
+                      - img [ref=e143]
+                      - img [ref=e145]
+                      - img [ref=e147]
+                      - img [ref=e149]
+                      - img [ref=e151]
+                  - cell "0" [ref=e153]:
+                    - generic [ref=e154]: "0"
+                  - cell [ref=e155]:
+                    - generic [ref=e156]:
+                      - button [ref=e157] [cursor=pointer]:
+                        - img
+                      - button [ref=e158] [cursor=pointer]:
+                        - img
+                - row "Sample hook 3 BP8 0" [ref=e159]:
+                  - cell "Sample hook 3" [ref=e160]:
+                    - generic [ref=e162]: Sample hook 3
+                  - cell "BP8" [ref=e163]:
+                    - generic [ref=e164]: BP8
+                  - cell [ref=e165]:
+                    - generic [ref=e166]:
+                      - img [ref=e167]
+                      - img [ref=e169]
+                      - img [ref=e171]
+                      - img [ref=e173]
+                      - img [ref=e175]
+                  - cell "0" [ref=e177]:
+                    - generic [ref=e178]: "0"
+                  - cell [ref=e179]:
+                    - generic [ref=e180]:
+                      - button [ref=e181] [cursor=pointer]:
+                        - img
+                      - button [ref=e182] [cursor=pointer]:
+                        - img
+  - region "Notifications (F8)":
+    - list
+```
