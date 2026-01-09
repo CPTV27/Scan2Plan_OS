@@ -13,7 +13,9 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const PANDADOC_STATUS_TO_CODE: Record<string, number> = {
   "document.draft": 0,
