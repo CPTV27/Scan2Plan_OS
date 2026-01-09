@@ -247,14 +247,12 @@ function DocumentReviewDialog({
                 <StageBadge stage={document.pandaDocStage} />
               </DialogDescription>
             </div>
-            {document.pandaDocPdfUrl && (
-              <Button variant="outline" size="sm" asChild>
-                <a href={document.pandaDocPdfUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm" asChild>
+                <a href={`/api/pandadoc/documents/${document.id}/pdf`} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   View Original PDF
                 </a>
               </Button>
-            )}
           </div>
         </DialogHeader>
 

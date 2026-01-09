@@ -220,6 +220,10 @@ export class PandaDocClient {
     return Buffer.from(arrayBuffer);
   }
 
+  async downloadPdfById(pandaDocId: string): Promise<Buffer> {
+    return this.downloadPdf(pandaDocId);
+  }
+
   async extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
     try {
       const data = await pdfParse(pdfBuffer);

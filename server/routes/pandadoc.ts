@@ -166,4 +166,24 @@ router.post("/process-all-pending", isAuthenticated, async (req: Request, res: R
   }
 });
 
+router.get("/documents/:id/pdf", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const document = await pandaDocClient.getDocument(id);
+    
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    
+    const pdfBuffer = await pandaDocClient.downloadPdfById(document.pandaDocId);
+    
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${document.pandaDocName || "document"}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error("PDF proxy error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 export default router;
