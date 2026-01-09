@@ -184,6 +184,15 @@ FY26_GOALS = {
    - PostMessage handler for CPQ_SCOPING_PAYLOAD (origin-validated security)
    - All fields persist in `scopingData` JSON field on cpqQuotes table
 
+5. **Profitability Gates System** - Server-side enforcement of business rules
+   - **GM Hard Gate:** Blocks proposal generation if margin < 40% (FY26_GOALS.MARGIN_FLOOR)
+   - **Auto Tier A Flagging:** Leads with sqft >= 50K auto-flagged as "Tier A" with priority 5
+   - **Attribution Gate:** Blocks Closed Won stage transition without lead source attribution
+   - **Estimator Card (Soft):** Recommends estimator card for Tier A deals, doesn't block proposals
+   - UI feedback in DealWorkspace shows warnings when gates would block actions
+   - Gate module: `server/lib/profitabilityGates.ts`
+   - Error codes: GM_GATE_BLOCKED, ATTRIBUTION_REQUIRED, ESTIMATOR_CARD_RECOMMENDED
+
 ---
 
 ## Areas Needing Attention
