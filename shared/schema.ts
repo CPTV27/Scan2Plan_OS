@@ -1800,3 +1800,107 @@ export const insertAiAnalyticsSchema = createInsertSchema(aiAnalytics).omit({
 });
 export type AiAnalytic = typeof aiAnalytics.$inferSelect;
 export type InsertAiAnalytic = z.infer<typeof insertAiAnalyticsSchema>;
+
+// === PANDADOC IMPORT SYSTEM (Proposal Vault) ===
+export const PANDADOC_IMPORT_STATUSES = [
+  "pending",
+  "fetching",
+  "extracted",
+  "needs_review",
+  "approved",
+  "rejected",
+  "error",
+] as const;
+export type PandaDocImportStatus = typeof PANDADOC_IMPORT_STATUSES[number];
+
+export const PANDADOC_BATCH_STATUSES = [
+  "pending",
+  "in_progress",
+  "completed",
+  "partial",
+  "failed",
+] as const;
+export type PandaDocBatchStatus = typeof PANDADOC_BATCH_STATUSES[number];
+
+export const pandaDocImportBatches = pgTable("pandadoc_import_batches", {
+  id: serial("id").primaryKey(),
+  name: text("name"),
+  status: text("status").default("pending").notNull(),
+  totalDocuments: integer("total_documents").default(0),
+  processedDocuments: integer("processed_documents").default(0),
+  successfulDocuments: integer("successful_documents").default(0),
+  failedDocuments: integer("failed_documents").default(0),
+  lastSyncCursor: text("last_sync_cursor"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPandaDocImportBatchSchema = createInsertSchema(pandaDocImportBatches).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type PandaDocImportBatch = typeof pandaDocImportBatches.$inferSelect;
+export type InsertPandaDocImportBatch = z.infer<typeof insertPandaDocImportBatchSchema>;
+
+export const pandaDocDocuments = pgTable("pandadoc_documents", {
+  id: serial("id").primaryKey(),
+  batchId: integer("batch_id").references(() => pandaDocImportBatches.id),
+  pandaDocId: text("pandadoc_id").notNull().unique(),
+  pandaDocName: text("pandadoc_name"),
+  pandaDocStatus: text("pandadoc_status"),
+  pandaDocVersion: text("pandadoc_version"),
+  pandaDocCreatedAt: timestamp("pandadoc_created_at"),
+  pandaDocUpdatedAt: timestamp("pandadoc_updated_at"),
+  pandaDocPdfUrl: text("pandadoc_pdf_url"),
+  
+  importStatus: text("import_status").default("pending").notNull(),
+  extractedData: jsonb("extracted_data"),
+  extractionConfidence: decimal("extraction_confidence", { precision: 5, scale: 2 }),
+  extractionErrors: jsonb("extraction_errors"),
+  
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  
+  cpqQuoteId: integer("cpq_quote_id").references(() => cpqQuotes.id),
+  leadId: integer("lead_id").references(() => leads.id),
+  
+  rawPandaDocData: jsonb("raw_pandadoc_data"),
+  pricingTableData: jsonb("pricing_table_data"),
+  recipientsData: jsonb("recipients_data"),
+  variablesData: jsonb("variables_data"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPandaDocDocumentSchema = createInsertSchema(pandaDocDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type PandaDocDocument = typeof pandaDocDocuments.$inferSelect;
+export type InsertPandaDocDocument = z.infer<typeof insertPandaDocDocumentSchema>;
+
+export const pandaDocImportBatchesRelations = relations(pandaDocImportBatches, ({ many }) => ({
+  documents: many(pandaDocDocuments),
+}));
+
+export const pandaDocDocumentsRelations = relations(pandaDocDocuments, ({ one }) => ({
+  batch: one(pandaDocImportBatches, {
+    fields: [pandaDocDocuments.batchId],
+    references: [pandaDocImportBatches.id],
+  }),
+  cpqQuote: one(cpqQuotes, {
+    fields: [pandaDocDocuments.cpqQuoteId],
+    references: [cpqQuotes.id],
+  }),
+  lead: one(leads, {
+    fields: [pandaDocDocuments.leadId],
+    references: [leads.id],
+  }),
+}));

@@ -29,6 +29,7 @@ import Marketing from "@/pages/Marketing";
 import HelpCenter from "@/pages/HelpCenter";
 import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
+import ProposalVault from "@/pages/ProposalVault";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -137,6 +138,11 @@ function Router() {
         </RoleGuard>
       </Route>
       <Route path="/settings" component={Settings} />
+      <Route path="/proposal-vault">
+        <RoleGuard allowedRoles={["ceo", "sales"]}>
+          <ProposalVault />
+        </RoleGuard>
+      </Route>
       <Route path="/help" component={HelpCenter} />
       <Route path="/scan-tech" component={ScanTech} />
       <Route path="/test-payload">

@@ -199,6 +199,16 @@ FY26_GOALS = {
    - CPQ Calculator guide (areas, pricing modes, travel, disciplines)
    - Location: `client/src/pages/HelpCenter.tsx`
 
+7. **PandaDoc Proposal Vault** - Batch import proposals from PandaDoc
+   - **Sync from PandaDoc:** Fetches all completed proposals via PandaDoc API
+   - **AI Extraction:** Parses pricing tables, client info, project details with confidence scoring
+   - **Review Workflow:** Side-by-side view of extracted data vs original, editable fields
+   - **Quote Creation:** Approved documents create CPQ quotes automatically
+   - **Status Tracking:** Pending → Extracted → Approved/Rejected pipeline
+   - Database: `pandadoc_import_batches`, `pandadoc_documents` tables
+   - API: `server/lib/pandadoc-client.ts`, `server/routes/pandadoc.ts`
+   - UI: `client/src/pages/ProposalVault.tsx`
+
 ---
 
 ## Areas Needing Attention

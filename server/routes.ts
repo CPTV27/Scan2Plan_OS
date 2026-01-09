@@ -30,6 +30,7 @@ import { registerQuickbooksRoutes } from "./routes/quickbooks";
 import { registerInvoiceRoutes } from "./routes/invoices";
 import { registerAirtableRoutes } from "./routes/airtable";
 import { registerAIRoutes } from "./routes/ai";
+import pandaDocRoutes from "./routes/pandadoc";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -217,6 +218,7 @@ export async function registerRoutes(
   registerInvoiceRoutes(app);
   registerAirtableRoutes(app);
   registerAIRoutes(app);
+  app.use("/api/pandadoc", pandaDocRoutes);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {

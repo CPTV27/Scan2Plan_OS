@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, FolderKanban, Smartphone, Settings, LogOut, ScanLine, Database, Menu, X, BarChart3, Wallet, Map, Megaphone, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, Smartphone, Settings, LogOut, ScanLine, Database, Menu, X, BarChart3, Wallet, Map, Megaphone, BookOpen, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ const allNavigation = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['ceo'] as UserRole[] },
   { name: 'Marketing', href: '/marketing', icon: Megaphone, roles: ['ceo', 'sales'] as UserRole[] },
   { name: 'Regional Intel', href: '/regional-intel', icon: Map, roles: ['ceo', 'sales'] as UserRole[] },
+  { name: 'Proposal Vault', href: '/proposal-vault', icon: FileText, roles: ['ceo', 'sales'] as UserRole[] },
   // { name: 'Airtable', href: '/airtable', icon: Database, roles: ['ceo'] as UserRole[] },
   { name: 'S2P Academy', href: '/help', icon: BookOpen, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
