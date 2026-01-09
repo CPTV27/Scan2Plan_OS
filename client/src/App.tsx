@@ -28,6 +28,7 @@ import ProposalBuilder from "@/pages/ProposalBuilder";
 import Marketing from "@/pages/Marketing";
 import HelpCenter from "@/pages/HelpCenter";
 import ClientInput from "@/pages/ClientInput";
+import TestPayloadSender from "@/pages/TestPayloadSender";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -138,6 +139,11 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/help" component={HelpCenter} />
       <Route path="/scan-tech" component={ScanTech} />
+      <Route path="/test-payload">
+        <RoleGuard allowedRoles={["ceo"]}>
+          <TestPayloadSender />
+        </RoleGuard>
+      </Route>
       <Route path="/field">
         <RoleGuard allowedRoles={["ceo", "production"]} redirectTo="/">
           <FieldHub />
