@@ -724,14 +724,14 @@ Thanks!`.trim();
     ? areas.find(a => a.id === boundaryDrawerAreaId)
     : null;
 
-  // Get project coordinates from lead data for boundary drawing
-  const projectCoordinates = useMemo(() => {
-    const googleIntel = lead?.googleIntel as any;
-    if (googleIntel?.travelInsights?.coordinates) {
-      return googleIntel.travelInsights.coordinates;
-    }
-    return null;
-  }, [lead]);
+  // Fetch project coordinates for boundary drawing
+  const { data: locationData } = useQuery<{ coordinates?: { lat: number; lng: number } }>({
+    queryKey: ["/api/location/preview", { address: lead?.projectAddress }],
+    enabled: !!lead?.projectAddress,
+  });
+
+  // Get project coordinates from location preview
+  const projectCoordinates = locationData?.coordinates || null;
 
   return (
     <div className="h-full flex flex-col">
