@@ -63,8 +63,11 @@ import {
   calculateTotalSqft,
   getAreaSqft,
   isTierAProject,
+  isLandscapeBuildingType,
+  normalizeDispatchLocation,
+  toUppercaseDispatchLocation,
+  isDispatchLocation,
   type Area,
-  type AreaKind,
   type TravelConfig,
   type PricingResult,
   type BoundaryCoordinate,
@@ -87,13 +90,12 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // Pricing mode (standard areas, landscape areas, or Tier A)
   const [pricingMode, setPricingMode] = useState<PricingMode>("standard");
   
-  // Form state - areas now include 'kind' property
+  // Form state - areas use buildingType (14-15 = landscape, others = building)
   const [areas, setAreas] = useState<Area[]>([
     {
       id: "1",
       name: "Area 1",
-      kind: "standard",
-      buildingType: "1",
+      buildingType: "1", // Default to Commercial - Standard
       squareFeet: "",
       lod: "200",
       disciplines: ["architecture"],
@@ -101,14 +103,14 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     },
   ]);
   const [services, setServices] = useState<Record<string, number>>({});
-  const [travel, setTravel] = useState<TravelConfig>({ dispatchLocation: "WOODSTOCK", distance: 0 });
+  const [travel, setTravel] = useState<TravelConfig>({ dispatchLocation: "woodstock", distance: 0 });
   const [risks, setRisks] = useState<string[]>([]);
   const [paymentTerms, setPaymentTerms] = useState("standard");
   const [projectNotes, setProjectNotes] = useState("");
   
-  // Filter areas by kind for display
-  const standardAreas = useMemo(() => areas.filter(a => a.kind === "standard"), [areas]);
-  const landscapeAreas = useMemo(() => areas.filter(a => a.kind === "landscape"), [areas]);
+  // Filter areas by type for display - uses buildingType to determine landscape (14-15)
+  const standardAreas = useMemo(() => areas.filter(a => !isLandscapeBuildingType(a.buildingType)), [areas]);
+  const landscapeAreas = useMemo(() => areas.filter(a => isLandscapeBuildingType(a.buildingType)), [areas]);
 
   // Building features
   const [hasBasement, setHasBasement] = useState(false);
@@ -234,7 +236,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       }
       if (lead.distance) {
         setTravel({
-          dispatchLocation: lead.dispatchLocation || "WOODSTOCK",
+          dispatchLocation: lead.dispatchLocation?.toLowerCase() || "woodstock",
           distance: lead.distance,
         });
       }
@@ -247,7 +249,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
           // Use Google travel distance if available
           if (googleIntel.travelInsights?.available && googleIntel.travelInsights?.distanceMiles) {
             setTravel({
-              dispatchLocation: lead.dispatchLocation || "WOODSTOCK",
+              dispatchLocation: lead.dispatchLocation?.toLowerCase() || "woodstock",
               distance: Math.round(googleIntel.travelInsights.distanceMiles),
             });
           }
@@ -368,21 +370,24 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Auto-calculate distance when quote loads with missing distance but has project address
   useEffect(() => {
-    // Dispatch location addresses (defined inline to avoid hoisting issues)
+    // Dispatch location addresses (supports both uppercase and lowercase keys)
     const dispatchAddresses: Record<string, string> = {
-      WOODSTOCK: "3272 Rt 212, Bearsville, NY 12409",
-      BROOKLYN: "176 Borinquen Place, Brooklyn, NY 11211",
-      TROY: "188 1st St, Troy, NY 12180",
+      woodstock: "3272 Rt 212, Bearsville, NY 12409",
+      brooklyn: "176 Borinquen Place, Brooklyn, NY 11211",
+      troy: "188 1st St, Troy, NY 12180",
     };
     
     // Only run if we have a lead with address, travel dispatch but no distance
     if (!lead?.projectAddress) return;
-    if (!travel?.dispatchLocation || travel.dispatchLocation === "FLY_OUT") return;
+    // Case-insensitive fly_out check for backwards compatibility
+    if (!travel?.dispatchLocation || isDispatchLocation(travel.dispatchLocation, "fly_out")) return;
     if (travel.distance && travel.distance > 0) return;
     if (isCalculatingDistance) return;
     
     const calculateMissingDistance = async () => {
-      const originAddress = dispatchAddresses[travel.dispatchLocation];
+      // Normalize to lowercase for lookup
+      const normalizedLocation = normalizeDispatchLocation(travel.dispatchLocation);
+      const originAddress = dispatchAddresses[normalizedLocation];
       if (!originAddress) return;
       
       setIsCalculatingDistance(true);
@@ -484,17 +489,17 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     return () => window.removeEventListener("message", handleMessage);
   }, [toast]);
 
-  // Dispatch location addresses for distance calculation
+  // Dispatch location addresses for distance calculation (lowercase keys)
   const DISPATCH_LOCATIONS: Record<string, string> = {
-    WOODSTOCK: "3272 Rt 212, Bearsville, NY 12409",
-    BROOKLYN: "176 Borinquen Place, Brooklyn, NY 11211",
-    TROY: "188 1st St, Troy, NY 12180",
+    woodstock: "3272 Rt 212, Bearsville, NY 12409",
+    brooklyn: "176 Borinquen Place, Brooklyn, NY 11211",
+    troy: "188 1st St, Troy, NY 12180",
   };
 
   // Calculate distance when dispatch location changes
   const handleDispatchLocationChange = async (locationCode: string) => {
-    // For fly-out jobs, distance doesn't apply - set to 0
-    if (locationCode === "FLY_OUT") {
+    // For fly-out jobs, distance doesn't apply - set to 0 (case-insensitive check)
+    if (isDispatchLocation(locationCode, "fly_out")) {
       setTravel({ dispatchLocation: locationCode, distance: 0 });
       toast({
         title: "Fly-out selected",
@@ -510,7 +515,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       return;
     }
 
-    const originAddress = DISPATCH_LOCATIONS[locationCode];
+    // Normalize to lowercase for address lookup
+    const normalizedCode = normalizeDispatchLocation(locationCode);
+    const originAddress = DISPATCH_LOCATIONS[normalizedCode];
     if (!originAddress) return;
 
     setIsCalculatingDistance(true);
@@ -620,7 +627,8 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Preview travel cost based on current settings
   const travelCostPreview = useMemo(() => {
-    if (!travel || travel.dispatchLocation === "FLY_OUT") return null;
+    // Case-insensitive fly_out check for backwards compatibility
+    if (!travel || isDispatchLocation(travel.dispatchLocation, "fly_out")) return null;
     if (customTravelCost && !isNaN(parseFloat(customTravelCost))) {
       return { cost: parseFloat(customTravelCost), isCustom: true };
     }
@@ -700,15 +708,25 @@ Thanks!`.trim();
       }
       
       // Safely build travel data with custom cost
-      let travelData = travel;
+      // Convert dispatch location to uppercase for persistence (legacy format for downstream systems)
+      let travelData = travel ? {
+        ...travel,
+        dispatchLocation: toUppercaseDispatchLocation(travel.dispatchLocation),
+      } : null;
       if (customTravelCost) {
         const customCost = parseFloat(customTravelCost);
         if (!isNaN(customCost)) {
-          travelData = travel
-            ? { ...travel, customCost }
+          travelData = travelData
+            ? { ...travelData, customCost }
             : { dispatchLocation: "WOODSTOCK", distance: 0, customCost };
         }
       }
+      
+      // Ensure areas have kind field for backwards compatibility
+      const areasWithKind = areas.map(area => ({
+        ...area,
+        kind: area.kind || (isLandscapeBuildingType(area.buildingType) ? "landscape" : "standard"),
+      }));
 
       // Parse Tier A costs - use "other" input value when "other" is selected
       const parseTierACost = (val: string) => {
@@ -724,7 +742,7 @@ Thanks!`.trim();
 
       const quoteData = {
         leadId: leadId || null,
-        areas,
+        areas: areasWithKind,
         services,
         travel: travelData,
         risks,
@@ -851,13 +869,26 @@ Thanks!`.trim();
   const saveAndGenerateLinkMutation = useMutation({
     mutationFn: async () => {
       // Build quote data with RFI fields
-      const travelData = customTravelCost && !isNaN(parseFloat(customTravelCost))
-        ? { ...travel, customCost: parseFloat(customTravelCost) }
-        : travel;
+      // Convert dispatch location to uppercase for persistence (legacy format)
+      let travelData = travel ? {
+        ...travel,
+        dispatchLocation: toUppercaseDispatchLocation(travel.dispatchLocation),
+      } : null;
+      if (customTravelCost && !isNaN(parseFloat(customTravelCost))) {
+        travelData = travelData
+          ? { ...travelData, customCost: parseFloat(customTravelCost) }
+          : { dispatchLocation: "WOODSTOCK", distance: 0, customCost: parseFloat(customTravelCost) };
+      }
+
+      // Ensure areas have kind field for backwards compatibility
+      const areasWithKind = areas.map(area => ({
+        ...area,
+        kind: area.kind || (isLandscapeBuildingType(area.buildingType) ? "landscape" : "standard"),
+      }));
 
       const quoteData = {
         leadId: leadId || null,
-        areas,
+        areas: areasWithKind,
         services,
         travel: travelData,
         risks,
@@ -941,21 +972,23 @@ Thanks!`.trim();
   });
 
   // Area management
-  // Add a new area based on current pricing mode
-  const addArea = (kind: AreaKind = "standard") => {
+  // Add a new area - isLandscape determines if building type 14 (landscape) is used
+  const addArea = (isLandscape: boolean = false) => {
     const newId = Date.now().toString();
-    const isLandscape = kind === "landscape";
+    // Landscape uses buildingType "14" (Landscape - Site/Civil)
+    const buildingType = isLandscape ? "14" : "1";
     setAreas([
       ...areas,
       {
         id: newId,
         name: isLandscape ? `Landscape ${landscapeAreas.length + 1}` : `Area ${standardAreas.length + 1}`,
-        kind,
-        buildingType: isLandscape ? "landscape_built" : "1",
+        buildingType,
         squareFeet: "",
-        lod: isLandscape ? "200" : "200",
+        lod: "200",
         disciplines: isLandscape ? ["site"] : ["architecture"],
         scope: "full",
+        // Keep kind field for backwards compatibility with downstream consumers
+        kind: isLandscape ? "landscape" : "standard",
       },
     ]);
   };
@@ -1119,11 +1152,11 @@ Thanks!`.trim();
                     Project Areas
                   </h2>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => addArea("standard")} data-testid="button-add-standard-area">
+                    <Button variant="outline" size="sm" onClick={() => addArea(false)} data-testid="button-add-standard-area">
                       <Plus className="h-4 w-4 mr-1" />
                       Add Building
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => addArea("landscape")} data-testid="button-add-landscape-area">
+                    <Button variant="outline" size="sm" onClick={() => addArea(true)} data-testid="button-add-landscape-area">
                       <Plus className="h-4 w-4 mr-1" />
                       <MapPin className="h-4 w-4 mr-1" />
                       Add Landscape
@@ -1138,11 +1171,11 @@ Thanks!`.trim();
                       <p>No project areas added yet.</p>
                       <p className="text-sm mt-1">Add buildings (sqft) or landscape areas (acres).</p>
                       <div className="flex gap-2 justify-center mt-4">
-                        <Button variant="outline" size="sm" onClick={() => addArea("standard")}>
+                        <Button variant="outline" size="sm" onClick={() => addArea(false)}>
                           <Plus className="h-4 w-4 mr-1" />
                           Add Building
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => addArea("landscape")}>
+                        <Button variant="outline" size="sm" onClick={() => addArea(true)}>
                           <Plus className="h-4 w-4 mr-1" />
                           Add Landscape
                         </Button>
@@ -1152,9 +1185,9 @@ Thanks!`.trim();
                 )}
 
                 {areas.map((area, index) => {
-                  // Calculate kind-specific index for test IDs
-                  const kindIndex = areas.slice(0, index).filter(a => a.kind === area.kind).length;
-                  const isLandscape = area.kind === "landscape";
+                  // Calculate type-specific index for test IDs - uses buildingType to determine landscape
+                  const isLandscape = isLandscapeBuildingType(area.buildingType);
+                  const kindIndex = areas.slice(0, index).filter(a => isLandscapeBuildingType(a.buildingType) === isLandscape).length;
                   
                   return (
                   <Card key={area.id}>
@@ -1187,7 +1220,7 @@ Thanks!`.trim();
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Building-specific fields */}
-                      {area.kind === "standard" && (
+                      {!isLandscape && (
                         <>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -1345,7 +1378,7 @@ Thanks!`.trim();
                       )}
 
                       {/* Landscape-specific fields */}
-                      {area.kind === "landscape" && (
+                      {isLandscape && (
                         <>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -1569,7 +1602,7 @@ Thanks!`.trim();
                     <div className="space-y-2">
                       <Label>Dispatch Origin</Label>
                       <Select
-                        value={travel?.dispatchLocation || "WOODSTOCK"}
+                        value={normalizeDispatchLocation(travel?.dispatchLocation || "woodstock")}
                         onValueChange={handleDispatchLocationChange}
                         disabled={isCalculatingDistance}
                       >
@@ -1577,14 +1610,14 @@ Thanks!`.trim();
                           <SelectValue placeholder="Select dispatch origin" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="WOODSTOCK">Woodstock (3272 Rt 212, Bearsville)</SelectItem>
-                          <SelectItem value="BROOKLYN">Brooklyn (176 Borinquen Pl)</SelectItem>
-                          <SelectItem value="TROY">Troy (188 1st St)</SelectItem>
-                          <SelectItem value="FLY_OUT">Out of State (Fly-out)</SelectItem>
+                          <SelectItem value="woodstock">Woodstock (3272 Rt 212, Bearsville)</SelectItem>
+                          <SelectItem value="brooklyn">Brooklyn (176 Borinquen Pl)</SelectItem>
+                          <SelectItem value="troy">Troy (188 1st St)</SelectItem>
+                          <SelectItem value="fly_out">Out of State (Fly-out)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    {travel?.dispatchLocation !== "FLY_OUT" && (
+                    {!isDispatchLocation(travel?.dispatchLocation || "", "fly_out") && (
                       <div className="space-y-2">
                         <Label>Distance (miles)</Label>
                         <Input
@@ -1592,7 +1625,7 @@ Thanks!`.trim();
                           value={travel?.distance || ""}
                           onChange={(e) =>
                             setTravel({
-                              dispatchLocation: travel?.dispatchLocation || "WOODSTOCK",
+                              dispatchLocation: travel?.dispatchLocation || "woodstock",
                               distance: parseInt(e.target.value) || 0,
                             })
                           }
@@ -1602,7 +1635,7 @@ Thanks!`.trim();
                         />
                       </div>
                     )}
-                    {travel?.dispatchLocation === "FLY_OUT" && (
+                    {isDispatchLocation(travel?.dispatchLocation || "", "fly_out") && (
                       <div className="space-y-2">
                         <Label className="text-muted-foreground">Travel Mode</Label>
                         <div className="flex items-center gap-2 h-9 px-3 border rounded-md bg-muted/50">
@@ -1613,16 +1646,16 @@ Thanks!`.trim();
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>{travel?.dispatchLocation === "FLY_OUT" ? "Fly-out Travel Cost" : "Custom Travel Cost (optional)"}</Label>
+                    <Label>{isDispatchLocation(travel?.dispatchLocation || "", "fly_out") ? "Fly-out Travel Cost" : "Custom Travel Cost (optional)"}</Label>
                     <Input
                       type="number"
                       value={customTravelCost}
                       onChange={(e) => setCustomTravelCost(e.target.value)}
-                      placeholder={travel?.dispatchLocation === "FLY_OUT" ? "Enter total flight + lodging cost" : "Leave empty to use calculated cost"}
+                      placeholder={isDispatchLocation(travel?.dispatchLocation || "", "fly_out") ? "Enter total flight + lodging cost" : "Leave empty to use calculated cost"}
                       data-testid="input-custom-travel-cost"
                     />
                     <p className="text-xs text-muted-foreground">
-                      {travel?.dispatchLocation === "FLY_OUT" 
+                      {isDispatchLocation(travel?.dispatchLocation || "", "fly_out") 
                         ? "Include airfare, lodging, rental car, and per diem"
                         : "Override the calculated mileage-based travel cost"
                       }

@@ -8,9 +8,6 @@
 
 import { FY26_GOALS, validateMarginGate, getMarginStatus } from '@shared/businessGoals';
 
-// Area Kind - distinguishes between standard building areas and landscape areas
-export type AreaKind = "standard" | "landscape";
-
 // Boundary coordinate for landscape areas
 export interface BoundaryCoordinate {
   lat: number;
@@ -24,14 +21,54 @@ export interface Facade {
   lod: string;
 }
 
+// Per-discipline LoD configuration (CPQ-aligned format)
+export interface DisciplineLodConfig {
+  discipline: string;
+  lod: string;
+  scope?: string; // 'full', 'interior', 'exterior', 'mixed'
+}
+
+// Helper function to check if building type is landscape
+// Supports both CPQ numeric IDs (14, 15) and legacy string IDs
+export function isLandscapeBuildingType(buildingType: string): boolean {
+  // CPQ numeric IDs
+  if (buildingType === "14" || buildingType === "15") return true;
+  // Legacy string IDs (backwards compatibility)
+  if (buildingType === "landscape_built" || buildingType === "landscape_natural") return true;
+  return false;
+}
+
+// Normalize dispatch location to lowercase for CPQ/UI display
+// Accepts both uppercase (legacy) and lowercase (CPQ) formats
+export function normalizeDispatchLocation(location: string): string {
+  return location.toLowerCase();
+}
+
+// Convert dispatch location to uppercase for persistence (legacy format)
+// Maintains backwards compatibility with downstream systems (QB, Salesforce, etc.)
+export function toUppercaseDispatchLocation(location: string): string {
+  const normalized = location.toLowerCase();
+  const mapping: Record<string, string> = {
+    woodstock: "WOODSTOCK",
+    brooklyn: "BROOKLYN",
+    troy: "TROY",
+    fly_out: "FLY_OUT",
+  };
+  return mapping[normalized] || location.toUpperCase();
+}
+
+// Check if dispatch location matches (case-insensitive)
+export function isDispatchLocation(location: string, target: string): boolean {
+  return location.toLowerCase() === target.toLowerCase();
+}
+
 // Types for pricing calculations
 export interface Area {
   id: string;
   name: string;
-  kind: AreaKind; // "standard" or "landscape"
   buildingType: string;
-  squareFeet: string; // For standard: sqft, for landscape: acres
-  lod: string;
+  squareFeet: string; // For standard: sqft, for landscape (types 14-15): acres
+  lod: string; // Default LoD (fallback when disciplineLods not specified)
   disciplines: string[];
   scope?: string;
   includeCadDeliverable?: boolean;
@@ -39,8 +76,8 @@ export interface Area {
   // Mixed scope separate LoDs
   mixedInteriorLod?: string;
   mixedExteriorLod?: string;
-  // Discipline-specific LoDs
-  disciplineLods?: Record<string, string>;
+  // Per-discipline LoD configuration (CPQ-aligned)
+  disciplineLods?: Record<string, DisciplineLodConfig>;
   // Roof/plan count
   numberOfRoofs?: number;
   // Facade definitions
@@ -48,11 +85,13 @@ export interface Area {
   // Grade around building
   gradeAroundBuilding?: boolean;
   gradeLod?: string;
-  // Legacy compatibility
+  // Legacy compatibility - deprecated, use disciplineLods
   interiorLod?: string;
   exteriorLod?: string;
   boundary?: BoundaryCoordinate[]; // Landscape area boundary coordinates
   boundaryImageUrl?: string; // Static map image of the boundary for proposals
+  // Legacy kind field - deprecated, infer from buildingType (14-15 = landscape)
+  kind?: "standard" | "landscape";
 }
 
 // Facade type options
@@ -119,23 +158,24 @@ export interface PricingResult {
 // Static pricing configuration
 // These rates are embedded in the client for instant calculations
 
+// Building types aligned with CPQ
 export const BUILDING_TYPES = [
-  { id: "1", label: "Office/Commercial" },
-  { id: "2", label: "Residential Single Family" },
-  { id: "3", label: "Residential Multi-Family" },
-  { id: "4", label: "Industrial/Warehouse" },
-  { id: "5", label: "Retail" },
-  { id: "6", label: "Healthcare" },
-  { id: "7", label: "Education K-12" },
-  { id: "8", label: "Higher Education" },
-  { id: "9", label: "Hospitality" },
-  { id: "10", label: "Mixed Use" },
-  { id: "11", label: "Religious/Cultural" },
-  { id: "12", label: "Government/Civic" },
-  { id: "13", label: "Data Center" },
-  { id: "14", label: "Landscape - Built" },
-  { id: "15", label: "Landscape - Natural" },
-  { id: "16", label: "ACT Modeling" },
+  { id: "1", label: "Commercial - Simple" },
+  { id: "2", label: "Residential - Standard" },
+  { id: "3", label: "Residential - Luxury" },
+  { id: "4", label: "Commercial / Office" },
+  { id: "5", label: "Retail / Restaurants" },
+  { id: "6", label: "Kitchen / Catering Facilities" },
+  { id: "7", label: "Education" },
+  { id: "8", label: "Hotel / Theatre / Museum" },
+  { id: "9", label: "Hospitals / Mixed Use" },
+  { id: "10", label: "Mechanical / Utility Rooms" },
+  { id: "11", label: "Warehouse / Storage" },
+  { id: "12", label: "Religious Buildings" },
+  { id: "13", label: "Infrastructure / Roads / Bridges" },
+  { id: "14", label: "Built Landscape" },
+  { id: "15", label: "Natural Landscape" },
+  { id: "16", label: "ACT (Above Ceiling Tiles)" },
 ];
 
 export const DISCIPLINES = [
@@ -146,9 +186,12 @@ export const DISCIPLINES = [
 ];
 
 export const LOD_OPTIONS = [
+  { id: "100", label: "LOD 100" },
   { id: "200", label: "LOD 200" },
+  { id: "250", label: "LOD 250" },
   { id: "300", label: "LOD 300" },
   { id: "350", label: "LOD 350" },
+  { id: "400", label: "LOD 400" },
 ];
 
 export const SCOPE_OPTIONS = [
@@ -179,9 +222,12 @@ const BASE_RATES: Record<string, Record<string, number>> = {
 
 // LOD multipliers
 const LOD_MULTIPLIERS: Record<string, number> = {
+  "100": 0.7,
   "200": 1.0,
+  "250": 1.15,
   "300": 1.3,
   "350": 1.5,
+  "400": 1.8,
 };
 
 // Scope multipliers (portion of price applied)
@@ -254,14 +300,11 @@ const CAD_BASE_RATES: Record<string, number> = {
 };
 
 // Risk premium factors (Applied ONLY to Architecture discipline)
-// Gold Standard rates from CPQ Logic Export
+// Aligned with CPQ - only these three risk factors are recognized
 export const RISK_FACTORS = [
   { id: "hazardous", label: "Hazardous Conditions", premium: 0.25 },
   { id: "noPower", label: "No Power/HVAC", premium: 0.20 },
   { id: "occupied", label: "Occupied Building", premium: 0.15 },
-  { id: "security", label: "High Security Facility", premium: 0.10 },
-  { id: "historic", label: "Historic Preservation", premium: 0.12 },
-  { id: "height", label: "High-Rise (10+ floors)", premium: 0.10 },
 ];
 
 // Upteam (vendor) cost multiplier
@@ -472,8 +515,8 @@ export function calculatePricing(
 
   // Process each area
   areas.forEach((area) => {
-    // Check both kind property (new) and buildingType (legacy) for landscape
-    const isLandscape = area.kind === "landscape" || area.buildingType === "14" || area.buildingType === "15";
+    // Check buildingType for landscape (14-15) - kind field deprecated
+    const isLandscape = isLandscapeBuildingType(area.buildingType) || area.kind === "landscape";
     const isACT = area.buildingType === "16";
     // For landscape: squareFeet contains acres, for standard: contains sqft
     const inputValue = isLandscape
@@ -490,7 +533,11 @@ export function calculatePricing(
       : [];
 
     disciplines.forEach((discipline) => {
-      const lod = area.lod || "200";
+      // Get per-discipline LoD if available, otherwise use default area LoD
+      const disciplineLodConfig = area.disciplineLods?.[discipline];
+      const lod = disciplineLodConfig?.lod || area.lod || "200";
+      // Discipline-specific scope overrides area scope
+      const disciplineScope = disciplineLodConfig?.scope || scope;
       let lineTotal = 0;
       let upteamLineCost = 0;
       let areaLabel = "";
@@ -509,7 +556,7 @@ export function calculatePricing(
         upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
       } else {
         const sqft = Math.max(inputValue, 3000);
-        const scopeMultiplier = SCOPE_MULTIPLIERS[scope] || SCOPE_MULTIPLIERS.full;
+        const scopeMultiplier = SCOPE_MULTIPLIERS[disciplineScope] || SCOPE_MULTIPLIERS.full;
         
         // Check for mixed LOD scenario (separate interior/exterior LODs)
         const hasInteriorLod = area.mixedInteriorLod || area.interiorLod;
@@ -891,10 +938,12 @@ export function isTierAProject(totalSqft: number): boolean {
 
 /**
  * Get square feet from an area, converting acres to sqft for landscape areas
+ * Uses buildingType (14-15) to determine landscape, with fallback to kind field
  */
 export function getAreaSqft(area: Area): number {
   const value = parseFloat(area.squareFeet) || 0;
-  if (area.kind === "landscape") {
+  const isLandscape = isLandscapeBuildingType(area.buildingType) || area.kind === "landscape";
+  if (isLandscape) {
     return Math.round(value * ACRES_TO_SQFT);
   }
   return value;
