@@ -341,6 +341,31 @@ function DealCard({
               </Button>
             )}
             <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => {
+                const cpqUrl = import.meta.env.VITE_CPQ_BASE_URL || '';
+                if (!cpqUrl) {
+                  alert('CPQ app URL not configured');
+                  return;
+                }
+                const returnUrl = encodeURIComponent(window.location.origin + `/deals/${lead.id}`);
+                const params = new URLSearchParams({
+                  leadId: String(lead.id),
+                  returnUrl,
+                  company: lead.clientName || '',
+                  project: lead.projectName || '',
+                  address: lead.projectAddress || '',
+                });
+                window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
+              }}
+              data-testid={`button-cpq-quote-${lead.id}`}
+              title="Generate Quote in CPQ"
+            >
+              <Calculator className="w-4 h-4" />
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="h-7 text-xs"
