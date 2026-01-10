@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logoUrl from '@assets/Scan2Plan_2021_logo_variations+[Recovered]-03_1764552312533.webp';
+import logoUrl from '@assets/Scan2Plan_2021_logo_variations+[Recovered]-03_(1)_1768016434331.webp';
 
 const COLORS = {
   primary: [59, 130, 246] as [number, number, number],

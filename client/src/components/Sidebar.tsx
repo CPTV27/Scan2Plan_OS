@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Users, FolderKanban, Smartphone, Settings, LogOut, ScanLine, Database, Menu, X, BarChart3, Wallet, Map, Megaphone, BookOpen, FileText, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users, FolderKanban, Settings, LogOut, Menu, X, BarChart3, Wallet, Map, Megaphone, BookOpen, FileText, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,13 +53,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="p-6 flex items-center gap-3">
-        <div className="bg-primary/10 p-2 rounded-lg border border-primary/20">
-          <ScanLine className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="font-display font-bold text-lg leading-none">Scan2Plan-OS</h1>
-          <span className="text-xs text-muted-foreground font-medium">{getRoleLabel(userRole)}</span>
-        </div>
+        <img 
+          src="/logo-horizontal.webp" 
+          alt="Scan2Plan" 
+          className="h-8 w-auto"
+        />
+        <Badge variant="secondary" className="text-xs font-medium">
+          {getRoleLabel(userRole)}
+        </Badge>
       </div>
 
       <nav className="flex-1 px-4 space-y-1.5 mt-4">
@@ -135,10 +136,12 @@ export function MobileHeader() {
   return (
     <div className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <div className="bg-primary/10 p-1.5 rounded-lg border border-primary/20">
-          <ScanLine className="h-5 w-5 text-primary" />
-        </div>
-        <span className="font-display font-bold text-sm">{currentPage?.name || 'Scan2Plan-OS'}</span>
+        <img 
+          src="/logo-horizontal.webp" 
+          alt="Scan2Plan" 
+          className="h-6 w-auto"
+        />
+        <span className="font-display font-bold text-sm">{currentPage?.name || ''}</span>
       </div>
       
       <Sheet open={open} onOpenChange={setOpen}>
