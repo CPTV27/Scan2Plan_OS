@@ -16,11 +16,29 @@ import { z } from "zod";
 const router = Router();
 
 const GenerateRequestSchema = z.object({
-  buyerType: z.enum(["A_Principal", "B_OwnerDev", "C_Unknown"]),
+  buyerType: z.enum(["A_Principal", "B_OwnerDev", "C_Unknown", "BP1", "BP2", "BP3", "BP4", "BP5", "BP6", "BP7", "BP8"]),
   painPoint: z.enum(["Rework_RFI", "ScheduleVolatility", "Inconsistency", "Terms_Risk"]),
   projectContext: z.string().min(10, "Project context must be at least 10 characters"),
   authorMode: z.enum(["Twain", "Fuller"]).optional().default("Twain"),
 });
+
+// Map BP codes to buyer modes for the engine
+function mapBuyerType(buyerType: string): BuyerMode {
+  const mapping: Record<string, BuyerMode> = {
+    "BP1": "A_Principal",  // Engineer -> Principal
+    "BP2": "B_OwnerDev",   // GC/Contractor -> Owner/Dev
+    "BP3": "B_OwnerDev",   // Owner's Rep -> Owner/Dev
+    "BP4": "A_Principal",  // PM -> Principal
+    "BP5": "A_Principal",  // Architect -> Principal
+    "BP6": "B_OwnerDev",   // Developer/Owner -> Owner/Dev
+    "BP7": "A_Principal",  // Sustainability Lead -> Principal
+    "BP8": "A_Principal",  // Tech Leader -> Principal
+    "A_Principal": "A_Principal",
+    "B_OwnerDev": "B_OwnerDev",
+    "C_Unknown": "C_Unknown",
+  };
+  return mapping[buyerType] || "C_Unknown";
+}
 
 router.post(
   "/generate/executive-brief",
@@ -38,7 +56,7 @@ router.post(
     const { buyerType, painPoint, projectContext, authorMode } = parsed.data;
 
     const result = await generateExecutiveBrief(
-      buyerType as BuyerMode,
+      mapBuyerType(buyerType),
       painPoint as PrimaryPain,
       projectContext,
       authorMode as AuthorMode

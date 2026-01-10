@@ -401,6 +401,79 @@ export function registerAIRoutes(app: Express) {
     res.json({ success: true, tokensUsed: embeddingResult.tokensUsed });
   }));
 
+  // General AI query endpoint for assistant
+  app.post("/api/ai/query", isAuthenticated, asyncHandler(async (req, res) => {
+    const { question } = req.body;
+    const user = req.user as any;
+
+    if (!question || typeof question !== "string") {
+      return res.status(400).json({ error: "Question is required" });
+    }
+
+    if (!aiClient.isConfigured()) {
+      return res.status(503).json({ error: "AI service not configured" });
+    }
+
+    try {
+      // Get context data
+      const leads = await storage.getLeads();
+      const projects = await storage.getProjects();
+      
+      // Calculate metrics for context
+      const openLeads = leads.filter(l => !["Closed Won", "Closed Lost"].includes(l.dealStage));
+      const totalPipelineValue = openLeads.reduce((sum, l) => sum + Number(l.value || 0), 0);
+      const avgDealSize = openLeads.length > 0 ? totalPipelineValue / openLeads.length : 0;
+      const staleLeads = openLeads.filter(l => {
+        if (!l.lastContactDate) return true;
+        const daysSince = (Date.now() - new Date(l.lastContactDate).getTime()) / (1000 * 60 * 60 * 24);
+        return daysSince > 14;
+      });
+      const highValueLeads = openLeads.filter(l => Number(l.value) >= 10000);
+      const proposalStage = openLeads.filter(l => l.dealStage === "Proposal");
+      const negotiationStage = openLeads.filter(l => l.dealStage === "Negotiation");
+
+      const contextSummary = `
+Current Pipeline Summary:
+- Total pipeline value: $${totalPipelineValue.toLocaleString()}
+- Open deals: ${openLeads.length}
+- Average deal size: $${Math.round(avgDealSize).toLocaleString()}
+- High-value deals (>$10k): ${highValueLeads.length}
+- Deals in Proposal stage: ${proposalStage.length}
+- Deals in Negotiation stage: ${negotiationStage.length}
+- Stale leads (>14 days no contact): ${staleLeads.length}
+- Active projects: ${projects.length}
+
+Recent high-value opportunities:
+${highValueLeads.slice(0, 5).map(l => `- ${l.clientName}: $${Number(l.value).toLocaleString()} (${l.dealStage})`).join('\n')}
+
+Leads needing follow-up:
+${staleLeads.slice(0, 5).map(l => `- ${l.clientName}: Last contact ${l.lastContactDate ? new Date(l.lastContactDate).toLocaleDateString() : 'never'}`).join('\n')}
+`;
+
+      const systemPrompt = `You are an AI assistant for Scan2Plan, a laser scanning and BIM services company. 
+You help the CEO and sales team with pipeline insights, deal analysis, and recommendations.
+Be concise and actionable in your responses. Use the context data to provide specific insights.
+
+${contextSummary}`;
+
+      const answer = await aiClient.generateText(systemPrompt, question, { maxTokens: 500 });
+
+      // Track analytics
+      await db.insert(aiAnalytics).values({
+        feature: "assistant",
+        userId: user?.id?.toString() || user?.claims?.email,
+        action: "query",
+        timeTakenMs: 0,
+        metadata: { questionLength: question.length },
+      });
+
+      res.json({ answer });
+    } catch (error: any) {
+      log("ERROR: AI query failed - " + error.message);
+      res.status(500).json({ error: "Failed to process query" });
+    }
+  }));
+
   // AI feature analytics
   app.get("/api/ai/analytics", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     const analytics = await db.select().from(aiAnalytics).limit(100);

@@ -517,21 +517,6 @@ export default function Sales() {
     }
   };
 
-  const stalenessMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/staleness/apply", { method: "POST", credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
-      toast({ 
-        title: "Staleness Applied", 
-        description: `Updated ${data.updated} leads with probability penalties.` 
-      });
-    },
-  });
-
   const moveMutation = useMutation({
     mutationFn: async ({ lead, newStage }: { lead: Lead; newStage: string }) => {
       setMovingLeadId(lead.id);
@@ -654,19 +639,6 @@ export default function Sales() {
                     <Send className="w-4 h-4 mr-2" />
                   )}
                   Sync to GHL {selectedLeads.length > 0 && `(${selectedLeads.length})`}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => stalenessMutation.mutate()}
-                  disabled={stalenessMutation.isPending}
-                  data-testid="button-apply-staleness"
-                >
-                  {stalenessMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Apply Staleness
                 </Button>
                 <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
                   <DialogTrigger asChild>

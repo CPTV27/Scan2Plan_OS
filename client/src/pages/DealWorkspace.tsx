@@ -436,29 +436,6 @@ export default function DealWorkspace() {
   const isCreatingNew = selectedVersionId === 0;
   const currentQuoteId = isCreatingNew ? undefined : (selectedVersionId || latestQuote?.id);
 
-  const generateUpidMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/leads/${leadId}/generate-upid`);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({ 
-        title: "Project ID Generated", 
-        description: data.driveFolderUrl 
-          ? `${data.upid} - Drive folder created` 
-          : `${data.upid} - Drive folder pending`
-      });
-    },
-    onError: (error: Error) => {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to generate Project ID", 
-        variant: "destructive" 
-      });
-    },
-  });
 
   const deleteLeadMutation = useMutation({
     mutationFn: async () => {
@@ -875,29 +852,7 @@ export default function DealWorkspace() {
                 </TooltipContent>
               </Tooltip>
             )
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => generateUpidMutation.mutate()}
-                  disabled={generateUpidMutation.isPending}
-                  data-testid="button-generate-upid"
-                >
-                  {generateUpidMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <FolderPlus className="w-4 h-4 mr-2" />
-                  )}
-                  Generate Project ID
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Generates ID and creates Google Drive folder for scoping files</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          ) : null}
           <Badge variant="outline" className="text-xs">
             {lead.dealStage}
           </Badge>

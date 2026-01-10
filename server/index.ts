@@ -9,6 +9,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { SERVER_CONSTANTS } from "./constants";
 import { pool } from "./db";
 import { log } from "./lib/logger";
+import { applyStalenessPenalties } from "./staleness";
 
 export { log };
 
@@ -131,6 +132,24 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   }
 
   await seedMarketingData();
+
+  // Daily staleness check - runs every 24 hours
+  const runDailyStaleness = async () => {
+    try {
+      const result = await applyStalenessPenalties();
+      if (result.updated > 0) {
+        log(`[Staleness] Daily check: Updated ${result.updated} leads with probability penalties`);
+      }
+    } catch (error: any) {
+      log(`[Staleness] Daily check failed: ${error.message}`);
+    }
+  };
+  
+  // Run immediately on startup
+  runDailyStaleness();
+  
+  // Then run every 24 hours (86400000 ms)
+  setInterval(runDailyStaleness, 24 * 60 * 60 * 1000);
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(

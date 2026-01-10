@@ -136,6 +136,17 @@ export class AIClient {
   isConfigured(): boolean {
     return !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
   }
+
+  async generateText(systemPrompt: string, userMessage: string, options?: { maxTokens?: number; temperature?: number }): Promise<string | null> {
+    return this.chat({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      maxTokens: options?.maxTokens,
+      temperature: options?.temperature,
+    });
+  }
 }
 
 export const aiClient = new AIClient();
