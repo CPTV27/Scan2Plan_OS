@@ -289,11 +289,24 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     }
   }));
 
-  // Partial update (PATCH) for simple field updates like buyerPersona
+  // Partial update (PATCH) for safe lightweight field updates only
+  // Restricted to buyerPersona and other non-critical fields that don't require business rule validation
+  const safePatchFieldsSchema = z.object({
+    buyerPersona: z.string().optional(),
+    leadPriority: z.number().min(1).max(5).optional(),
+    notes: z.string().optional(),
+  }).strict();
+  
   app.patch("/api/leads/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
-      const updates = req.body;
+      
+      // Validate only safe fields are being updated
+      const updates = safePatchFieldsSchema.parse(req.body);
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
       
       const previousLead = await storage.getLead(leadId);
       if (!previousLead) {
@@ -304,6 +317,10 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       res.json(lead);
     } catch (err: any) {
       log("ERROR: [Lead PATCH] - " + (err.message || err));
+      if (err instanceof z.ZodError) {
+        const errorMessage = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return res.status(400).json({ message: `Invalid fields: ${errorMessage}. Use PUT for full updates.` });
+      }
       return res.status(400).json({ message: err.message || "Invalid update data" });
     }
   }));
