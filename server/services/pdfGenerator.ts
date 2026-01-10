@@ -14,6 +14,32 @@ interface ProposalData {
   caseStudies: CaseStudy[];
 }
 
+// Payment terms display mapping
+const PAYMENT_TERMS_DISPLAY: Record<string, string> = {
+  net15: "Net 15",
+  net30: "Net 30",
+  net45: "Net 45",
+  net60: "Net 60",
+  net90: "Net 90",
+  dueOnReceipt: "Due on Receipt",
+  "50/50": "50% Deposit / 50% on Completion",
+  standard: "Due on Receipt",
+  partner: "Partner Terms (Net 30)",
+  prepaid: "Prepaid (5% Discount)",
+};
+
+// Discipline display names
+const DISCIPLINE_NAMES: Record<string, string> = {
+  architecture: "Architecture",
+  arch: "Architecture",
+  structural: "Structural",
+  struct: "Structural",
+  mep: "MEP",
+  mepf: "MEP",
+  site: "Site/Civil",
+  civil: "Site/Civil",
+};
+
 function formatCurrency(value: number | string | null | undefined): string {
   const num = Number(value) || 0;
   return new Intl.NumberFormat("en-US", {
@@ -24,22 +50,125 @@ function formatCurrency(value: number | string | null | undefined): string {
   }).format(num);
 }
 
-function deriveLOD(lead: Lead, quote: CpqQuote | null): string {
-  if (quote?.cpqAreas) {
-    const areas = quote.cpqAreas as any[];
-    if (areas.length > 0 && areas[0]?.disciplineLods) {
-      const lods = Object.values(areas[0].disciplineLods) as string[];
-      if (lods.length > 0) {
-        const lodNum = Math.max(...lods.map(l => parseInt(l) || 300));
-        return `LOD ${lodNum}`;
+function formatPaymentTerms(paymentTerms: string | null | undefined): string {
+  if (!paymentTerms) return PAYMENT_TERMS_DISPLAY.standard;
+  return PAYMENT_TERMS_DISPLAY[paymentTerms] || paymentTerms;
+}
+
+interface LODInfo {
+  display: string;  // Single line display
+  perDiscipline: { discipline: string; lod: string }[];  // Detailed breakdown
+  hasMultiple: boolean;  // Whether disciplines have different LODs
+}
+
+function deriveLODInfo(lead: Lead, quote: CpqQuote | null): LODInfo {
+  const perDiscipline: { discipline: string; lod: string }[] = [];
+  const disciplineLodMap = new Map<string, Set<string>>();
+  
+  // Helper to process areas and aggregate LODs
+  const processAreas = (areas: any[]) => {
+    for (const area of areas) {
+      if (area.disciplineLods) {
+        for (const [discipline, lodData] of Object.entries(area.disciplineLods)) {
+          const lodValue = typeof lodData === 'object' && lodData !== null 
+            ? (lodData as any).lod 
+            : String(lodData);
+          if (!disciplineLodMap.has(discipline)) {
+            disciplineLodMap.set(discipline, new Set());
+          }
+          disciplineLodMap.get(discipline)!.add(lodValue);
+        }
       }
     }
+  };
+  
+  // Try cpqAreas first (primary schema field)
+  if (quote) {
+    const cpqAreas = (quote as any).cpqAreas as any[] | undefined;
+    if (cpqAreas && cpqAreas.length > 0) {
+      processAreas(cpqAreas);
+    }
+    // Also try areas field as fallback (some quotes use this)
+    const areas = (quote as any).areas as any[] | undefined;
+    if (areas && areas.length > 0 && disciplineLodMap.size === 0) {
+      processAreas(areas);
+    }
   }
-  if (lead.disciplines && lead.disciplines.includes("LoD")) {
+  
+  // Convert map to array with display names
+  disciplineLodMap.forEach((lods, discipline) => {
+    const lodArray = Array.from(lods);
+    const highestLod = Math.max(...lodArray.map((l: string) => parseInt(l) || 300));
+    const displayName = DISCIPLINE_NAMES[discipline.toLowerCase()] || discipline;
+    perDiscipline.push({ discipline: displayName, lod: String(highestLod) });
+  });
+  
+  // Fallback to lead disciplines
+  if (perDiscipline.length === 0 && lead.disciplines && lead.disciplines.includes("LoD")) {
     const match = lead.disciplines.match(/LoD\s*(\d+)/i);
-    if (match) return `LOD ${match[1]}`;
+    if (match) {
+      return {
+        display: `LOD ${match[1]}`,
+        perDiscipline: [],
+        hasMultiple: false,
+      };
+    }
   }
-  return "LOD 300";
+  
+  // Default fallback
+  if (perDiscipline.length === 0) {
+    return {
+      display: "LOD 300",
+      perDiscipline: [],
+      hasMultiple: false,
+    };
+  }
+  
+  // Check if all LODs are the same
+  const uniqueLods = new Set(perDiscipline.map(d => d.lod));
+  const hasMultiple = uniqueLods.size > 1;
+  
+  if (hasMultiple) {
+    // Format as "Arch: 350, MEP: 300, Structural: 300"
+    const display = perDiscipline.map(d => `${d.discipline}: ${d.lod}`).join(", ");
+    return { display, perDiscipline, hasMultiple };
+  } else {
+    // All same, just show highest
+    const highestLod = Math.max(...perDiscipline.map(d => parseInt(d.lod) || 300));
+    return {
+      display: `LOD ${highestLod}`,
+      perDiscipline,
+      hasMultiple: false,
+    };
+  }
+}
+
+// Legacy function for backward compatibility
+function deriveLOD(lead: Lead, quote: CpqQuote | null): string {
+  return deriveLODInfo(lead, quote).display;
+}
+
+interface ServiceInfo {
+  matterport: boolean;
+  actScan: boolean;
+  additionalElevations: number;
+}
+
+function deriveServices(quote: CpqQuote | null): ServiceInfo {
+  const defaultServices: ServiceInfo = {
+    matterport: false,
+    actScan: false,
+    additionalElevations: 0,
+  };
+  
+  if (!quote?.services) return defaultServices;
+  
+  const services = quote.services as any;
+  return {
+    matterport: Boolean(services.matterport),
+    actScan: Boolean(services.actScan),
+    additionalElevations: Number(services.additionalElevations) || 0,
+  };
 }
 
 function deriveScope(lead: Lead): string {
@@ -93,8 +222,10 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   const margin = 20;
   const contentWidth = pageWidth - (margin * 2);
   
-  const lod = deriveLOD(lead, quote);
+  const lodInfo = deriveLODInfo(lead, quote);
   const scope = deriveScope(lead);
+  const services = deriveServices(quote);
+  const paymentTermsDisplay = formatPaymentTerms(quote?.paymentTerms as string | undefined);
   
   const addNewPageIfNeeded = (requiredSpace: number = 30) => {
     if (yPos + requiredSpace > doc.internal.pageSize.getHeight() - 20) {
@@ -153,7 +284,6 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
     ["Project Address:", lead.projectAddress || "Not specified"],
     ["Building Type:", lead.buildingType || "Not specified"],
     ["Scope:", scope],
-    ["LOD:", lod],
   ];
   
   for (const [label, value] of details) {
@@ -161,6 +291,22 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
     doc.text(label, margin, yPos);
     doc.setFont("helvetica", "normal");
     doc.text(value, margin + 40, yPos);
+    yPos += 6;
+  }
+  
+  // Display LOD - show per-discipline if they differ
+  doc.setFont("helvetica", "bold");
+  doc.text("LOD:", margin, yPos);
+  doc.setFont("helvetica", "normal");
+  if (lodInfo.hasMultiple && lodInfo.perDiscipline.length > 0) {
+    // Multi-line LOD display for different disciplines
+    yPos += 6;
+    for (const disc of lodInfo.perDiscipline) {
+      doc.text(`  ${disc.discipline}: LOD ${disc.lod}`, margin + 5, yPos);
+      yPos += 5;
+    }
+  } else {
+    doc.text(lodInfo.display, margin + 40, yPos);
     yPos += 6;
   }
   yPos += 10;
@@ -184,13 +330,41 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   }
 
   addSection("Scope of Work", 15);
-  const scopeText = getScopeDescription(scope, lod);
+  const scopeText = getScopeDescription(scope, lodInfo.display);
   addParagraph(scopeText);
 
+  // Add "What's Included" section for services
+  const includedItems: string[] = [
+    "Laser scanning with Trimble X7 (millimeter accuracy)",
+    "Registered point cloud deliverable (E57 + RCP formats)",
+  ];
+  
+  if (services.matterport) {
+    includedItems.push("Matterport 3D virtual tour capture");
+  }
+  if (services.actScan) {
+    includedItems.push("Above Ceiling Tile (ACT) scanning");
+  }
+  if (services.additionalElevations > 0) {
+    includedItems.push(`${services.additionalElevations} additional CAD interior elevations`);
+  }
+  
+  // Always add standard items
+  includedItems.push("QA/QC review by dedicated team");
+  includedItems.push("Project coordination & handoff");
+  
+  addSection("What's Included", 15);
+  for (const item of includedItems) {
+    addNewPageIfNeeded();
+    doc.text(`• ${item}`, margin, yPos);
+    yPos += 6;
+  }
+  yPos += 5;
+
   // Add Site Boundary Maps section if quote has landscape areas with boundaries
-  if (quote?.areas) {
-    const areas = quote.areas as any[];
-    const landscapeAreas: AreaWithBoundary[] = areas
+  if (quote) {
+    const quoteAreas = ((quote as any).cpqAreas || (quote as any).areas) as any[] | undefined;
+    const landscapeAreas: AreaWithBoundary[] = (quoteAreas || [])
       .filter((a: any) => a.kind === "landscape" && a.boundaryImageUrl && a.boundary?.length >= 3)
       .map((a: any) => ({
         name: a.name || "Landscape Area",
@@ -317,6 +491,7 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   }
 
   addSection("Terms & Conditions", 15);
+  addParagraph(`Payment Terms: ${paymentTermsDisplay}`);
   addParagraph(`Deposit: ${PAYMENT_TERMS.deposit}`);
   addParagraph(`Final Payment: ${PAYMENT_TERMS.final}`);
   addParagraph(`Payment Methods: ${PAYMENT_TERMS.methods.join(", ")}`);
