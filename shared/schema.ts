@@ -273,6 +273,20 @@ export const CPQ_PAYMENT_TERMS = [
 ] as const;
 export type CpqPaymentTerm = typeof CPQ_PAYMENT_TERMS[number];
 
+// Centralized display labels for payment terms (used across UI and proposal generators)
+export const CPQ_PAYMENT_TERMS_DISPLAY: Record<CpqPaymentTerm, string> = {
+  partner: "Partner (no premium)",
+  owner: "Owner (no premium)",
+  "50/50": "50% Deposit / 50% on Completion",
+  net15: "Net 15",
+  net30: "Net 30 (+5%)",
+  net45: "Net 45 (+7%)",
+  net60: "Net 60 (+10%)",
+  net90: "Net 90 (+15%)",
+  standard: "Standard",
+  other: "Other",
+};
+
 // === GOOGLE INTEL TYPE (Solar API + Distance Matrix) ===
 export interface GoogleBuildingInsights {
   available: boolean;

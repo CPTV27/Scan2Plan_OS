@@ -236,6 +236,13 @@ FY26_GOALS = {
    - API: `server/lib/intelligence_engine.ts`, `server/routes/intelligence.ts`
    - UI Components: `client/src/components/intelligence/` (integrated into Brand Generator)
 
+10. **Payment Terms Centralization** - Refactored all payment term dropdowns
+   - **Centralized Constants:** `CPQ_PAYMENT_TERMS` and `CPQ_PAYMENT_TERMS_DISPLAY` in shared/schema.ts
+   - **New Options:** Added 50/50, Net 15, Net 45 payment terms with proper pricing logic
+   - **UI Consistency:** All dropdowns (Calculator, DealWorkspace Quote Builder/Lead Details, LeadForm) now derive from shared constants
+   - **Proposal Generators:** PDF and email generators use consistent display mappings
+   - **Pricing Logic:** Net 15 (no surcharge), Net 45 (+7%), 50/50 (no surcharge) handled correctly
+
 ---
 
 ## Areas Needing Attention

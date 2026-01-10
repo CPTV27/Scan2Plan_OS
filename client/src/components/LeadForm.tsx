@@ -9,6 +9,8 @@ import {
   BUYER_PERSONAS,
   SOURCE_OPTIONS,
   REFERRAL_SOURCES,
+  CPQ_PAYMENT_TERMS,
+  CPQ_PAYMENT_TERMS_DISPLAY,
   type BuyerPersonaId,
 } from "@shared/schema";
 import { z } from "zod";
@@ -862,16 +864,11 @@ export function LeadForm({ lead, onSuccess, onOpenVault, onOpenCPQ, onOpenResear
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="partner">Partner (no hold on production)</SelectItem>
-                        <SelectItem value="owner">Owner (hold if delay)</SelectItem>
-                        <SelectItem value="50/50">50% Deposit / 50% on Completion</SelectItem>
-                        <SelectItem value="net15">Net 15</SelectItem>
-                        <SelectItem value="net30">Net 30 (+5%)</SelectItem>
-                        <SelectItem value="net45">Net 45 (+7%)</SelectItem>
-                        <SelectItem value="net60">Net 60 (+10%)</SelectItem>
-                        <SelectItem value="net90">Net 90 (+15%)</SelectItem>
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {CPQ_PAYMENT_TERMS.map((term) => (
+                          <SelectItem key={term} value={term}>
+                            {CPQ_PAYMENT_TERMS_DISPLAY[term]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

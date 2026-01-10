@@ -91,7 +91,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest } from "@/lib/queryClient";
 import type { Lead, CpqQuote, DealAttribution, CpqCalculateRequest, CpqCalculateResponse, CpqApiArea } from "@shared/schema";
-import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, CPQ_API_DISCIPLINES, CPQ_API_LODS, CPQ_API_SCOPES, CPQ_API_RISKS, CPQ_API_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS } from "@shared/schema";
+import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, CPQ_API_DISCIPLINES, CPQ_API_LODS, CPQ_API_SCOPES, CPQ_API_RISKS, CPQ_API_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -897,15 +897,11 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved }: Quo
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="partner">Partner (no premium)</SelectItem>
-                    <SelectItem value="owner">Owner (no premium)</SelectItem>
-                    <SelectItem value="50/50">50% Deposit / 50% on Completion</SelectItem>
-                    <SelectItem value="net15">Net 15</SelectItem>
-                    <SelectItem value="net30">Net 30 (+5%)</SelectItem>
-                    <SelectItem value="net45">Net 45 (+7%)</SelectItem>
-                    <SelectItem value="net60">Net 60 (+10%)</SelectItem>
-                    <SelectItem value="net90">Net 90 (+15%)</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
+                    {CPQ_PAYMENT_TERMS.filter(term => term !== "other").map((term) => (
+                      <SelectItem key={term} value={term}>
+                        {CPQ_PAYMENT_TERMS_DISPLAY[term]}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </CardContent>
@@ -2060,15 +2056,11 @@ export default function DealWorkspace() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="partner">Partner (no hold)</SelectItem>
-                                <SelectItem value="owner">Owner (hold if delay)</SelectItem>
-                                <SelectItem value="50/50">50% Deposit / 50% on Completion</SelectItem>
-                                <SelectItem value="net15">Net 15</SelectItem>
-                                <SelectItem value="net30">Net 30 (+5%)</SelectItem>
-                                <SelectItem value="net45">Net 45 (+7%)</SelectItem>
-                                <SelectItem value="net60">Net 60 (+10%)</SelectItem>
-                                <SelectItem value="net90">Net 90 (+15%)</SelectItem>
-                                <SelectItem value="standard">Standard</SelectItem>
+                                {CPQ_PAYMENT_TERMS.filter(term => term !== "other").map((term) => (
+                                  <SelectItem key={term} value={term}>
+                                    {CPQ_PAYMENT_TERMS_DISPLAY[term]}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />
