@@ -71,6 +71,30 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     res.json(research);
   }));
 
+  // Deal Attributions (Marketing Influence Tracker)
+  app.get("/api/leads/:id/attributions", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leadId = Number(req.params.id);
+    const attributions = await storage.getDealAttributions(leadId);
+    res.json(attributions);
+  }));
+
+  app.post("/api/leads/:id/attributions", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leadId = Number(req.params.id);
+    const { touchpoint } = req.body;
+    const attribution = await storage.createDealAttribution({
+      leadId,
+      touchpoint,
+      recordedAt: new Date(),
+    });
+    res.status(201).json(attribution);
+  }));
+
+  app.delete("/api/leads/:id/attributions/:attrId", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const attrId = Number(req.params.attrId);
+    await storage.deleteDealAttribution(attrId);
+    res.status(204).send();
+  }));
+
   app.post(api.leads.create.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       log("[Lead Create] Request body: " + JSON.stringify(req.body, null, 2).slice(0, 1000));
