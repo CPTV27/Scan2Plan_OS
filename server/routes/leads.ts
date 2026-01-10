@@ -289,6 +289,25 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     }
   }));
 
+  // Partial update (PATCH) for simple field updates like buyerPersona
+  app.patch("/api/leads/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const leadId = Number(req.params.id);
+      const updates = req.body;
+      
+      const previousLead = await storage.getLead(leadId);
+      if (!previousLead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      const lead = await storage.updateLead(leadId, updates);
+      res.json(lead);
+    } catch (err: any) {
+      log("ERROR: [Lead PATCH] - " + (err.message || err));
+      return res.status(400).json({ message: err.message || "Invalid update data" });
+    }
+  }));
+
   // Soft delete a lead (moves to trash for 60 days)
   app.delete(api.leads.delete.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     const user = req.user as any;
