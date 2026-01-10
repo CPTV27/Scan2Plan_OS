@@ -64,6 +64,13 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     res.json(lead);
   }));
 
+  // Lead Research endpoint
+  app.get("/api/leads/:id/research", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leadId = Number(req.params.id);
+    const research = await storage.getLeadResearch(leadId);
+    res.json(research);
+  }));
+
   app.post(api.leads.create.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       log("[Lead Create] Request body: " + JSON.stringify(req.body, null, 2).slice(0, 1000));

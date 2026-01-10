@@ -26,7 +26,12 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
 
   const { data: notifications = [] } = useQuery<Notification[]>({
-    queryKey: ['/api/notifications', { unread: 'true' }],
+    queryKey: ['/api/notifications'],
+    queryFn: async () => {
+      const res = await fetch('/api/notifications?unread=true', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
     refetchInterval: 30000,
   });
 
