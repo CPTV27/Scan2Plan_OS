@@ -329,6 +329,37 @@ export function registerQuickbooksRoutes(app: Express): void {
     }
   }));
 
+  // Download estimate PDF from QuickBooks
+  app.get("/api/quickbooks/estimate/:estimateId/pdf", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const { estimateId } = req.params;
+
+      if (!estimateId) {
+        return res.status(400).json({ message: "Estimate ID is required" });
+      }
+
+      const isConnected = await quickbooksClient.isConnected();
+      if (!isConnected) {
+        return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
+      }
+
+      const pdfBuffer = await quickbooksClient.downloadEstimatePdf(estimateId);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="estimate-${estimateId}.pdf"`);
+      res.setHeader("Content-Length", pdfBuffer.length.toString());
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      log("ERROR: [QuickBooks] PDF download error - " + error.message);
+      const errorMessage = error.message || "Failed to download PDF";
+      if (errorMessage.includes("401") || errorMessage.includes("expired") || errorMessage.includes("not connected")) {
+        res.status(401).json({ message: "QuickBooks authentication expired. Please reconnect.", needsReauth: true });
+      } else {
+        res.status(500).json({ message: errorMessage });
+      }
+    }
+  }));
+
   app.get("/api/quickbooks/accounts", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const accounts = await quickbooksClient.getAccounts();

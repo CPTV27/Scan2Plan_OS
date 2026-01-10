@@ -54,6 +54,7 @@ import {
   Cloud,
   DollarSign,
   ExternalLink,
+  FileDown,
   FileText,
   Folder,
   FolderCheck,
@@ -920,6 +921,18 @@ export default function DealWorkspace() {
                 <DropdownMenuItem disabled className="text-muted-foreground">
                   <DollarSign className="w-4 h-4 mr-2" />
                   QuickBooks not connected
+                </DropdownMenuItem>
+              )}
+              {/* Download estimate PDF - show if estimate exists */}
+              {lead.qboEstimateId && qboStatus?.connected && (
+                <DropdownMenuItem 
+                  onClick={() => {
+                    window.open(`/api/quickbooks/estimate/${lead.qboEstimateId}/pdf`, '_blank');
+                  }}
+                  data-testid="menu-download-pdf"
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Download Estimate PDF
                 </DropdownMenuItem>
               )}
               <AlertDialog>

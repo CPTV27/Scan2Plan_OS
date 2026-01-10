@@ -793,6 +793,31 @@ export class QuickBooksClient {
     return `https://${domain}/app/estimate?txnId=${estimateId}&companyId=${realmId}`;
   }
 
+  // Download estimate as PDF
+  async downloadEstimatePdf(estimateId: string): Promise<Buffer> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/estimate/${estimateId}/pdf`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/pdf",
+          "Content-Type": "application/pdf",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to download estimate PDF: ${error}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
   // Get QBO base URL configuration
   getConfig(): { baseUrl: string; isSandbox: boolean } {
     const isSandbox = process.env.QB_SANDBOX === "true";
