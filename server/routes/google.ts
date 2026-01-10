@@ -36,20 +36,21 @@ const CPQ_BUILDING_TYPE_NAMES: Record<string, string> = {
   "16": "ACT (Acoustic Ceiling)",
 };
 
-// Discipline display names
+// Discipline display names - consistent capitalization
 const DISCIPLINE_NAMES: Record<string, string> = {
   "arch": "Architecture",
   "architecture": "Architecture",
-  "struct": "Structural",
-  "structural": "Structural",
-  "mech": "Mechanical",
-  "mechanical": "Mechanical",
-  "elec": "Electrical",
-  "electrical": "Electrical",
-  "plumb": "Plumbing",
-  "plumbing": "Plumbing",
-  "site": "Site/Civil",
-  "mep": "MEP",
+  "struct": "Structure",
+  "structural": "Structure",
+  "mech": "MEPF",
+  "mechanical": "MEPF",
+  "elec": "MEPF",
+  "electrical": "MEPF",
+  "plumb": "MEPF",
+  "plumbing": "MEPF",
+  "site": "Site",
+  "mep": "MEPF",
+  "mepf": "MEPF",
 };
 
 // Scope display names
@@ -61,17 +62,49 @@ const SCOPE_NAMES: Record<string, string> = {
   "facade": "Facade Only",
 };
 
+// Payment terms display names
+const PAYMENT_TERMS_NAMES: Record<string, string> = {
+  "standard": "Due on Receipt",
+  "prepaid": "Prepaid (5% discount)",
+  "partner": "Partner Terms (10% discount)",
+  "net15": "Net 15",
+  "net30": "Net 30",
+  "net60": "Net 60",
+  "net90": "Net 90",
+};
+
+function formatDate(dateStr: string | Date | null | undefined): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 function generateProposalEmailHtml(lead: any, quote: any): string {
-  const clientName = lead.contactName || lead.company || 'Valued Client';
+  // Client info - prefer contact name over company
+  const clientName = lead.contactName || lead.clientName || lead.company || 'Valued Client';
   const projectName = lead.projectName || lead.company || 'Your Project';
+  const projectAddress = quote?.projectAddress || lead.projectAddress || '';
+  const quoteNumber = quote?.quoteNumber || '';
+  const quoteDate = formatDate(quote?.createdAt) || formatDate(new Date());
+  
+  // Contact info
+  const contactName = lead.contactName || lead.billingContactName || '';
+  const contactEmail = lead.contactEmail || lead.billingContactEmail || '';
+  const contactPhone = lead.contactPhone || lead.billingContactPhone || '';
+  
+  // Payment terms
+  const paymentTermsKey = quote?.paymentTerms || lead.paymentTerms || 'standard';
+  const paymentTermsDisplay = PAYMENT_TERMS_NAMES[paymentTermsKey] || paymentTermsKey;
+  
   const pricingData = quote?.pricingBreakdown;
   const totalPrice = pricingData?.totalClientPrice || pricingData?.totalPrice || pricingData?.subtotal || quote?.totalPrice || 0;
   const areas = quote?.areas || [];
   const pricingItems = pricingData?.items || [];
   
-  // Build detailed scope of work table
+  // Build detailed scope of work table with distinct area names
   let scopeTableRows = '';
   if (areas.length > 0) {
+    const seenNames = new Set<string>();
     scopeTableRows = areas.map((area: any, i: number) => {
       const sqft = area.kind === 'landscape' 
         ? Math.round(parseFloat(area.acres || 0) * 43560) 
@@ -79,9 +112,14 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
       const buildingTypeName = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.kind || 'Building';
       const scopeName = SCOPE_NAMES[area.scope] || area.scope || 'Full';
       const lod = area.lod || '300';
-      const disciplines = (area.disciplines || [])
-        .map((d: string) => DISCIPLINE_NAMES[d] || d)
-        .join(', ') || 'Architecture';
+      
+      // Get disciplines with consistent capitalization and deduplication
+      const disciplineSet = new Set<string>();
+      (area.disciplines || []).forEach((d: string) => {
+        const mapped = DISCIPLINE_NAMES[d.toLowerCase()] || d;
+        disciplineSet.add(mapped);
+      });
+      const disciplines = Array.from(disciplineSet).sort().join(', ') || 'Architecture';
       
       // Handle mixed LOD display
       let lodDisplay = `LOD ${lod}`;
@@ -89,9 +127,18 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
         lodDisplay = `Int LOD ${area.mixedInteriorLod} / Ext LOD ${area.mixedExteriorLod}`;
       }
       
+      // Make area names distinct if they duplicate project name
+      let areaName = area.name || `Area ${i + 1}`;
+      if (areaName === projectName && areas.length > 1) {
+        areaName = `Area ${i + 1} - ${buildingTypeName}`;
+      } else if (seenNames.has(areaName)) {
+        areaName = `${areaName} (${i + 1})`;
+      }
+      seenNames.add(areaName);
+      
       return `<tr>
         <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
-          <strong>${area.name || `Area ${i + 1}`}</strong><br>
+          <strong>${areaName}</strong><br>
           <span style="color: #6b7280; font-size: 13px;">${buildingTypeName}</span>
         </td>
         <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
@@ -108,23 +155,35 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
     }).join('');
   }
   
-  // Build pricing breakdown - categorize items
-  const baseItems: any[] = [];
+  // Build pricing breakdown - categorize items with better labels
+  const scanningItems: any[] = [];
+  const modelingItems: any[] = [];
   const travelItems: any[] = [];
   const riskItems: any[] = [];
   const adjustmentItems: any[] = [];
   
   pricingItems.forEach((item: any) => {
-    if (item.isTotal) return; // Skip total row
+    if (item.isTotal) return;
     const label = (item.label || '').toLowerCase();
+    
+    // Categorize with better logic
     if (label.includes('travel') || label.includes('mileage')) {
       travelItems.push(item);
     } else if (label.includes('risk') || label.includes('premium') || label.includes('occupied') || label.includes('hazardous')) {
       riskItems.push(item);
-    } else if (label.includes('adjustment') || label.includes('discount')) {
+    } else if (label.includes('adjustment')) {
+      // Rename adjustment for clarity
+      adjustmentItems.push({
+        ...item,
+        label: item.label.replace('Price Adjustment', 'Margin Adjustment')
+      });
+    } else if (label.includes('discount')) {
       adjustmentItems.push(item);
+    } else if (label.includes('scanning') || label.includes('scan')) {
+      scanningItems.push(item);
     } else {
-      baseItems.push(item);
+      // All modeling/discipline items go here
+      modelingItems.push(item);
     }
   });
   
@@ -144,6 +203,17 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
     ).join('');
   }
   
+  // Build contact info section
+  const hasContactInfo = contactName || contactEmail || contactPhone;
+  const contactInfoHtml = hasContactInfo ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Project Contact</h3>
+    <table style="width: 100%; margin: 16px 0; font-size: 14px;">
+      ${contactName ? `<tr><td style="padding: 4px 0; color: #6b7280;">Contact:</td><td style="padding: 4px 0;"><strong>${contactName}</strong></td></tr>` : ''}
+      ${contactEmail ? `<tr><td style="padding: 4px 0; color: #6b7280;">Email:</td><td style="padding: 4px 0;"><a href="mailto:${contactEmail}" style="color: #2563eb;">${contactEmail}</a></td></tr>` : ''}
+      ${contactPhone ? `<tr><td style="padding: 4px 0; color: #6b7280;">Phone:</td><td style="padding: 4px 0;">${contactPhone}</td></tr>` : ''}
+    </table>
+  ` : '';
+  
   return `
 <!DOCTYPE html>
 <html>
@@ -158,13 +228,28 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
   </div>
   
   <div style="background: white; padding: 32px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-    <p style="font-size: 16px; margin-bottom: 24px;">Dear ${clientName},</p>
     
-    <p>Thank you for the opportunity to provide a proposal for <strong>${projectName}</strong>. Based on our discussions and site analysis, we are pleased to present the following scope and investment summary.</p>
+    <!-- Quote Header with Number, Date, Address -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
+      <div>
+        ${quoteNumber ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Quote Number</p><p style="margin: 0; font-size: 16px; font-weight: 600;">${quoteNumber}</p>` : ''}
+      </div>
+      <div style="text-align: right;">
+        ${quoteDate ? `<p style="margin: 0 0 4px 0; font-size: 14px; color: #6b7280;">Date</p><p style="margin: 0; font-size: 16px;">${quoteDate}</p>` : ''}
+      </div>
+    </div>
+    
+    <p style="font-size: 16px; margin-bottom: 16px;">Dear ${clientName},</p>
+    
+    <p>Thank you for the opportunity to provide a proposal for <strong>${projectName}</strong>.</p>
+    ${projectAddress ? `<p style="margin: 8px 0 24px 0; color: #6b7280;"><strong>Project Location:</strong> ${projectAddress}</p>` : '<p style="margin-bottom: 24px;"></p>'}
+    
+    <p>Based on our discussions and site analysis, we are pleased to present the following scope and investment summary.</p>
     
     <div style="background: #f0f9ff; border-left: 4px solid #2563eb; padding: 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
       <h2 style="margin: 0 0 12px 0; color: #1e40af; font-size: 18px;">Project Investment</h2>
       <p style="margin: 0; font-size: 32px; font-weight: 700; color: #1e3a5f;">${formatCurrency(totalPrice)}</p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #6b7280;">Payment Terms: ${paymentTermsDisplay}</p>
     </div>
     
     ${areas.length > 0 ? `
@@ -184,11 +269,20 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
     </table>
     ` : ''}
     
-    ${baseItems.length > 0 ? `
-    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Pricing Breakdown</h3>
+    ${scanningItems.length > 0 ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Scanning Services</h3>
     <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
       <tbody>
-        ${buildItemRows(baseItems)}
+        ${buildItemRows(scanningItems)}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${modelingItems.length > 0 ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Modeling Services</h3>
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tbody>
+        ${buildItemRows(modelingItems)}
       </tbody>
     </table>
     ` : ''}
@@ -203,7 +297,7 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
     ` : ''}
     
     ${riskItems.length > 0 ? `
-    <h4 style="color: #6b7280; margin: 16px 0 8px 0; font-size: 14px;">Risk Premiums</h4>
+    <h4 style="color: #6b7280; margin: 16px 0 8px 0; font-size: 14px;">Site Conditions</h4>
     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
       <tbody>
         ${buildItemRows(riskItems)}
@@ -226,6 +320,8 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
       ${servicesHtml}
     </ul>
     ` : ''}
+    
+    ${contactInfoHtml}
     
     <div style="margin-top: 32px;">
       <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">What's Included</h3>
