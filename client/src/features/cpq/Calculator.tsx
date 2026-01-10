@@ -2221,45 +2221,104 @@ Thanks!`.trim();
           
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-2">
-              {pricing.items
-                .filter((item) => !item.isTotal)
-                .map((item, index) => (
-                  <div
-                    key={index}
-                    className={`flex justify-between text-sm ${
-                      item.isDiscount ? "text-green-600" : ""
-                    }`}
-                  >
-                    <span className="truncate flex-1 mr-2">{item.label}</span>
-                    <span className="font-mono">
-                      {item.isDiscount ? "-" : ""}${Math.abs(item.value).toLocaleString()}
-                    </span>
+              {/* Show Tier A pricing items when in Tier A mode */}
+              {isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0 ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate flex-1 mr-2">Scanning Cost</span>
+                    <span className="font-mono">${tierAPricingResult.scanningCost.toLocaleString()}</span>
                   </div>
-                ))}
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate flex-1 mr-2">Modeling Cost</span>
+                    <span className="font-mono">${tierAPricingResult.modelingCost.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span className="truncate flex-1 mr-2">Margin Multiplier ({tierAPricingResult.marginLabel})</span>
+                    <span className="font-mono">×{tierAPricingResult.margin}</span>
+                  </div>
+                  {tierAPricingResult.travelCost > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="truncate flex-1 mr-2">Travel</span>
+                      <span className="font-mono">${tierAPricingResult.travelCost.toLocaleString()}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Standard pricing items */
+                pricing.items
+                  .filter((item) => !item.isTotal)
+                  .map((item, index) => (
+                    <div
+                      key={index}
+                      className={`flex justify-between text-sm ${
+                        item.isDiscount ? "text-green-600" : ""
+                      }`}
+                    >
+                      <span className="truncate flex-1 mr-2">{item.label}</span>
+                      <span className="font-mono">
+                        {item.isDiscount ? "-" : ""}${Math.abs(item.value).toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+              )}
+              {/* Show areas summary when no items yet */}
+              {!isTierA && pricing.items.length === 0 && areas.length > 0 && (
+                <div className="text-sm text-muted-foreground italic">
+                  Add disciplines to areas to see pricing
+                </div>
+              )}
+              {!isTierA && pricing.items.length === 0 && areas.length === 0 && (
+                <div className="text-sm text-muted-foreground italic">
+                  Add building or landscape areas to begin
+                </div>
+              )}
             </div>
           </ScrollArea>
           <div className="p-4 border-t bg-background space-y-3">
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
-              <span className="font-mono">${pricing.subtotal.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Internal Cost</span>
-              <span className="font-mono text-muted-foreground">
-                ${pricing.totalUpteamCost.toLocaleString()}
-              </span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total</span>
-              <span className="font-mono">${pricing.totalClientPrice.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Profit Margin</span>
-              <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
-                ${pricing.profitMargin.toLocaleString()} ({marginPercent.toFixed(1)}%)
-              </span>
-            </div>
+            {/* Show Tier A totals when in Tier A mode */}
+            {isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0 ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Subtotal (Cost)</span>
+                  <span className="font-mono">${tierAPricingResult.subtotal.toLocaleString()}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span className="font-mono">${tierAPricingResult.totalWithTravel.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Profit Margin</span>
+                  <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
+                    ${(tierAPricingResult.clientPrice - tierAPricingResult.subtotal).toLocaleString()} ({marginPercent.toFixed(1)}%)
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Subtotal</span>
+                  <span className="font-mono">${pricing.subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Internal Cost</span>
+                  <span className="font-mono text-muted-foreground">
+                    ${pricing.totalUpteamCost.toLocaleString()}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span className="font-mono">${pricing.totalClientPrice.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Profit Margin</span>
+                  <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
+                    ${pricing.profitMargin.toLocaleString()} ({marginPercent.toFixed(1)}%)
+                  </span>
+                </div>
+              </>
+            )}
             {isMarginBelowGate && (
               <div className="text-xs text-red-600 mt-1" data-testid="text-margin-gate-error">
                 Margin must be at least {(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% to save quote

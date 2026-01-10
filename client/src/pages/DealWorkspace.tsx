@@ -597,7 +597,7 @@ export default function DealWorkspace() {
       form.reset({
         clientName: lead.clientName,
         projectName: lead.projectName || "",
-        projectAddress: lead.projectAddress,
+        projectAddress: lead.projectAddress || "",
         value: Number(lead.value),
         dealStage: lead.dealStage,
         probability: lead.probability || 0,
@@ -790,19 +790,23 @@ export default function DealWorkspace() {
             Evidence Vault
           </Button>
           
-          {/* Start Quote Button - Blue (Primary) */}
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => {
-              setSelectedVersionId(0); // Create new quote
-              setActiveTab("quote");
-            }}
-            data-testid="button-start-quote"
-          >
-            <Calculator className="w-4 h-4 mr-2" />
-            Start Quote
-          </Button>
+          {/* Generate Estimate in QuickBooks Button */}
+          {latestQuote && qboStatus?.connected && (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
+              onClick={() => pushToQboMutation.mutate(!!lead.qboEstimateId)}
+              disabled={pushToQboMutation.isPending}
+              data-testid="button-generate-qbo-estimate"
+            >
+              {pushToQboMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <DollarSign className="w-4 h-4 mr-2" />
+              )}
+              {lead.qboEstimateId ? "Sync to QuickBooks" : "Generate Estimate in QuickBooks"}
+            </Button>
+          )}
           
           {/* Communicate Button - Green */}
           <Button
