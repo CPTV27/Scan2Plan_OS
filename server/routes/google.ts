@@ -69,6 +69,7 @@ const PAYMENT_TERMS_NAMES: Record<string, string> = {
   "partner": "Partner Terms (10% discount)",
   "net15": "Net 15",
   "net30": "Net 30",
+  "net45": "Net 45",
   "net60": "Net 60",
   "net90": "Net 90",
 };
@@ -111,7 +112,34 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
         : parseInt(area.squareFeet || area.sqft || 0, 10);
       const buildingTypeName = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.kind || 'Building';
       const scopeName = SCOPE_NAMES[area.scope] || area.scope || 'Full';
-      const lod = area.lod || '300';
+      
+      // Extract LOD from disciplineLods - this is the correct data structure
+      const disciplineLodEntries: { discipline: string; lod: string }[] = [];
+      if (area.disciplineLods && typeof area.disciplineLods === 'object') {
+        for (const [disc, lodData] of Object.entries(area.disciplineLods)) {
+          const lodValue = typeof lodData === 'object' && lodData !== null 
+            ? (lodData as any).lod 
+            : String(lodData);
+          const displayName = DISCIPLINE_NAMES[disc.toLowerCase()] || disc;
+          disciplineLodEntries.push({ discipline: displayName, lod: lodValue || '300' });
+        }
+      }
+      
+      // Determine LOD display - show per-discipline if they differ
+      let lodDisplay = 'LOD 300';
+      if (disciplineLodEntries.length > 0) {
+        const uniqueLods = new Set(disciplineLodEntries.map(d => d.lod));
+        if (uniqueLods.size > 1) {
+          lodDisplay = disciplineLodEntries.map(d => `${d.discipline}: LOD ${d.lod}`).join(', ');
+        } else {
+          const highestLod = Math.max(...disciplineLodEntries.map(d => parseInt(d.lod) || 300));
+          lodDisplay = `LOD ${highestLod}`;
+        }
+      } else if (area.mixedInteriorLod && area.mixedExteriorLod && area.mixedInteriorLod !== area.mixedExteriorLod) {
+        lodDisplay = `Int LOD ${area.mixedInteriorLod} / Ext LOD ${area.mixedExteriorLod}`;
+      } else if (area.lod) {
+        lodDisplay = `LOD ${area.lod}`;
+      }
       
       // Get disciplines with consistent capitalization and deduplication
       const disciplineSet = new Set<string>();
@@ -120,12 +148,6 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
         disciplineSet.add(mapped);
       });
       const disciplines = Array.from(disciplineSet).sort().join(', ') || 'Architecture';
-      
-      // Handle mixed LOD display
-      let lodDisplay = `LOD ${lod}`;
-      if (area.mixedInteriorLod && area.mixedExteriorLod && area.mixedInteriorLod !== area.mixedExteriorLod) {
-        lodDisplay = `Int LOD ${area.mixedInteriorLod} / Ext LOD ${area.mixedExteriorLod}`;
-      }
       
       // Make area names distinct if they duplicate project name
       let areaName = area.name || `Area ${i + 1}`;
