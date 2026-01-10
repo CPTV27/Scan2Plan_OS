@@ -954,6 +954,42 @@ This document contains 10 test jobs using real addresses for accurate travel cal
 
 ---
 
-*Document Version: 1.0*  
+## Database Record Summary (January 2026)
+
+All 10 test jobs have been created in the development database:
+
+| Job | Lead ID | Quote ID | Quote Number | Total Price | Margin |
+|-----|---------|----------|--------------|-------------|--------|
+| 1 | 66 | 76 | Q-2026-TEST-001 | $6,800 | 50% |
+| 2 | 67 | 77 | Q-2026-TEST-002 | $42,500 | 50% |
+| 3 | 68 | 78 | Q-2026-TEST-003 | $18,500 | 50% |
+| 4 | 69 | 79 | Q-2026-TEST-004 | $125,000 | 50% |
+| 5 | 70 | 80 | Q-2026-TEST-005 | $4,800 | 50% |
+| 6 | 71 | 81 | Q-2026-TEST-006 | $32,500 | 50% |
+| 7 | 72 | 82 | Q-2026-TEST-007 | $52,000 | 50% |
+| 8 | 73 | 83 | Q-2026-TEST-008 | $78,000 | 50% |
+| 9 | 74 | 84 | Q-2026-TEST-009 | $165,000 | 50% |
+| 10 | 75 | 85 | Q-2026-TEST-010 | $18,500 | 50% |
+
+**Total Pipeline Value:** $544,100
+
+### Data Normalization Applied
+- **Dispatch Locations:** All normalized to UPPERCASE (BROOKLYN, TROY) for database/QuickBooks/Salesforce compatibility
+- **Area Kind:** All areas set to `standard` (landscape areas would use `14-15` buildingType)
+- **Pricing Breakdown:** Each quote includes `totalClientPrice`, `totalUpteamCost`, `areaBreakdown`, `travelCost`, `riskPremium`, `servicesTotal`, and `margin` fields
+
+### How to Query Test Data
+```sql
+-- Get all test leads with quotes
+SELECT l.id, l.client_name, l.value, q.quote_number, q.total_price
+FROM leads l
+JOIN cpq_quotes q ON q.lead_id = l.id
+WHERE l.id BETWEEN 66 AND 75
+ORDER BY l.id;
+```
+
+---
+
+*Document Version: 1.1*  
 *Last Updated: January 2026*  
 *Based on real property addresses for accurate travel/mapping testing*
