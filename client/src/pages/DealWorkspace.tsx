@@ -1627,12 +1627,15 @@ export default function DealWorkspace() {
                               </span>
                             )}
                           </div>
-                          {/* Show Tier A cost breakdown if available */}
-                          {(quote as any).internalCosts?.tierAScanningCost != null && (
-                            <div className="flex items-center gap-4 text-sm mt-2 pt-2 border-t border-muted">
-                              <span className="text-muted-foreground">
-                                Scanning: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAScanningCost).toLocaleString()}</span>
-                              </span>
+                          {/* Show cost breakdown - Tier A or Standard pricing */}
+                          {((quote as any).internalCosts?.tierAScanningCost != null || (quote as any).pricingBreakdown?.items?.length > 0) && (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mt-2 pt-2 border-t border-muted">
+                              {/* Tier A costs */}
+                              {(quote as any).internalCosts?.tierAScanningCost != null && (
+                                <span className="text-muted-foreground">
+                                  Scanning: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAScanningCost).toLocaleString()}</span>
+                                </span>
+                              )}
                               {(quote as any).internalCosts?.tierAModelingCost != null && (
                                 <span className="text-muted-foreground">
                                   Modeling: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAModelingCost).toLocaleString()}</span>
@@ -1641,6 +1644,18 @@ export default function DealWorkspace() {
                               {(quote as any).internalCosts?.assumedMargin && (
                                 <span className="text-muted-foreground">
                                   Target Margin: <span className="font-mono font-medium text-foreground">{(quote as any).internalCosts.assumedMargin}%</span>
+                                </span>
+                              )}
+                              {/* Standard pricing items - show top 3 disciplines */}
+                              {!(quote as any).internalCosts?.tierAScanningCost && (quote as any).pricingBreakdown?.items?.slice(0, 3).map((item: any, idx: number) => (
+                                <span key={idx} className="text-muted-foreground">
+                                  {item.label}: <span className="font-mono font-medium text-foreground">${Number(item.value).toLocaleString()}</span>
+                                </span>
+                              ))}
+                              {/* Show "more" indicator if there are more items */}
+                              {!(quote as any).internalCosts?.tierAScanningCost && (quote as any).pricingBreakdown?.items?.length > 3 && (
+                                <span className="text-muted-foreground text-xs">
+                                  +{(quote as any).pricingBreakdown.items.length - 3} more
                                 </span>
                               )}
                             </div>
