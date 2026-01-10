@@ -16,20 +16,47 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// CPQ Building type ID to name mapping
+const CPQ_BUILDING_TYPE_NAMES: Record<string, string> = {
+  "1": "Residential - Single Family",
+  "2": "Residential - Multi Family",
+  "3": "Residential - Luxury",
+  "4": "Commercial / Office",
+  "5": "Retail / Restaurants",
+  "6": "Kitchen / Catering",
+  "7": "Education",
+  "8": "Hotel / Theatre / Museum",
+  "9": "Hospitals / Mixed Use",
+  "10": "Mechanical / Utility",
+  "11": "Warehouse / Storage",
+  "12": "Religious Buildings",
+  "13": "Infrastructure / Roads",
+  "14": "Built Landscape",
+  "15": "Natural Landscape",
+  "16": "ACT (Acoustic Ceiling)",
+};
+
 function generateProposalEmailHtml(lead: any, quote: any): string {
   const clientName = lead.contactName || lead.company || 'Valued Client';
   const projectName = lead.projectName || lead.company || 'Your Project';
-  const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
+  // Check multiple possible price fields in pricingBreakdown
+  const pricingData = quote?.pricingBreakdown;
+  const totalPrice = pricingData?.totalClientPrice || pricingData?.totalPrice || pricingData?.subtotal || quote?.totalPrice || 0;
   const areas = quote?.areas || [];
   
   let areaDetails = '';
   if (areas.length > 0) {
     areaDetails = areas.map((area: any, i: number) => {
-      const sqft = area.kind === 'landscape' ? Math.round(area.acres * 43560) : area.sqft;
+      // Handle both squareFeet (string) and sqft (number) field names
+      const sqft = area.kind === 'landscape' 
+        ? Math.round(parseFloat(area.acres || 0) * 43560) 
+        : parseInt(area.squareFeet || area.sqft || 0, 10);
+      // Get building type name from ID, fallback to kind
+      const buildingTypeName = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.kind || 'Building';
       return `<tr>
         <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${area.name || `Area ${i + 1}`}</td>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${area.buildingType || area.kind}</td>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${sqft?.toLocaleString() || '-'} sqft</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${buildingTypeName}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${sqft > 0 ? sqft.toLocaleString() : '-'} sqft</td>
       </tr>`;
     }).join('');
   }
