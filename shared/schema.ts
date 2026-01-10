@@ -262,9 +262,13 @@ export type CpqService = typeof CPQ_SERVICES[number];
 export const CPQ_PAYMENT_TERMS = [
   "partner",       // Partner (no hold on production)
   "owner",         // Owner (hold if delay)
+  "50/50",         // 50% Deposit / 50% on Completion
+  "net15",         // Net 15 (no surcharge)
   "net30",         // Net 30 +5%
+  "net45",         // Net 45 +7%
   "net60",         // Net 60 +10%
   "net90",         // Net 90 +15%
+  "standard",      // Standard terms
   "other",
 ] as const;
 export type CpqPaymentTerm = typeof CPQ_PAYMENT_TERMS[number];
@@ -455,7 +459,7 @@ export const cpqScopingDataSchema = z.object({
   timelineOther: z.string().optional(),
   timelineNotes: z.string().optional(),
   // Payment Terms (updated to match external CPQ)
-  paymentTerms: z.enum(["", "partner", "owner", "net30", "net60", "net90", "other"]).optional(),
+  paymentTerms: z.enum(["", "partner", "owner", "50/50", "net15", "net30", "net45", "net60", "net90", "standard", "other"]).optional(),
   paymentTermsOther: z.string().optional(),
   paymentNotes: z.string().optional(),
   // Contact Information

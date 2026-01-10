@@ -67,6 +67,8 @@ const PAYMENT_TERMS_NAMES: Record<string, string> = {
   "standard": "Due on Receipt",
   "prepaid": "Prepaid (5% discount)",
   "partner": "Partner Terms (10% discount)",
+  "owner": "Owner Terms (hold if delay)",
+  "50/50": "50% Deposit / 50% on Completion",
   "net15": "Net 15",
   "net30": "Net 30",
   "net45": "Net 45",

@@ -818,10 +818,22 @@ export function calculatePricing(
       value: paymentAdjustment,
       isDiscount: true,
     });
+  } else if (paymentTerms === "50/50") {
+    // 50% deposit / 50% on completion - no surcharge, just split payment
+    // No pricing adjustment, just a payment structure
+  } else if (paymentTerms === "net15") {
+    // Net 15 - fast payment, no surcharge
+    // No pricing adjustment for fast payment
   } else if (paymentTerms === "net30") {
     paymentAdjustment = subtotal * 0.05; // 5% surcharge for Net 30
     items.push({
       label: "Net 30 Terms (+5%)",
+      value: paymentAdjustment,
+    });
+  } else if (paymentTerms === "net45") {
+    paymentAdjustment = subtotal * 0.07; // 7% surcharge for Net 45
+    items.push({
+      label: "Net 45 Terms (+7%)",
       value: paymentAdjustment,
     });
   } else if (paymentTerms === "net60") {
