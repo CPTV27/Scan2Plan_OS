@@ -345,23 +345,10 @@ function DealCard({
               size="icon"
               className="h-7 w-7"
               onClick={() => {
-                const cpqUrl = import.meta.env.VITE_CPQ_BASE_URL || '';
-                if (!cpqUrl) {
-                  alert('CPQ app URL not configured');
-                  return;
-                }
-                const returnUrl = encodeURIComponent(window.location.origin + `/deals/${lead.id}`);
-                const params = new URLSearchParams({
-                  leadId: String(lead.id),
-                  returnUrl,
-                  company: lead.clientName || '',
-                  project: lead.projectName || '',
-                  address: lead.projectAddress || '',
-                });
-                window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
+                window.location.href = `/deals/${lead.id}?tab=quote`;
               }}
               data-testid={`button-cpq-quote-${lead.id}`}
-              title="Generate Quote"
+              title="Open Quote Builder"
             >
               <Calculator className="w-4 h-4" />
             </Button>

@@ -1067,7 +1067,12 @@ export default function DealWorkspace() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     const validTabs = ["lead", "quote", "history", "ai", "documents"];
-    return validTabs.includes("lead") ? "lead" : "lead";
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabFromUrl = urlParams.get("tab");
+    if (tabFromUrl && validTabs.includes(tabFromUrl)) {
+      return tabFromUrl;
+    }
+    return "lead";
   });
   const { toast } = useToast();
   
@@ -1429,31 +1434,6 @@ export default function DealWorkspace() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Generate Quote Button - Primary CTA */}
-          <Button
-            size="sm"
-            onClick={() => {
-              const cpqUrl = import.meta.env.VITE_CPQ_BASE_URL || '';
-              if (!cpqUrl) {
-                toast({ title: "Error", description: "CPQ app URL not configured", variant: "destructive" });
-                return;
-              }
-              const returnUrl = encodeURIComponent(window.location.origin + `/deals/${lead.id}`);
-              const params = new URLSearchParams({
-                leadId: String(lead.id),
-                returnUrl,
-                company: lead.clientName || '',
-                project: lead.projectName || '',
-                address: lead.projectAddress || '',
-              });
-              window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
-            }}
-            data-testid="button-generate-quote"
-          >
-            <Calculator className="w-4 h-4 mr-2" />
-            Generate Quote
-          </Button>
-          
           {/* Evidence Vault Button - Purple */}
           <Button
             size="sm"
