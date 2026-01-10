@@ -36,35 +36,110 @@ const CPQ_BUILDING_TYPE_NAMES: Record<string, string> = {
   "16": "ACT (Acoustic Ceiling)",
 };
 
+// Discipline display names
+const DISCIPLINE_NAMES: Record<string, string> = {
+  "arch": "Architecture",
+  "architecture": "Architecture",
+  "struct": "Structural",
+  "structural": "Structural",
+  "mech": "Mechanical",
+  "mechanical": "Mechanical",
+  "elec": "Electrical",
+  "electrical": "Electrical",
+  "plumb": "Plumbing",
+  "plumbing": "Plumbing",
+  "site": "Site/Civil",
+  "mep": "MEP",
+};
+
+// Scope display names
+const SCOPE_NAMES: Record<string, string> = {
+  "full": "Full Building (Interior + Exterior)",
+  "interior": "Interior Only",
+  "exterior": "Exterior Only",
+  "roof": "Roof/Facades",
+  "facade": "Facade Only",
+};
+
 function generateProposalEmailHtml(lead: any, quote: any): string {
   const clientName = lead.contactName || lead.company || 'Valued Client';
   const projectName = lead.projectName || lead.company || 'Your Project';
-  // Check multiple possible price fields in pricingBreakdown
   const pricingData = quote?.pricingBreakdown;
   const totalPrice = pricingData?.totalClientPrice || pricingData?.totalPrice || pricingData?.subtotal || quote?.totalPrice || 0;
   const areas = quote?.areas || [];
+  const pricingItems = pricingData?.items || [];
   
-  let areaDetails = '';
+  // Build detailed scope of work table
+  let scopeTableRows = '';
   if (areas.length > 0) {
-    areaDetails = areas.map((area: any, i: number) => {
-      // Handle both squareFeet (string) and sqft (number) field names
+    scopeTableRows = areas.map((area: any, i: number) => {
       const sqft = area.kind === 'landscape' 
         ? Math.round(parseFloat(area.acres || 0) * 43560) 
         : parseInt(area.squareFeet || area.sqft || 0, 10);
-      // Get building type name from ID, fallback to kind
       const buildingTypeName = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.kind || 'Building';
+      const scopeName = SCOPE_NAMES[area.scope] || area.scope || 'Full';
+      const lod = area.lod || '300';
+      const disciplines = (area.disciplines || [])
+        .map((d: string) => DISCIPLINE_NAMES[d] || d)
+        .join(', ') || 'Architecture';
+      
+      // Handle mixed LOD display
+      let lodDisplay = `LOD ${lod}`;
+      if (area.mixedInteriorLod && area.mixedExteriorLod && area.mixedInteriorLod !== area.mixedExteriorLod) {
+        lodDisplay = `Int LOD ${area.mixedInteriorLod} / Ext LOD ${area.mixedExteriorLod}`;
+      }
+      
       return `<tr>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${area.name || `Area ${i + 1}`}</td>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${buildingTypeName}</td>
-        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${sqft > 0 ? sqft.toLocaleString() : '-'} sqft</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+          <strong>${area.name || `Area ${i + 1}`}</strong><br>
+          <span style="color: #6b7280; font-size: 13px;">${buildingTypeName}</span>
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+          ${scopeName}<br>
+          <span style="color: #6b7280; font-size: 13px;">${lodDisplay}</span>
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+          ${disciplines}
+        </td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: right; vertical-align: top;">
+          ${sqft > 0 ? sqft.toLocaleString() : '-'} sqft
+        </td>
       </tr>`;
     }).join('');
   }
   
-  const pricingBreakdown = quote?.pricingBreakdown;
+  // Build pricing breakdown - categorize items
+  const baseItems: any[] = [];
+  const travelItems: any[] = [];
+  const riskItems: any[] = [];
+  const adjustmentItems: any[] = [];
+  
+  pricingItems.forEach((item: any) => {
+    if (item.isTotal) return; // Skip total row
+    const label = (item.label || '').toLowerCase();
+    if (label.includes('travel') || label.includes('mileage')) {
+      travelItems.push(item);
+    } else if (label.includes('risk') || label.includes('premium') || label.includes('occupied') || label.includes('hazardous')) {
+      riskItems.push(item);
+    } else if (label.includes('adjustment') || label.includes('discount')) {
+      adjustmentItems.push(item);
+    } else {
+      baseItems.push(item);
+    }
+  });
+  
+  // Build pricing line items HTML
+  const buildItemRows = (items: any[]) => items.map((item: any) => 
+    `<tr>
+      <td style="padding: 6px 0; border-bottom: 1px solid #f3f4f6;">${item.label}</td>
+      <td style="padding: 6px 0; border-bottom: 1px solid #f3f4f6; text-align: right; font-weight: 500;">${formatCurrency(item.value || 0)}</td>
+    </tr>`
+  ).join('');
+  
+  // Additional services
   let servicesHtml = '';
-  if (pricingBreakdown?.services?.length > 0) {
-    servicesHtml = pricingBreakdown.services.map((svc: any) => 
+  if (pricingData?.services?.length > 0) {
+    servicesHtml = pricingData.services.map((svc: any) => 
       `<li style="margin: 4px 0;">${svc.name}: ${formatCurrency(svc.price)}</li>`
     ).join('');
   }
@@ -76,7 +151,7 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; max-width: 720px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
   <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: white; padding: 32px; border-radius: 12px 12px 0 0;">
     <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700;">Scan2Plan</h1>
     <p style="margin: 0; opacity: 0.9; font-size: 14px;">Precision 3D Laser Scanning & BIM Services</p>
@@ -94,22 +169,59 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
     
     ${areas.length > 0 ? `
     <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Scope of Work</h3>
-    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
       <thead>
         <tr style="background: #f3f4f6;">
-          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Area</th>
-          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Type</th>
+          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Area / Building Type</th>
+          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Scope / LOD</th>
+          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Disciplines</th>
           <th style="padding: 10px 12px; text-align: right; font-weight: 600;">Size</th>
         </tr>
       </thead>
       <tbody>
-        ${areaDetails}
+        ${scopeTableRows}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${baseItems.length > 0 ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Pricing Breakdown</h3>
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+      <tbody>
+        ${buildItemRows(baseItems)}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${travelItems.length > 0 ? `
+    <h4 style="color: #6b7280; margin: 16px 0 8px 0; font-size: 14px;">Travel</h4>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <tbody>
+        ${buildItemRows(travelItems)}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${riskItems.length > 0 ? `
+    <h4 style="color: #6b7280; margin: 16px 0 8px 0; font-size: 14px;">Risk Premiums</h4>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <tbody>
+        ${buildItemRows(riskItems)}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${adjustmentItems.length > 0 ? `
+    <h4 style="color: #6b7280; margin: 16px 0 8px 0; font-size: 14px;">Adjustments</h4>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+      <tbody>
+        ${buildItemRows(adjustmentItems)}
       </tbody>
     </table>
     ` : ''}
     
     ${servicesHtml ? `
-    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Services Included</h3>
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Additional Services</h3>
     <ul style="padding-left: 20px; margin: 16px 0;">
       ${servicesHtml}
     </ul>
