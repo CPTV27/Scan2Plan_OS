@@ -4,7 +4,7 @@ import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Search, AlertCircle, Loader2, RefreshCw, ChevronLeft, ChevronRight, DollarSign, Building2, Ruler, FileText, Trash2, Target, Phone, FileCheck, Handshake, Trophy, XCircle, ExternalLink, Link2, Brain, Star, Upload, FileSpreadsheet, Calculator, Briefcase, ShieldCheck, ShieldAlert, ShieldX, ShieldOff, Send, Users } from "lucide-react";
+import { Plus, Search, AlertCircle, Loader2, RefreshCw, ChevronLeft, ChevronRight, DollarSign, Building2, Ruler, FileText, Trash2, Target, Phone, FileCheck, Handshake, Trophy, XCircle, ExternalLink, Link2, Brain, Star, Upload, FileSpreadsheet, Calculator, Briefcase, ShieldCheck, ShieldAlert, ShieldX, ShieldOff, Send, Users, FileDown } from "lucide-react";
 import { AIAssistant } from "@/components/AIAssistant";
 import { AIActions } from "@/components/AIActions";
 import { ResearchButton, IntelligenceBadges } from "@/components/ResearchButton";
@@ -327,15 +327,29 @@ function DealCard({
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={onOpenCPQ}
-            data-testid={`button-open-deal-${lead.id}`}
-          >
-            Open Deal
-          </Button>
+          <div className="flex items-center gap-1">
+            {(lead as any).qboEstimateId && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => window.open(`/api/quickbooks/estimate/${(lead as any).qboEstimateId}/pdf`, '_blank')}
+                data-testid={`button-download-pdf-${lead.id}`}
+                title="Download Estimate PDF"
+              >
+                <FileDown className="w-4 h-4" />
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onOpenCPQ}
+              data-testid={`button-open-deal-${lead.id}`}
+            >
+              Open Deal
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
