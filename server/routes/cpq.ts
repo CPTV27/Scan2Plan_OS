@@ -676,8 +676,8 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         version: input.version,
         clientName: input.clientName,
         projectName: input.projectName,
-        projectAddress: input.projectAddress || lead.projectAddress,
-        totalPrice: input.totalPrice,
+        projectAddress: input.projectAddress || lead.projectAddress || "",
+        totalPrice: String(input.totalPrice),
         areas: input.areas || [],
         pricingBreakdown: input.pricingBreakdown || { totalClientPrice: input.totalPrice },
         travel: input.travel,
@@ -688,7 +688,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         // Store external CPQ reference
         externalCpqId: input.externalQuoteId,
         externalCpqUrl: input.externalQuoteUrl,
-      });
+      } as any);
       
       // Update lead with quote info
       await storage.updateLead(input.leadId, {
