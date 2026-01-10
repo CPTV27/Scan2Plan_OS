@@ -235,7 +235,7 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
         return res.status(404).json({ message: "Lead not found" });
       }
 
-      const quotes = await storage.getQuotesByLeadId(leadId);
+      const quotes = await storage.getCpqQuotesByLead(leadId);
       const latestQuote = quotes.find(q => q.isLatest) || quotes[quotes.length - 1];
 
       if (!latestQuote) {
