@@ -222,6 +222,33 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
     }
   }));
 
+  // Preview proposal HTML without sending
+  app.get("/api/google/gmail/preview-proposal/:leadId", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const leadId = parseInt(req.params.leadId);
+
+      const lead = await storage.getLead(leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const quotes = await storage.getCpqQuotesByLead(leadId);
+      const latestQuote = quotes.find(q => q.isLatest) || quotes[quotes.length - 1];
+
+      if (!latestQuote) {
+        return res.status(400).json({ message: "No quote found for this lead. Please create a quote first." });
+      }
+
+      const htmlBody = generateProposalEmailHtml(lead, latestQuote);
+
+      res.setHeader('Content-Type', 'text/html');
+      res.send(htmlBody);
+    } catch (error: any) {
+      log("ERROR: Proposal preview error - " + (error?.message || error));
+      res.status(500).json({ message: error.message || "Failed to generate proposal preview" });
+    }
+  }));
+
   app.post("/api/google/gmail/send-proposal", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const { leadId, recipientEmail, customSubject } = req.body;

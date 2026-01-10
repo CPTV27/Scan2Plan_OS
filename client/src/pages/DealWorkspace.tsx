@@ -98,7 +98,7 @@ import CPQCalculator from "@/features/cpq/Calculator";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download } from "lucide-react";
+import { Brain, Paperclip, Download, Eye } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
 
 const BUYER_PERSONAS: Record<string, string> = {
@@ -929,22 +929,33 @@ export default function DealWorkspace() {
           {/* QuickBooks Sync Status */}
           <QboEstimateBadge lead={lead} />
           
-          {/* Send Proposal Email - Standalone Button */}
+          {/* Proposal Buttons - Preview and Send */}
           {latestQuote && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
-              disabled={sendProposalMutation.isPending}
-              data-testid="button-send-proposal"
-            >
-              {sendProposalMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Mail className="w-4 h-4 mr-2" />
-              )}
-              Send Proposal
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.open(`/api/google/gmail/preview-proposal/${leadId}`, '_blank')}
+                data-testid="button-preview-proposal"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Preview Proposal
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
+                disabled={sendProposalMutation.isPending}
+                data-testid="button-send-proposal"
+              >
+                {sendProposalMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                Send Proposal
+              </Button>
+            </>
           )}
 
           {/* Delete Button - Standalone with Confirmation */}
