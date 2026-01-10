@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -35,6 +36,7 @@ import {
   Link,
   Loader2,
   PenTool,
+  ChevronDown,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { BoundaryDrawer } from "@/components/BoundaryDrawer";
@@ -2221,12 +2223,64 @@ Thanks!`.trim();
                   <span className="text-sm text-muted-foreground">Subtotal</span>
                   <span className="font-mono">${pricing.subtotal.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Internal Cost</span>
-                  <span className="font-mono text-muted-foreground">
-                    ${pricing.totalUpteamCost.toLocaleString()}
-                  </span>
-                </div>
+                {/* Itemized Internal Costs */}
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <span className="flex items-center gap-1">
+                      <ChevronDown className="w-3 h-3" />
+                      Internal Cost Breakdown
+                    </span>
+                    <span className="font-mono">${pricing.totalUpteamCost.toLocaleString()}</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2 space-y-1 text-xs">
+                    {pricing.disciplineTotals?.architecture > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Architecture</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.architecture * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.mep > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">MEP</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.mep * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.structural > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Structural</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.structural * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.site > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Site</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.site * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.travel > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Travel</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.travel * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.services > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Services</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.services * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {pricing.disciplineTotals?.risk > 0 && (
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-4">Risk Premium</span>
+                        <span className="font-mono">${Math.round(pricing.disciplineTotals.risk * 0.65).toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-muted-foreground pt-1 border-t border-muted">
+                      <span className="pl-4">Overhead (15%)</span>
+                      <span className="font-mono">${Math.round(pricing.totalUpteamCost * 0.15).toLocaleString()}</span>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>

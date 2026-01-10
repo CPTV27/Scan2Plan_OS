@@ -580,7 +580,7 @@ export default function DealWorkspace() {
       notes: "",
       quoteNumber: "",
       timeline: "",
-      paymentTerms: "",
+      paymentTerms: "standard",
       leadSource: "",
       leadPriority: 3,
       contactName: "",
