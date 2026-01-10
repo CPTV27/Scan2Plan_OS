@@ -579,9 +579,32 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   }, [basePricing, priceAdjustmentPercent]);
 
   // Calculate margin status for GM Hard Gate
-  const marginPercent = useMemo(() => calculateMarginPercent(pricing), [pricing]);
-  const marginGateError = useMemo(() => getMarginGateError(pricing), [pricing]);
-  const isMarginBelowGate = !passesMarginGate(pricing);
+  // In Tier A mode, use Tier A pricing for margin gate check
+  const marginPercent = useMemo(() => {
+    if (isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0) {
+      // Tier A margin: (clientPrice - subtotal) / clientPrice * 100
+      return ((tierAPricingResult.clientPrice - tierAPricingResult.subtotal) / tierAPricingResult.clientPrice) * 100;
+    }
+    return calculateMarginPercent(pricing);
+  }, [pricing, isTierA, tierAPricingResult]);
+  
+  const marginGateError = useMemo(() => {
+    if (isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0) {
+      const tierAMarginPercent = ((tierAPricingResult.clientPrice - tierAPricingResult.subtotal) / tierAPricingResult.clientPrice) * 100;
+      if (tierAMarginPercent >= FY26_GOALS.MARGIN_FLOOR * 100) return null;
+      return `Margin below ${(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% Governance Gate.`;
+    }
+    return getMarginGateError(pricing);
+  }, [pricing, isTierA, tierAPricingResult]);
+  
+  const isMarginBelowGate = useMemo(() => {
+    if (isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0) {
+      // Tier A: check if margin >= 40%
+      const tierAMarginPercent = ((tierAPricingResult.clientPrice - tierAPricingResult.subtotal) / tierAPricingResult.clientPrice) * 100;
+      return tierAMarginPercent < FY26_GOALS.MARGIN_FLOOR * 100;
+    }
+    return !passesMarginGate(pricing);
+  }, [pricing, isTierA, tierAPricingResult]);
   
   // Calculate the minimum adjustment needed to reach 40% margin
   const requiredAdjustmentPercent = useMemo(() => {
