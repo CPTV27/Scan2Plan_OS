@@ -1258,58 +1258,6 @@ export default function DealWorkspace() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="timeline"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Estimated Timeline</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-timeline">
-                                  <SelectValue placeholder="Select timeline" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="1week">~1 Week</SelectItem>
-                                <SelectItem value="2weeks">~2 Weeks</SelectItem>
-                                <SelectItem value="3weeks">~3 Weeks</SelectItem>
-                                <SelectItem value="4weeks">~4 Weeks</SelectItem>
-                                <SelectItem value="5weeks">~5 Weeks</SelectItem>
-                                <SelectItem value="6weeks">~6 Weeks</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="paymentTerms"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Payment Terms</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-payment-terms">
-                                  <SelectValue placeholder="Select terms" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="partner">Partner (no hold)</SelectItem>
-                                <SelectItem value="owner">Owner (hold if delay)</SelectItem>
-                                <SelectItem value="net30">Net 30 (+5%)</SelectItem>
-                                <SelectItem value="net60">Net 60 (+10%)</SelectItem>
-                                <SelectItem value="net90">Net 90 (+15%)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
                   </CardContent>
                 </Card>
 
@@ -1426,6 +1374,31 @@ export default function DealWorkspace() {
                           )}
                         />
                       </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="paymentTerms"
+                        render={({ field }) => (
+                          <FormItem className="mt-4">
+                            <FormLabel>Payment Terms</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-terms">
+                                  <SelectValue placeholder="Select terms" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="partner">Partner (no hold)</SelectItem>
+                                <SelectItem value="owner">Owner (hold if delay)</SelectItem>
+                                <SelectItem value="net30">Net 30 (+5%)</SelectItem>
+                                <SelectItem value="net60">Net 60 (+10%)</SelectItem>
+                                <SelectItem value="net90">Net 90 (+15%)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     <FormField
