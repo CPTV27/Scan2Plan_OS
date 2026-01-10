@@ -3,7 +3,7 @@ import {
   leads, projects, fieldNotes, settings, leadResearch, scantechs,
   users, accounts, invoices, internalLoans, vendorPayables, quoteVersions, projectAttachments,
   cpqPricingMatrix, cpqUpteamPricingMatrix, cpqCadPricingMatrix, cpqPricingParameters, cpqQuotes,
-  caseStudies, notifications, dealAttributions, events, eventRegistrations, qbCustomers,
+  caseStudies, notifications, dealAttributions, events, eventRegistrations, qbCustomers, leadDocuments,
   type InsertLead, type InsertProject, type InsertFieldNote, type InsertLeadResearch,
   type Lead, type Project, type FieldNote, type Setting, type LeadResearch, type User, type UserRole,
   type Account, type InsertAccount, type Invoice, type InsertInvoice,
@@ -17,13 +17,15 @@ import {
   type Notification, type InsertNotification,
   type DealAttribution, type InsertDealAttribution,
   type Event, type InsertEvent, type EventRegistration, type InsertEventRegistration,
-  type QbCustomer, type InsertQbCustomer
+  type QbCustomer, type InsertQbCustomer,
+  type LeadDocument, type InsertLeadDocument
 } from "@shared/schema";
-import { eq, desc, and, lt, sql, max, ilike } from "drizzle-orm";
+import { eq, desc, and, lt, sql, max, ilike, isNull, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // Leads
   getLeads(): Promise<Lead[]>;
+  getDeletedLeads(): Promise<Lead[]>;
   getLead(id: number): Promise<Lead | undefined>;
   getLeadByQboInvoiceId(qboInvoiceId: string): Promise<Lead | undefined>;
   getLeadByQboEstimateId(qboEstimateId: string): Promise<Lead | undefined>;
@@ -32,6 +34,8 @@ export interface IStorage {
   getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead>;
+  softDeleteLead(id: number, deletedBy?: string): Promise<Lead>;
+  restoreLead(id: number): Promise<Lead>;
   deleteLead(id: number): Promise<void>;
 
   // Projects
@@ -160,12 +164,30 @@ export interface IStorage {
   searchQbCustomers(query: string): Promise<QbCustomer[]>;
   getQbCustomerByQbId(qbId: string): Promise<QbCustomer | undefined>;
   upsertQbCustomer(customer: InsertQbCustomer): Promise<QbCustomer>;
+
+  // Lead Documents (Files attached to deals)
+  getLeadDocuments(leadId: number): Promise<LeadDocument[]>;
+  getLeadDocument(id: number): Promise<LeadDocument | undefined>;
+  createLeadDocument(doc: InsertLeadDocument): Promise<LeadDocument>;
+  updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument>;
+  deleteLeadDocument(id: number): Promise<void>;
+  getUnmigratedDocuments(leadId: number): Promise<LeadDocument[]>;
 }
 
 export class DatabaseStorage implements IStorage {
   // Leads
   async getLeads(): Promise<Lead[]> {
-    return await db.select().from(leads).orderBy(desc(leads.lastContactDate));
+    // Filter out soft-deleted leads (deletedAt is null = active)
+    return await db.select().from(leads)
+      .where(isNull(leads.deletedAt))
+      .orderBy(desc(leads.lastContactDate));
+  }
+
+  async getDeletedLeads(): Promise<Lead[]> {
+    // Get soft-deleted leads for trash view
+    return await db.select().from(leads)
+      .where(isNotNull(leads.deletedAt))
+      .orderBy(desc(leads.deletedAt));
   }
 
   async getLead(id: number): Promise<Lead | undefined> {
@@ -227,6 +249,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(leads.id, id))
       .returning();
     return updated;
+  }
+
+  async softDeleteLead(id: number, deletedBy?: string): Promise<Lead> {
+    const [deleted] = await db.update(leads)
+      .set({ deletedAt: new Date(), deletedBy: deletedBy || null })
+      .where(eq(leads.id, id))
+      .returning();
+    return deleted;
+  }
+
+  async restoreLead(id: number): Promise<Lead> {
+    const [restored] = await db.update(leads)
+      .set({ deletedAt: null, deletedBy: null })
+      .where(eq(leads.id, id))
+      .returning();
+    return restored;
   }
 
   async deleteLead(id: number): Promise<void> {
@@ -923,6 +961,44 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(qbCustomers).values(customer).returning();
       return created;
     }
+  }
+
+  // Lead Documents
+  async getLeadDocuments(leadId: number): Promise<LeadDocument[]> {
+    return await db.select().from(leadDocuments)
+      .where(eq(leadDocuments.leadId, leadId))
+      .orderBy(desc(leadDocuments.uploadedAt));
+  }
+
+  async getLeadDocument(id: number): Promise<LeadDocument | undefined> {
+    const [doc] = await db.select().from(leadDocuments).where(eq(leadDocuments.id, id));
+    return doc;
+  }
+
+  async createLeadDocument(doc: InsertLeadDocument): Promise<LeadDocument> {
+    const [created] = await db.insert(leadDocuments).values(doc).returning();
+    return created;
+  }
+
+  async updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> {
+    const [updated] = await db.update(leadDocuments)
+      .set(updates)
+      .where(eq(leadDocuments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLeadDocument(id: number): Promise<void> {
+    await db.delete(leadDocuments).where(eq(leadDocuments.id, id));
+  }
+
+  async getUnmigratedDocuments(leadId: number): Promise<LeadDocument[]> {
+    return await db.select().from(leadDocuments)
+      .where(and(
+        eq(leadDocuments.leadId, leadId),
+        isNull(leadDocuments.movedToDriveAt)
+      ))
+      .orderBy(leadDocuments.uploadedAt);
   }
 }
 

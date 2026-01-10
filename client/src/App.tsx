@@ -31,6 +31,7 @@ import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
 import ProposalVault from "@/pages/ProposalVault";
 import BrandGenerator from "@/pages/BrandGenerator";
+import Trash from "@/pages/Trash";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -75,6 +76,11 @@ function Router() {
       <Route path="/sales">
         <RoleGuard allowedRoles={["ceo", "sales"]}>
           <Sales />
+        </RoleGuard>
+      </Route>
+      <Route path="/sales/trash">
+        <RoleGuard allowedRoles={["ceo", "sales"]}>
+          <Trash />
         </RoleGuard>
       </Route>
       <Route path="/sales/calculator">

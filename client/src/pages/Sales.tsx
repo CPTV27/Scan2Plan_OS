@@ -706,6 +706,13 @@ export default function Sales() {
                   <FileText className="w-4 h-4 mr-2" /> Import PDFs
                 </Button>
                 <GHLImport />
+                <Button 
+                  variant="ghost"
+                  onClick={() => navigate("/sales/trash")}
+                  data-testid="button-view-trash"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Trash
+                </Button>
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                   <DialogTrigger asChild>
                     <Button data-testid="button-new-lead">

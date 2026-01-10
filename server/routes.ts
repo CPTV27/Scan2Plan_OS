@@ -33,6 +33,7 @@ import { registerAIRoutes } from "./routes/ai";
 import pandaDocRoutes from "./routes/pandadoc";
 import brandEngineRoutes from "./routes/brandEngine";
 import intelligenceRoutes from "./routes/intelligence";
+import { registerDocumentRoutes } from "./routes/documents";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -220,6 +221,7 @@ export async function registerRoutes(
   registerInvoiceRoutes(app);
   registerAirtableRoutes(app);
   registerAIRoutes(app);
+  registerDocumentRoutes(app);
   app.use("/api/pandadoc", pandaDocRoutes);
   app.use("/api/brand", brandEngineRoutes);
   app.use("/api/intelligence", intelligenceRoutes);

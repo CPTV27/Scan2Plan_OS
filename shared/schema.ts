@@ -641,6 +641,9 @@ export const leads = pgTable("leads", {
   // Estimator Card (Required for Tier A deals before proposal)
   estimatorCardId: text("estimator_card_id"), // Google Drive file ID for estimator card PDF
   estimatorCardUrl: text("estimator_card_url"), // Direct URL to estimator card in Drive
+  // Soft Delete (60-day trash can)
+  deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
+  deletedBy: text("deleted_by"), // User ID who deleted the record
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -742,6 +745,33 @@ export const insertLeadResearchSchema = createInsertSchema(leadResearch).omit({
 });
 export type InsertLeadResearch = z.infer<typeof insertLeadResearchSchema>;
 export type LeadResearch = typeof leadResearch.$inferSelect;
+
+// === LEAD DOCUMENTS (Files attached to deals) ===
+export const leadDocuments = pgTable("lead_documents", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(), // File size in bytes
+  storageKey: text("storage_key").notNull(), // Path in local storage or GCS
+  uploadedBy: text("uploaded_by"), // User ID who uploaded
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  // Google Drive migration fields
+  movedToDriveAt: timestamp("moved_to_drive_at"), // When file was moved to Drive
+  driveFileId: text("drive_file_id"), // Google Drive file ID after migration
+  driveFileUrl: text("drive_file_url"), // Direct URL to file in Drive
+});
+
+export const insertLeadDocumentSchema = createInsertSchema(leadDocuments).omit({
+  id: true,
+  uploadedAt: true,
+  movedToDriveAt: true,
+  driveFileId: true,
+  driveFileUrl: true,
+});
+export type InsertLeadDocument = z.infer<typeof insertLeadDocumentSchema>;
+export type LeadDocument = typeof leadDocuments.$inferSelect;
 
 // Regulatory risk item schema for AI-extracted risks
 export const regulatoryRiskSchema = z.object({
@@ -870,7 +900,7 @@ export const projects = pgTable("projects", {
   driveFolderId: text("drive_folder_id"), // Google Drive folder ID for project files
   driveFolderUrl: text("drive_folder_url"), // Direct URL to the Google Drive folder
   driveFolderStatus: text("drive_folder_status").default("pending"), // pending, success, failed
-  driveSubfolders: jsonb("drive_subfolders"), // {fieldCapture, bimProduction, accountingFinancials, clientDeliverables}
+  driveSubfolders: jsonb("drive_subfolders"), // {fieldCapture, bimProduction, accountingFinancials, clientDeliverables, additionalDocuments}
   // Travel-Aware Scheduling
   scanDate: timestamp("scan_date"), // Scheduled scan date
   calendarEventId: text("calendar_event_id"), // Google Calendar event ID
@@ -958,6 +988,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
     bimProduction: z.string(),
     accountingFinancials: z.string(),
     clientDeliverables: z.string(),
+    additionalDocuments: z.string().optional(),
   }).optional(),
   chatSpaceId: z.string().optional(),
   chatSpaceUrl: z.string().optional(),

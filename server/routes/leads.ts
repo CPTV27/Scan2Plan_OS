@@ -6,7 +6,8 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { generateUniversalProjectId, generateClientCode, generateUPID } from "@shared/utils/projectId";
 import { enrichLeadWithGoogleIntel } from "../google-intel";
-import { isGoogleDriveConnected, createProjectFolder } from "../googleDrive";
+import { isGoogleDriveConnected, createProjectFolder, uploadFileToDrive } from "../googleDrive";
+import path from "path";
 import { log } from "../lib/logger";
 import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
 import { TIER_A_THRESHOLD } from "@shared/schema";
@@ -257,7 +258,27 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     }
   }));
 
+  // Soft delete a lead (moves to trash for 60 days)
   app.delete(api.leads.delete.path, isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const user = req.user as any;
+    const lead = await storage.softDeleteLead(Number(req.params.id), user?.id);
+    res.json(lead);
+  }));
+
+  // Get trash (soft-deleted leads)
+  app.get("/api/leads/trash", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (_req, res) => {
+    const deletedLeads = await storage.getDeletedLeads();
+    res.json(deletedLeads);
+  }));
+
+  // Restore a soft-deleted lead
+  app.patch("/api/leads/:id/restore", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const lead = await storage.restoreLead(Number(req.params.id));
+    res.json(lead);
+  }));
+
+  // Permanently delete a lead (for trash cleanup)
+  app.delete("/api/leads/:id/permanent", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     await storage.deleteLead(Number(req.params.id));
     res.status(204).send();
   }));
@@ -349,6 +370,41 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
           } as any);
           
           log(`Auto-created production project for lead ${leadId} (${lead.clientName}) with UPID: ${universalProjectId}`);
+          
+          // Migrate lead documents to Google Drive "Additional Documents" folder
+          if (driveFolderStatus === "success" && driveSubfolders?.additionalDocuments) {
+            try {
+              const documents = await storage.getLeadDocuments(leadId);
+              for (const doc of documents) {
+                if (!doc.movedToDriveAt && doc.storageKey) {
+                  try {
+                    const storagePath = path.join(process.cwd(), doc.storageKey);
+                    if (fs.existsSync(storagePath)) {
+                      const fileBuffer = fs.readFileSync(storagePath);
+                      const driveResult = await uploadFileToDrive(
+                        driveSubfolders.additionalDocuments,
+                        doc.originalName,
+                        doc.mimeType,
+                        fileBuffer
+                      );
+                      
+                      await storage.updateLeadDocument(doc.id, {
+                        movedToDriveAt: new Date(),
+                        driveFileId: driveResult.fileId,
+                        driveFileUrl: driveResult.webViewLink,
+                      });
+                      
+                      log(`Migrated document "${doc.originalName}" to Google Drive for lead ${leadId}`);
+                    }
+                  } catch (docErr) {
+                    log(`WARN: Failed to migrate document ${doc.id}: ${(docErr as any)?.message}`);
+                  }
+                }
+              }
+            } catch (migrationErr) {
+              log(`WARN: Document migration failed for lead ${leadId}: ${(migrationErr as any)?.message}`);
+            }
+          }
         }
       }
       

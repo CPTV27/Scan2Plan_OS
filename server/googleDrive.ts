@@ -62,6 +62,7 @@ export interface ProjectFolderResult {
     bimProduction: string;
     accountingFinancials: string;
     clientDeliverables: string;
+    additionalDocuments: string;
   };
 }
 
@@ -86,6 +87,7 @@ export async function createProjectFolder(universalProjectId: string): Promise<P
     '02_BIM_Production',
     '03_Accounting_Financials',
     '04_Client_Final_Deliverables',
+    '05_Additional_Documents',
   ];
 
   const subfolderIds: string[] = [];
@@ -130,6 +132,7 @@ export async function createProjectFolder(universalProjectId: string): Promise<P
       bimProduction: subfolderIds[1],
       accountingFinancials: subfolderIds[2],
       clientDeliverables: subfolderIds[3],
+      additionalDocuments: subfolderIds[4],
     },
   };
 }

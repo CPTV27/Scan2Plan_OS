@@ -98,7 +98,8 @@ import CPQCalculator from "@/features/cpq/Calculator";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain } from "lucide-react";
+import { Brain, Paperclip, Download } from "lucide-react";
+import type { LeadDocument } from "@shared/schema";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -432,6 +433,11 @@ export default function DealWorkspace() {
     enabled: !!leadId,
   });
 
+  const { data: documents, isLoading: documentsLoading } = useQuery<LeadDocument[]>({
+    queryKey: ["/api/leads", leadId, "documents"],
+    enabled: !!leadId,
+  });
+
   const latestQuote = quotes?.find((q) => q.isLatest);
   const isCreatingNew = selectedVersionId === 0;
   const currentQuoteId = isCreatingNew ? undefined : (selectedVersionId || latestQuote?.id);
@@ -443,7 +449,11 @@ export default function DealWorkspace() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
-      toast({ title: "Deal Deleted", description: "The deal has been permanently removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads/trash"] });
+      toast({ 
+        title: "Deal Moved to Trash", 
+        description: "The deal has been moved to trash and will be permanently deleted after 60 days." 
+      });
       setLocation("/sales");
     },
     onError: (error: Error) => {
@@ -452,6 +462,43 @@ export default function DealWorkspace() {
         description: error.message || "Failed to delete deal", 
         variant: "destructive" 
       });
+    },
+  });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/leads/${leadId}/documents`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to upload document");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "documents"] });
+      toast({ title: "Document Uploaded", description: "File has been uploaded successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      await apiRequest("DELETE", `/api/documents/${documentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "documents"] });
+      toast({ title: "Document Deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -878,7 +925,63 @@ export default function DealWorkspace() {
           {/* QuickBooks Sync Status */}
           <QboEstimateBadge lead={lead} />
           
-          {/* More Actions Menu with Delete */}
+          {/* Send Proposal Email - Standalone Button */}
+          {latestQuote && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
+              disabled={sendProposalMutation.isPending}
+              data-testid="button-send-proposal"
+            >
+              {sendProposalMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4 mr-2" />
+              )}
+              Send Proposal
+            </Button>
+          )}
+
+          {/* Delete Button - Standalone with Confirmation */}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                data-testid="button-delete-deal"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Move to Trash?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  "{lead.clientName}" will be moved to trash. You can restore it within 60 days. After that, it will be permanently deleted.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteLeadMutation.mutate()}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteLeadMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Move to Trash
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          
+          {/* More Actions Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" data-testid="button-more-actions">
@@ -919,56 +1022,6 @@ export default function DealWorkspace() {
                   Download Estimate PDF
                 </DropdownMenuItem>
               )}
-              {/* Send proposal email - requires quote */}
-              {latestQuote && (
-                <DropdownMenuItem 
-                  onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
-                  disabled={sendProposalMutation.isPending}
-                  data-testid="menu-send-proposal"
-                >
-                  {sendProposalMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Mail className="w-4 h-4 mr-2" />
-                  )}
-                  Send Proposal Email
-                </DropdownMenuItem>
-              )}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem 
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-destructive focus:text-destructive"
-                    data-testid="menu-delete-deal"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Deal
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this deal?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete "{lead.clientName}" and all associated quotes. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteLeadMutation.mutate()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      data-testid="button-confirm-delete"
-                    >
-                      {deleteLeadMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4 mr-2" />
-                      )}
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -997,6 +1050,10 @@ export default function DealWorkspace() {
             <TabsTrigger value="ai" className="gap-2" data-testid="tab-ai-assistant">
               <Brain className="w-4 h-4" />
               AI Assistant
+            </TabsTrigger>
+            <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
+              <Paperclip className="w-4 h-4" />
+              Documents
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1597,6 +1654,125 @@ export default function DealWorkspace() {
           <ScrollArea className="h-full">
             <div className="p-4">
               <DealAIAssistant lead={lead} />
+            </div>
+          </ScrollArea>
+        </TabsContent>
+
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Paperclip className="w-4 h-4" />
+                    Project Documents
+                  </CardTitle>
+                  <CardDescription>
+                    Upload floor plans, pictures, or other files. When this deal closes, files will automatically move to Google Drive.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center border-2 border-dashed border-muted rounded-lg p-6">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Upload floor plans, pictures, or documents</span>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          disabled={uploadDocumentMutation.isPending}
+                          onClick={() => {
+                            const input = document.getElementById('document-upload-input') as HTMLInputElement;
+                            input?.click();
+                          }}
+                          data-testid="button-upload-document"
+                        >
+                          {uploadDocumentMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>Select File</>
+                          )}
+                        </Button>
+                        <input
+                          id="document-upload-input"
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadDocumentMutation.mutate(file);
+                            e.target.value = '';
+                          }}
+                          disabled={uploadDocumentMutation.isPending}
+                          data-testid="input-upload-document"
+                        />
+                      </div>
+                    </div>
+
+                    {documentsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : documents && documents.length > 0 ? (
+                      <div className="space-y-2">
+                        {documents.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                            data-testid={`document-item-${doc.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Paperclip className="w-4 h-4 text-muted-foreground" />
+                              <div>
+                                <p className="text-sm font-medium">{doc.originalName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(doc.size / 1024).toFixed(1)} KB
+                                  {doc.uploadedAt && ` • ${formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true })}`}
+                                </p>
+                              </div>
+                              {doc.movedToDriveAt && (
+                                <Badge variant="secondary" className="text-xs gap-1">
+                                  <ExternalLink className="w-3 h-3" />
+                                  In Drive
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => window.open(`/api/documents/${doc.id}/download`, '_blank')}
+                                data-testid={`button-download-${doc.id}`}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive"
+                                onClick={() => deleteDocumentMutation.mutate(doc.id)}
+                                disabled={deleteDocumentMutation.isPending}
+                                data-testid={`button-delete-document-${doc.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <Paperclip className="w-12 h-12 text-muted-foreground mb-4" />
+                        <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </ScrollArea>
         </TabsContent>
