@@ -2235,7 +2235,7 @@ Thanks!`.trim();
                   <CollapsibleContent className="pt-2 space-y-1 text-xs">
                     {pricing.disciplineTotals?.architecture > 0 && (
                       <div className="flex justify-between text-muted-foreground">
-                        <span className="pl-4">Architecture</span>
+                        <span className="pl-4">Up Team</span>
                         <span className="font-mono">${Math.round(pricing.disciplineTotals.architecture * 0.65).toLocaleString()}</span>
                       </div>
                     )}
