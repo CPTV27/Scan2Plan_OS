@@ -214,6 +214,18 @@ export function registerAIRoutes(app: Express) {
       disciplines = [extractedData.disciplines];
     }
 
+    // Determine area kind based on buildingType (14-15 or legacy identifiers = landscape, others = standard)
+    const buildingType = extractedData.buildingType || "1";
+    // Coerce to string for comparison (handles both numeric and string values)
+    const buildingTypeStr = String(buildingType);
+    const isLandscape = buildingTypeStr === "14" || buildingTypeStr === "15" || 
+                        buildingTypeStr === "landscape_built" || buildingTypeStr === "landscape_natural";
+    const areaKind = isLandscape ? "landscape" : "standard";
+    
+    // Normalize dispatch location to uppercase for legacy system compatibility
+    const rawDispatch = extractedData.dispatchLocation || "WOODSTOCK";
+    const dispatchLocation = typeof rawDispatch === 'string' ? rawDispatch.toUpperCase() : "WOODSTOCK";
+
     // Create quote from extracted data
     const quoteData = {
       leadId: conversation.leadId,
@@ -222,14 +234,14 @@ export function registerAIRoutes(app: Express) {
       areas: [{
         id: "1",
         name: "Area 1",
-        kind: "standard" as const,
-        buildingType: extractedData.buildingType || "1",
+        kind: areaKind as "standard" | "landscape",
+        buildingType,
         squareFeet: extractedData.squareFeet?.toString() || "",
         lod: extractedData.lod || "300",
         scope: extractedData.scope || "full",
         disciplines,
       }],
-      dispatchLocation: extractedData.dispatchLocation || "WOODSTOCK",
+      dispatchLocation,
       notes: extractedData.notes || "",
       status: "draft" as const,
     };

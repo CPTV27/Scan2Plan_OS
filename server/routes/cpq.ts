@@ -63,6 +63,42 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     next();
   };
 
+  // Helper function to normalize quote data before saving
+  // - Converts travel.dispatchLocation to uppercase for legacy system compatibility
+  // - Backfills areas[].kind based on buildingType (14-15 = landscape, others = standard)
+  const normalizeQuoteData = (data: any): any => {
+    const normalized = { ...data };
+    
+    // Normalize travel.dispatchLocation to uppercase (with type guard)
+    if (normalized.travel && typeof normalized.travel.dispatchLocation === 'string') {
+      normalized.travel = {
+        ...normalized.travel,
+        dispatchLocation: normalized.travel.dispatchLocation.toUpperCase(),
+      };
+    }
+    
+    // Also normalize top-level dispatchLocation if present (with type guard)
+    if (typeof normalized.dispatchLocation === 'string') {
+      normalized.dispatchLocation = normalized.dispatchLocation.toUpperCase();
+    }
+    
+    // Backfill areas[].kind based on buildingType
+    if (Array.isArray(normalized.areas)) {
+      normalized.areas = normalized.areas.map((area: any) => {
+        const buildingType = String(area.buildingType || '');
+        // Building types 14 and 15 are landscape types
+        const isLandscape = buildingType === '14' || buildingType === '15' || 
+                           buildingType === 'landscape_built' || buildingType === 'landscape_natural';
+        return {
+          ...area,
+          kind: area.kind || (isLandscape ? 'landscape' : 'standard'),
+        };
+      });
+    }
+    
+    return normalized;
+  };
+
   const cpqSyncSchema = z.object({
     value: z.number().optional(),
     dealStage: z.enum(["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"]).optional(),
@@ -254,8 +290,9 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
   app.post("/api/cpq/quotes", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const user = req.user as any;
+      const normalizedData = normalizeQuoteData(req.body);
       const quote = await storage.createCpqQuote({
-        ...req.body,
+        ...normalizedData,
         createdBy: user?.claims?.email || user?.username || "unknown",
       });
       res.status(201).json(quote);
@@ -280,7 +317,8 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
   app.patch("/api/cpq/quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
-      const quote = await storage.updateCpqQuote(quoteId, req.body);
+      const normalizedData = normalizeQuoteData(req.body);
+      const quote = await storage.updateCpqQuote(quoteId, normalizedData);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
       res.json(quote);
     } catch (error) {
@@ -302,13 +340,19 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
 
       const user = req.user as any;
       
-      const projectName = req.body.projectName || lead.projectName || lead.clientName || `Project-${leadId}`;
-      const projectAddress = req.body.projectAddress || lead.projectAddress || "Address not specified";
-      const typeOfBuilding = req.body.typeOfBuilding || lead.buildingType || "1";
-      const dispatchLocation = req.body.dispatchLocation || lead.dispatchLocation || "WOODSTOCK";
+      // Normalize quote data (uppercase dispatch locations, backfill area kinds)
+      const normalizedData = normalizeQuoteData(req.body);
+      
+      const projectName = normalizedData.projectName || lead.projectName || lead.clientName || `Project-${leadId}`;
+      const projectAddress = normalizedData.projectAddress || lead.projectAddress || "Address not specified";
+      const typeOfBuilding = normalizedData.typeOfBuilding || lead.buildingType || "1";
+      // Use normalized travel.dispatchLocation or fall back to lead's dispatch location (also uppercase)
+      const dispatchLocation = normalizedData.travel?.dispatchLocation || 
+                              normalizedData.dispatchLocation || 
+                              (lead.dispatchLocation ? lead.dispatchLocation.toUpperCase() : "WOODSTOCK");
       
       const quote = await storage.createCpqQuote({
-        ...req.body,
+        ...normalizedData,
         leadId,
         projectName,
         projectAddress,
@@ -316,7 +360,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         dispatchLocation,
         createdBy: user?.claims?.email || user?.username || "unknown",
       });
-      log(`[CPQ Quote Create] Success, quoteId: ${quote.id}`);
+      log(`[CPQ Quote Create] Success, quoteId: ${quote.id}, dispatchLocation: ${dispatchLocation}`);
       res.status(201).json(quote);
     } catch (error: any) {
       log("ERROR: [CPQ Quote Create] - " + (error?.message || error));
@@ -350,7 +394,8 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
   app.patch("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const quoteId = Number(req.params.id);
-      const quote = await storage.updateCpqQuote(quoteId, req.body);
+      const normalizedData = normalizeQuoteData(req.body);
+      const quote = await storage.updateCpqQuote(quoteId, normalizedData);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
       res.json(quote);
     } catch (error) {
@@ -676,15 +721,19 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       const buildingTypeId = input.typeOfBuilding 
         || (/^\d+$/.test(lead.buildingType || '') ? lead.buildingType : "1");
       
-      const quote = await storage.createCpqQuote({
+      // Normalize dispatch location to uppercase
+      const dispatchLocation = (lead.dispatchLocation || "WOODSTOCK").toUpperCase();
+      
+      // Build quote data and normalize it
+      const quoteData = normalizeQuoteData({
         leadId: input.leadId,
         quoteNumber: input.quoteNumber,
         versionNumber: input.version,
         clientName: input.clientName,
         projectName: input.projectName,
         projectAddress: input.projectAddress || lead.projectAddress || "Not specified",
-        typeOfBuilding: buildingTypeId, // Must be numeric ID from CPQ payload
-        dispatchLocation: lead.dispatchLocation || "WOODSTOCK",
+        typeOfBuilding: buildingTypeId,
+        dispatchLocation,
         totalPrice: String(input.totalPrice),
         areas: input.areas || [],
         risks: [],
@@ -695,10 +744,11 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         paymentTerms: input.paymentTerms || "standard",
         margin: input.margin,
         createdBy: "external-cpq",
-        // Store external CPQ reference
         externalCpqId: input.externalQuoteId,
         externalCpqUrl: input.externalQuoteUrl,
-      } as any);
+      });
+      
+      const quote = await storage.createCpqQuote(quoteData as any);
       
       // Update lead with quote info
       await storage.updateLead(input.leadId, {
