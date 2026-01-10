@@ -476,6 +476,44 @@ export default function DealWorkspace() {
     },
   });
 
+  const pushToQboMutation = useMutation({
+    mutationFn: async (forceResync: boolean = false) => {
+      if (!latestQuote?.id) throw new Error("No quote to push");
+      const response = await apiRequest("POST", "/api/quickbooks/estimate", {
+        quoteId: latestQuote.id,
+        contactEmail: lead?.contactEmail || lead?.billingContactEmail,
+        forceResync,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to create estimate");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/estimate-url", leadId] });
+      toast({ 
+        title: "Estimate Created", 
+        description: `QuickBooks estimate ${data.estimateNumber} created successfully.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to push to QuickBooks", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Check QuickBooks connection status
+  const { data: qboStatus } = useQuery<{ connected: boolean }>({
+    queryKey: ["/api/quickbooks/estimate-url", leadId],
+    enabled: !!leadId,
+    staleTime: 60000,
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -863,6 +901,27 @@ export default function DealWorkspace() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Push to QuickBooks - show if there's a quote and QBO is connected */}
+              {latestQuote && qboStatus?.connected && (
+                <DropdownMenuItem 
+                  onClick={() => pushToQboMutation.mutate(!!lead.qboEstimateId)}
+                  disabled={pushToQboMutation.isPending}
+                  data-testid="menu-push-to-qbo"
+                >
+                  {pushToQboMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <DollarSign className="w-4 h-4 mr-2" />
+                  )}
+                  {lead.qboEstimateId ? "Re-sync to QuickBooks" : "Push to QuickBooks"}
+                </DropdownMenuItem>
+              )}
+              {latestQuote && !qboStatus?.connected && (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  QuickBooks not connected
+                </DropdownMenuItem>
+              )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <DropdownMenuItem 

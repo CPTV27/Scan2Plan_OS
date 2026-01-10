@@ -114,6 +114,221 @@ export function registerQuickbooksRoutes(app: Express): void {
     }
   }));
 
+  // Create QuickBooks estimate from CPQ quote
+  const createEstimateSchema = z.object({
+    quoteId: z.number().int().positive(),
+    contactEmail: z.string().email().optional(),
+    forceResync: z.boolean().optional().default(false),
+  });
+
+  app.post("/api/quickbooks/estimate", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const parsed = createEstimateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          message: "Invalid request data", 
+          errors: parsed.error.errors 
+        });
+      }
+
+      const { quoteId, contactEmail, forceResync } = parsed.data;
+
+      // Fetch the quote
+      const quote = await storage.getCpqQuote(quoteId);
+      if (!quote) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (!quote.leadId) {
+        return res.status(400).json({ message: "Quote is not linked to a lead" });
+      }
+
+      // Fetch the lead
+      const lead = await storage.getLead(quote.leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      // Check if already synced (unless force resync)
+      if (lead.qboEstimateId && !forceResync) {
+        return res.status(409).json({ 
+          message: "Estimate already exists in QuickBooks", 
+          estimateId: lead.qboEstimateId,
+          estimateNumber: lead.qboEstimateNumber,
+        });
+      }
+
+      // Check QuickBooks connection
+      const isConnected = await quickbooksClient.isConnected();
+      if (!isConnected) {
+        return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
+      }
+
+      // Transform CPQ quote pricing_breakdown into line items for QuickBooks
+      const lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number; discipline?: string }> = [];
+      const pricingBreakdown = quote.pricingBreakdown as any;
+      const areas = quote.areas as any[];
+
+      // Add area-based line items from pricing breakdown (areaBreakdown is the actual field name)
+      const areaBreakdown = pricingBreakdown?.areaBreakdown || pricingBreakdown?.areas || [];
+      if (Array.isArray(areaBreakdown)) {
+        for (const area of areaBreakdown) {
+          const areaName = area.name || area.label || `Area ${area.id}`;
+          const price = Number(area.price || area.subtotal || area.total || 0);
+          
+          // Get disciplines from the matching area in quote.areas
+          const areaConfig = areas?.find(a => a.name === area.name || a.id === area.id);
+          const disciplines = areaConfig?.disciplines as string[] || [];
+          const primaryDiscipline = disciplines[0]; // Use first discipline as primary
+          
+          if (price > 0 && !isNaN(price)) {
+            lineItems.push({
+              description: `${areaName}${disciplines.length > 0 ? ` (${disciplines.join(', ')})` : ''}`,
+              quantity: 1,
+              unitPrice: price,
+              amount: price,
+              discipline: primaryDiscipline,
+            });
+          }
+        }
+      }
+
+      // Add travel cost from pricing breakdown or quote.travel
+      const travelCost = Number(pricingBreakdown?.travelCost || 0);
+      const travel = quote.travel as any;
+      if (travelCost > 0 && !isNaN(travelCost)) {
+        lineItems.push({
+          description: `Travel - ${travel?.distance || 0} miles from ${travel?.dispatchLocation || 'Office'}`,
+          quantity: 1,
+          unitPrice: travelCost,
+          amount: travelCost,
+        });
+      } else if (travel?.total && Number(travel.total) > 0) {
+        const travelAmount = Number(travel.total);
+        if (!isNaN(travelAmount)) {
+          lineItems.push({
+            description: `Travel - ${travel.distance || 0} miles from ${travel.dispatchLocation || 'Office'}`,
+            quantity: 1,
+            unitPrice: travelAmount,
+            amount: travelAmount,
+          });
+        }
+      }
+
+      // Add additional services if present
+      const services = quote.services as any[];
+      if (services && Array.isArray(services)) {
+        for (const service of services) {
+          const serviceAmount = Number(service.price || service.amount || 0);
+          if (serviceAmount > 0 && !isNaN(serviceAmount)) {
+            const quantity = Number(service.quantity) || 1;
+            lineItems.push({
+              description: service.label || service.name || 'Additional Service',
+              quantity: quantity,
+              unitPrice: serviceAmount / quantity,
+              amount: serviceAmount,
+            });
+          }
+        }
+      }
+
+      // Fallback: If no line items from breakdown, use total price as single line
+      if (lineItems.length === 0 && quote.totalPrice) {
+        const totalPrice = Number(quote.totalPrice);
+        if (!isNaN(totalPrice) && totalPrice > 0) {
+          lineItems.push({
+            description: quote.projectName || 'Professional Services',
+            quantity: 1,
+            unitPrice: totalPrice,
+            amount: totalPrice,
+          });
+        }
+      }
+
+      // Validate we have at least one valid line item
+      if (lineItems.length === 0) {
+        return res.status(400).json({ message: "No valid line items could be extracted from the quote" });
+      }
+
+      // Reconcile line items with CPQ total - add adjustment if there's a difference
+      const quoteTotalPrice = Number(quote.totalPrice || pricingBreakdown?.totalPrice || 0);
+      const lineItemsTotal = lineItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      
+      if (quoteTotalPrice > 0 && !isNaN(quoteTotalPrice) && !isNaN(lineItemsTotal)) {
+        const difference = Math.round((quoteTotalPrice - lineItemsTotal) * 100) / 100;
+        
+        if (Math.abs(difference) >= 0.01) {
+          // Add adjustment line item to reconcile the total
+          lineItems.push({
+            description: difference > 0 
+              ? 'Project Adjustments (Complexity, LOD, Risk Factors)' 
+              : 'Discount Adjustment',
+            quantity: 1,
+            unitPrice: difference,
+            amount: difference,
+          });
+          log(`[QuickBooks] Added reconciliation adjustment of $${difference.toFixed(2)} to match CPQ total of $${quoteTotalPrice.toFixed(2)}`);
+        }
+      }
+
+      // Create the estimate in QuickBooks
+      const clientName = quote.clientName || lead.clientName || 'Unknown Client';
+      const projectName = quote.projectName || lead.projectName || 'Project';
+      // Better email fallback chain
+      const email = contactEmail || lead.contactEmail || lead.billingContactEmail || (quote as any).billingContactEmail || undefined;
+
+      let result;
+      try {
+        result = await quickbooksClient.createEstimateFromQuote(
+          lead.id,
+          clientName,
+          projectName,
+          lineItems,
+          email
+        );
+      } catch (qbError: any) {
+        log(`ERROR: [QuickBooks] Failed to create estimate for lead ${lead.id}: ${qbError.message}`);
+        throw qbError; // Re-throw to be caught by outer handler
+      }
+
+      // Update lead with QuickBooks IDs - this must succeed to prevent duplicates
+      try {
+        await storage.updateLead(lead.id, {
+          qboEstimateId: result.estimateId,
+          qboEstimateNumber: result.estimateNumber,
+          qboCustomerId: result.customerId,
+          qboSyncedAt: new Date(),
+        });
+      } catch (updateError: any) {
+        log(`ERROR: [QuickBooks] Created estimate ${result.estimateNumber} but failed to update lead ${lead.id}: ${updateError.message}`);
+        // Return partial success with estimate info so user can manually update or retry with forceResync
+        return res.status(500).json({
+          message: `Estimate ${result.estimateNumber} created in QuickBooks but failed to save to local database. Use Re-sync option to retry.`,
+          estimateId: result.estimateId,
+          estimateNumber: result.estimateNumber,
+          partialSuccess: true,
+        });
+      }
+
+      log(`[QuickBooks] Created estimate ${result.estimateNumber} for lead ${lead.id} from quote ${quoteId}`);
+
+      res.json({
+        message: "Estimate created successfully",
+        estimateId: result.estimateId,
+        estimateNumber: result.estimateNumber,
+        customerId: result.customerId,
+      });
+    } catch (error: any) {
+      log("ERROR: [QuickBooks] Create estimate error - " + error.message);
+      const errorMessage = error.message || "Failed to create estimate";
+      if (errorMessage.includes("401") || errorMessage.includes("expired") || errorMessage.includes("not connected")) {
+        res.status(401).json({ message: "QuickBooks authentication expired. Please reconnect.", needsReauth: true });
+      } else {
+        res.status(500).json({ message: errorMessage });
+      }
+    }
+  }));
+
   app.get("/api/quickbooks/accounts", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       const accounts = await quickbooksClient.getAccounts();
