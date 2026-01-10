@@ -677,18 +677,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCpqQuote(insertQuote: InsertCpqQuote): Promise<CpqQuote> {
-    const quoteNumber = `Q${Date.now()}`;
+    // Use provided quoteNumber or generate a new one (check undefined explicitly for empty string support)
+    const quoteNumber = insertQuote.quoteNumber !== undefined && insertQuote.quoteNumber !== '' 
+      ? insertQuote.quoteNumber 
+      : `Q${Date.now()}`;
     
-    // Auto-determine version number based on leadId
-    let versionNumber = 1;
+    // Check if versionNumber was explicitly provided
+    const providedVersionNumber = (insertQuote as any).versionNumber;
+    let versionNumber = providedVersionNumber ?? 1;
+    let shouldBeLatest = true;
+    
     if (insertQuote.leadId) {
       const existingQuotes = await db.select().from(cpqQuotes)
         .where(eq(cpqQuotes.leadId, insertQuote.leadId));
-      const maxVersion = Math.max(...existingQuotes.map(q => q.versionNumber), 0);
-      versionNumber = maxVersion + 1;
       
-      // Mark all previous versions for this lead as not latest
-      if (existingQuotes.length > 0) {
+      const maxVersion = Math.max(...existingQuotes.map(q => q.versionNumber), 0);
+      
+      // Only auto-increment if no version was provided
+      if (providedVersionNumber === undefined || providedVersionNumber === null) {
+        versionNumber = maxVersion + 1;
+      }
+      
+      // Only mark as latest if this version is strictly greater than current max
+      // or if there are no existing quotes (maxVersion is 0)
+      shouldBeLatest = maxVersion === 0 || versionNumber > maxVersion;
+      
+      // Only update isLatest flags if this will be the new latest
+      if (shouldBeLatest && existingQuotes.length > 0) {
         await db.update(cpqQuotes)
           .set({ isLatest: false })
           .where(eq(cpqQuotes.leadId, insertQuote.leadId));
@@ -699,7 +714,7 @@ export class DatabaseStorage implements IStorage {
       ...insertQuote,
       quoteNumber,
       versionNumber,
-      isLatest: true,
+      isLatest: shouldBeLatest,
     }).returning();
     return quote;
   }

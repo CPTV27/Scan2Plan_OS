@@ -632,6 +632,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     projectName: z.string(),
     projectAddress: z.string().optional(),
     totalPrice: z.number(),
+    typeOfBuilding: z.string().optional(), // Numeric building type ID from CPQ
     areas: z.array(z.object({
       name: z.string(),
       buildingType: z.string(),
@@ -670,20 +671,29 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       }
       
       // Create a quote in the CRM from external CPQ data
+      // Provide defaults for required cpqQuotes fields
+      // typeOfBuilding: prefer CPQ payload, then lead if numeric, else default "1"
+      const buildingTypeId = input.typeOfBuilding 
+        || (/^\d+$/.test(lead.buildingType || '') ? lead.buildingType : "1");
+      
       const quote = await storage.createCpqQuote({
         leadId: input.leadId,
         quoteNumber: input.quoteNumber,
-        version: input.version,
+        versionNumber: input.version,
         clientName: input.clientName,
         projectName: input.projectName,
-        projectAddress: input.projectAddress || lead.projectAddress || "",
+        projectAddress: input.projectAddress || lead.projectAddress || "Not specified",
+        typeOfBuilding: buildingTypeId, // Must be numeric ID from CPQ payload
+        dispatchLocation: lead.dispatchLocation || "WOODSTOCK",
         totalPrice: String(input.totalPrice),
         areas: input.areas || [],
+        risks: [],
+        services: {},
+        scopingMode: false,
         pricingBreakdown: input.pricingBreakdown || { totalClientPrice: input.totalPrice },
         travel: input.travel,
         paymentTerms: input.paymentTerms || "standard",
         margin: input.margin,
-        status: input.status || "draft",
         createdBy: "external-cpq",
         // Store external CPQ reference
         externalCpqId: input.externalQuoteId,

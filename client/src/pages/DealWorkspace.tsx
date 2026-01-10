@@ -1607,6 +1607,11 @@ export default function DealWorkspace() {
                                   Current
                                 </Badge>
                               )}
+                              {(quote as any).createdBy === "external-cpq" && (
+                                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+                                  External CPQ
+                                </Badge>
+                              )}
                               {quote.versionName && (
                                 <span className="text-muted-foreground text-sm">
                                   ({quote.versionName})
@@ -1628,10 +1633,22 @@ export default function DealWorkspace() {
                                 ${Number(quote.totalPrice).toLocaleString()}
                               </span>
                             )}
-                            {quote.createdBy && (
+                            {quote.createdBy && quote.createdBy !== "external-cpq" && (
                               <span className="text-muted-foreground">
                                 by {quote.createdBy}
                               </span>
+                            )}
+                            {(quote as any).externalCpqUrl && (
+                              <a
+                                href={(quote as any).externalCpqUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                View in CPQ
+                              </a>
                             )}
                           </div>
                           {/* Show cost breakdown - Tier A or Standard pricing */}

@@ -1519,6 +1519,10 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   clientTokenExpiresAt: timestamp("client_token_expires_at"),
   clientStatus: text("client_status").default("pending"),
   
+  // External CPQ Integration
+  externalCpqId: text("external_cpq_id"),
+  externalCpqUrl: text("external_cpq_url"),
+  
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
