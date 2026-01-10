@@ -94,7 +94,6 @@ import type { Lead, CpqQuote, DealAttribution } from "@shared/schema";
 import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD } from "@shared/schema";
 import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
-import CPQCalculator from "@/features/cpq/Calculator";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
@@ -417,9 +416,16 @@ export default function DealWorkspace() {
   const params = useParams<{ id: string }>();
   const leadId = Number(params.id);
   const [, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState("lead");
-  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    const validTabs = ["lead", "history", "ai", "documents"];
+    return validTabs.includes("lead") ? "lead" : "lead";
+  });
   const { toast } = useToast();
+  
+  const handleTabChange = (value: string) => {
+    const validTabs = ["lead", "history", "ai", "documents"];
+    setActiveTab(validTabs.includes(value) ? value : "lead");
+  };
   const queryClient = useQueryClient();
   const updateMutation = useUpdateLead();
 
@@ -439,8 +445,6 @@ export default function DealWorkspace() {
   });
 
   const latestQuote = quotes?.find((q) => q.isLatest);
-  const isCreatingNew = selectedVersionId === 0;
-  const currentQuoteId = isCreatingNew ? undefined : (selectedVersionId || latestQuote?.id);
 
 
   const deleteLeadMutation = useMutation({
@@ -776,6 +780,31 @@ export default function DealWorkspace() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Generate Quote Button - Primary CTA */}
+          <Button
+            size="sm"
+            onClick={() => {
+              const cpqUrl = import.meta.env.VITE_CPQ_BASE_URL || '';
+              if (!cpqUrl) {
+                toast({ title: "Error", description: "CPQ app URL not configured", variant: "destructive" });
+                return;
+              }
+              const returnUrl = encodeURIComponent(window.location.origin + `/deals/${lead.id}`);
+              const params = new URLSearchParams({
+                leadId: String(lead.id),
+                returnUrl,
+                company: lead.clientName || '',
+                project: lead.projectName || '',
+                address: lead.projectAddress || '',
+              });
+              window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
+            }}
+            data-testid="button-generate-quote"
+          >
+            <Calculator className="w-4 h-4 mr-2" />
+            Generate Quote
+          </Button>
+          
           {/* Evidence Vault Button - Purple */}
           <Button
             size="sm"
@@ -1037,44 +1066,17 @@ export default function DealWorkspace() {
                   Download Estimate PDF
                 </DropdownMenuItem>
               )}
-              {/* Open in External CPQ */}
-              <DropdownMenuItem
-                onClick={() => {
-                  const cpqUrl = import.meta.env.VITE_CPQ_BASE_URL || '';
-                  if (!cpqUrl) {
-                    toast({ title: "Error", description: "CPQ app URL not configured", variant: "destructive" });
-                    return;
-                  }
-                  const returnUrl = encodeURIComponent(window.location.origin + `/deals/${lead.id}`);
-                  const params = new URLSearchParams({
-                    leadId: String(lead.id),
-                    returnUrl,
-                    company: lead.clientName || '',
-                    project: lead.projectName || '',
-                    address: lead.projectAddress || '',
-                  });
-                  window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
-                }}
-                data-testid="menu-open-external-cpq"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open in External CPQ
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </header>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden">
         <div className="border-b px-4 bg-card/30">
           <TabsList className="h-11 bg-transparent">
             <TabsTrigger value="lead" className="gap-2" data-testid="tab-lead">
               <FileText className="w-4 h-4" />
               Lead Details
-            </TabsTrigger>
-            <TabsTrigger value="quote" className="gap-2" data-testid="tab-quote">
-              <Calculator className="w-4 h-4" />
-              Quote Builder
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2" data-testid="tab-history">
               <History className="w-4 h-4" />
@@ -1508,64 +1510,6 @@ export default function DealWorkspace() {
           </ScrollArea>
         </TabsContent>
 
-        {/* Quote Builder Tab */}
-        <TabsContent value="quote" className="flex-1 overflow-hidden m-0">
-          <div className="h-full flex flex-col">
-            {quotes && quotes.length > 0 && (
-              <div className="flex items-center gap-4 px-4 py-2 bg-muted/30 border-b">
-                <span className="text-sm font-medium">Version:</span>
-                <Select
-                  value={isCreatingNew ? "new" : (currentQuoteId?.toString() || "")}
-                  onValueChange={(val) => {
-                    if (val === "new") {
-                      setSelectedVersionId(0);
-                    } else {
-                      setSelectedVersionId(Number(val));
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-64" data-testid="select-version">
-                    <SelectValue placeholder="Select version" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new" data-testid="select-version-new">
-                      <div className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        <span>Create New Version</span>
-                      </div>
-                    </SelectItem>
-                    {quotes.map((q) => (
-                      <SelectItem key={q.id} value={q.id.toString()} data-testid={`select-version-${q.id}`}>
-                        <div className="flex items-center gap-2">
-                          <span>v{q.versionNumber}</span>
-                          {q.isLatest && <Badge variant="secondary" className="text-[10px]">Latest</Badge>}
-                          <span className="text-muted-foreground text-xs">
-                            {q.createdAt && formatDistanceToNow(new Date(q.createdAt), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <ScrollArea className="flex-1">
-              {quotesLoading ? (
-                <div className="flex items-center justify-center h-64">
-                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <CPQCalculator
-                  key={currentQuoteId || "new"}
-                  leadId={leadId}
-                  quoteId={currentQuoteId}
-                  onClose={() => setLocation("/sales")}
-                />
-              )}
-            </ScrollArea>
-          </div>
-        </TabsContent>
-
         {/* Version History Tab */}
         <TabsContent value="history" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full">
@@ -1590,13 +1534,9 @@ export default function DealWorkspace() {
                       {quotes.map((quote) => (
                         <div
                           key={quote.id}
-                          className={`p-4 rounded-lg border transition-colors hover-elevate cursor-pointer ${
-                            currentQuoteId === quote.id ? "border-primary bg-primary/10" : quote.isLatest ? "border-primary/50 bg-primary/5" : "border-border"
+                          className={`p-4 rounded-lg border transition-colors ${
+                            quote.isLatest ? "border-primary/50 bg-primary/5" : "border-border"
                           }`}
-                          onClick={() => {
-                            setSelectedVersionId(quote.id);
-                            setActiveTab("quote");
-                          }}
                           data-testid={`version-card-${quote.id}`}
                         >
                           <div className="flex items-center justify-between gap-4 mb-2">

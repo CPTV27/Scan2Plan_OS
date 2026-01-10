@@ -167,13 +167,13 @@ function DealCard({
   return (
     <Card 
       className={clsx(
-        "mb-3 border-l-4 transition-all",
+        "mb-3 border-l-4 transition-all overflow-hidden",
         STAGE_COLORS[lead.dealStage as Stage] || "border-l-muted",
         isHighValue && "ring-1 ring-yellow-500/50"
       )}
       data-testid={`card-deal-${lead.id}`}
     >
-      <CardContent className="p-3 space-y-2">
+      <CardContent className="p-3 space-y-2 overflow-hidden">
         <div className="flex items-start justify-between gap-2">
           {onToggleSelect && (
             <Checkbox
@@ -204,8 +204,8 @@ function DealCard({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1.5 overflow-hidden">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <DollarSign className="w-3 h-3 text-muted-foreground" />
             <span className={clsx(
               "text-sm font-mono",
@@ -214,7 +214,7 @@ function DealCard({
               {Number(lead.value).toLocaleString()}
             </span>
           </div>
-          <div className="flex items-center gap-0.5" title={`Priority: ${lead.leadPriority || 3}/5`}>
+          <div className="flex items-center gap-0.5 flex-shrink-0" title={`Priority: ${lead.leadPriority || 3}/5`}>
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className={clsx(
                 "w-3 h-3",
@@ -229,7 +229,7 @@ function DealCard({
           {lead.leadSource && (
             <Badge 
               variant="secondary" 
-              className="text-xs"
+              className="text-xs flex-shrink-0 max-w-[80px] truncate"
               data-testid={`badge-source-${lead.id}`}
             >
               {lead.leadSource}
@@ -239,21 +239,21 @@ function DealCard({
         </div>
 
         {(lead.sqft || lead.buildingType || lead.scope) && (
-          <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground overflow-hidden">
             {lead.sqft && (
-              <span className="flex items-center gap-0.5">
+              <span className="flex items-center gap-0.5 flex-shrink-0">
                 <Ruler className="w-3 h-3" />
                 {lead.sqft.toLocaleString()} sqft
               </span>
             )}
             {lead.buildingType && (
-              <span className="flex items-center gap-0.5">
-                <Building2 className="w-3 h-3" />
-                {lead.buildingType.split(' / ')[0]}
+              <span className="flex items-center gap-0.5 flex-shrink-0 max-w-[100px] truncate">
+                <Building2 className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{lead.buildingType.split(' / ')[0]}</span>
               </span>
             )}
             {lead.scope && (
-              <Badge variant="secondary" className="text-xs px-1 py-0">
+              <Badge variant="secondary" className="text-xs px-1 py-0 flex-shrink-0">
                 {lead.scope}
               </Badge>
             )}
@@ -268,12 +268,12 @@ function DealCard({
         )}
 
         {lead.quoteUrl && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap overflow-hidden">
             <a 
               href={lead.quoteUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-primary hover:underline"
+              className="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
               data-testid={`link-quote-${lead.id}`}
             >
               <Link2 className="w-3 h-3" />
@@ -282,7 +282,7 @@ function DealCard({
             {lead.quoteVersion && (
               <Badge 
                 variant="outline" 
-                className="text-xs font-mono"
+                className="text-xs font-mono flex-shrink-0"
                 data-testid={`badge-version-${lead.id}`}
               >
                 V{lead.quoteVersion}
@@ -301,8 +301,8 @@ function DealCard({
           </p>
         )}
 
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between gap-1 pt-1 border-t border-border overflow-hidden">
+          <div className="flex items-center gap-0.5 flex-shrink-0">
             <PersonaSelect leadId={lead.id} currentPersona={lead.buyerPersona} />
             <Button
               variant="ghost"
@@ -327,7 +327,7 @@ function DealCard({
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 flex-shrink-0">
             {(lead as any).qboEstimateId && (
               <Button
                 variant="ghost"
@@ -361,18 +361,18 @@ function DealCard({
                 window.open(`${cpqUrl}/calculator/new?${params.toString()}`, '_blank');
               }}
               data-testid={`button-cpq-quote-${lead.id}`}
-              title="Generate Quote in CPQ"
+              title="Generate Quote"
             >
               <Calculator className="w-4 h-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs"
+              className="h-7 text-xs px-2"
               onClick={onOpenCPQ}
               data-testid={`button-open-deal-${lead.id}`}
             >
-              Open Deal
+              Open
             </Button>
           </div>
         </div>
