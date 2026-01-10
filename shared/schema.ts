@@ -202,8 +202,8 @@ export type CpqDiscipline = typeof CPQ_DISCIPLINES[number];
 export const CPQ_LOD_VALUES = ["200", "300", "350"] as const;
 export type CpqLodValue = typeof CPQ_LOD_VALUES[number];
 
-// === CPQ SCOPE VALUES ===
-export const CPQ_SCOPE_VALUES = ["full", "interior", "exterior"] as const;
+// === CPQ SCOPE VALUES (aligned with original CPQ) ===
+export const CPQ_SCOPE_VALUES = ["full", "interior", "exterior", "roof", "facade"] as const;
 export type CpqScopeValue = typeof CPQ_SCOPE_VALUES[number];
 
 // === CPQ RISK FACTORS ===
@@ -302,13 +302,14 @@ export interface GoogleIntel {
   travelInsights?: GoogleTravelInsights;
 }
 
-// Payment term percentage adjustments
+// Payment term percentage adjustments (aligned with original CPQ)
+// Positive = surcharge, Negative = discount
 export const CPQ_PAYMENT_TERM_PERCENTAGES: Record<CpqPaymentTerm, number> = {
-  partner: 0,
+  partner: -10,  // 10% discount for partner terms
   owner: 0,
-  net30: 5,
-  net60: 10,
-  net90: 15,
+  net30: 5,      // 5% surcharge
+  net60: 10,     // 10% surcharge
+  net90: 15,     // 15% surcharge
   other: 0,
 };
 

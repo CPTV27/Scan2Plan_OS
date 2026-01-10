@@ -156,6 +156,7 @@ export const SCOPE_OPTIONS = [
   { id: "interior", label: "Interior Only" },
   { id: "exterior", label: "Exterior Only" },
   { id: "roof", label: "Roof & Facades" },
+  { id: "facade", label: "Facade Only (Front/Side)" },
 ];
 
 // Base rates per sqft by building type and discipline (LOD 200)
@@ -184,12 +185,13 @@ const LOD_MULTIPLIERS: Record<string, number> = {
 };
 
 // Scope multipliers (portion of price applied)
-// Scope Discounts: Interior Only = 75% (25% off), Exterior Only = 50% (50% off), Roof = 35% (65% off)
+// ALIGNED WITH ORIGINAL CPQ: Interior=65%, Exterior=35%, Facade=25%
 const SCOPE_MULTIPLIERS: Record<string, { interior: number; exterior: number }> = {
-  full: { interior: 0.7, exterior: 0.3 },       // 100% - full project
-  interior: { interior: 0.75, exterior: 0 },    // 75% - 25% discount for interior only
-  exterior: { interior: 0, exterior: 0.5 },     // 50% - 50% discount for exterior only
-  roof: { interior: 0, exterior: 0.35 },        // 35% - 65% discount for roof/facades only
+  full: { interior: 0.65, exterior: 0.35 },     // 100% - full project (65% interior + 35% exterior)
+  interior: { interior: 0.65, exterior: 0 },    // 65% - interior only scope
+  exterior: { interior: 0, exterior: 0.35 },    // 35% - exterior only scope
+  roof: { interior: 0, exterior: 0.35 },        // 35% - roof/facades scope (same as exterior)
+  facade: { interior: 0, exterior: 0.25 },      // 25% - facade only (front/side facades)
 };
 
 // Area tier breaks for pricing adjustments
@@ -507,13 +509,39 @@ export function calculatePricing(
         upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
       } else {
         const sqft = Math.max(inputValue, 3000);
-        const ratePerSqft = getPricingRate(area.buildingType, sqft, discipline, lod);
         const scopeMultiplier = SCOPE_MULTIPLIERS[scope] || SCOPE_MULTIPLIERS.full;
-        const effectiveMultiplier = scopeMultiplier.interior + scopeMultiplier.exterior;
+        
+        // Check for mixed LOD scenario (separate interior/exterior LODs)
+        const hasInteriorLod = area.mixedInteriorLod || area.interiorLod;
+        const hasExteriorLod = area.mixedExteriorLod || area.exteriorLod;
+        const isMixedLod = hasInteriorLod && hasExteriorLod && hasInteriorLod !== hasExteriorLod;
+        
+        if (isMixedLod && scopeMultiplier.interior > 0 && scopeMultiplier.exterior > 0) {
+          // Mixed LOD: Calculate interior and exterior portions separately
+          const interiorLod = hasInteriorLod || lod;
+          const exteriorLod = hasExteriorLod || lod;
+          
+          const interiorRate = getPricingRate(area.buildingType, sqft, discipline, interiorLod);
+          const exteriorRate = getPricingRate(area.buildingType, sqft, discipline, exteriorLod);
+          
+          const interiorCost = sqft * interiorRate * scopeMultiplier.interior;
+          const exteriorCost = sqft * exteriorRate * scopeMultiplier.exterior;
+          
+          lineTotal = interiorCost + exteriorCost;
+          
+          // Calculate effective per-sqft rate for display
+          const effectiveRate = lineTotal / sqft;
+          areaLabel = `${sqft.toLocaleString()} sqft @ $${effectiveRate.toFixed(3)}/sqft (Int ${interiorLod}/Ext ${exteriorLod})`;
+          upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+        } else {
+          // Single LOD: Use standard calculation
+          const ratePerSqft = getPricingRate(area.buildingType, sqft, discipline, lod);
+          const effectiveMultiplier = scopeMultiplier.interior + scopeMultiplier.exterior;
 
-        lineTotal = sqft * ratePerSqft * effectiveMultiplier;
-        areaLabel = `${sqft.toLocaleString()} sqft`;
-        upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+          lineTotal = sqft * ratePerSqft * effectiveMultiplier;
+          areaLabel = `${sqft.toLocaleString()} sqft`;
+          upteamLineCost = lineTotal * UPTEAM_MULTIPLIER;
+        }
       }
 
       if (lineTotal > 0) {
@@ -726,19 +754,39 @@ export function calculatePricing(
     subtotal = MINIMUM_PROJECT_CHARGE;
   }
 
-  // Payment term adjustments
+  // Payment term adjustments - ALIGNED WITH ORIGINAL CPQ
+  // Partner: -10%, Net30: +5%, Net60: +10%, Net90: +15%
   let paymentAdjustment = 0;
-  if (paymentTerms === "prepaid") {
-    paymentAdjustment = -subtotal * 0.05; // 5% discount for prepaid
+  if (paymentTerms === "partner") {
+    paymentAdjustment = -subtotal * 0.10; // 10% discount for partner terms
     items.push({
-      label: "Prepaid Discount (5%)",
+      label: "Partner Discount (-10%)",
       value: paymentAdjustment,
       isDiscount: true,
     });
-  } else if (paymentTerms === "net60") {
-    paymentAdjustment = subtotal * 0.03; // 3% surcharge for extended terms
+  } else if (paymentTerms === "prepaid") {
+    paymentAdjustment = -subtotal * 0.05; // 5% discount for prepaid
     items.push({
-      label: "Extended Terms Surcharge (3%)",
+      label: "Prepaid Discount (-5%)",
+      value: paymentAdjustment,
+      isDiscount: true,
+    });
+  } else if (paymentTerms === "net30") {
+    paymentAdjustment = subtotal * 0.05; // 5% surcharge for Net 30
+    items.push({
+      label: "Net 30 Terms (+5%)",
+      value: paymentAdjustment,
+    });
+  } else if (paymentTerms === "net60") {
+    paymentAdjustment = subtotal * 0.10; // 10% surcharge for Net 60
+    items.push({
+      label: "Net 60 Terms (+10%)",
+      value: paymentAdjustment,
+    });
+  } else if (paymentTerms === "net90") {
+    paymentAdjustment = subtotal * 0.15; // 15% surcharge for Net 90
+    items.push({
+      label: "Net 90 Terms (+15%)",
       value: paymentAdjustment,
     });
   }

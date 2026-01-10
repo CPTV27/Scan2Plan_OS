@@ -1256,6 +1256,61 @@ Thanks!`.trim();
                             </div>
                           </div>
 
+                          {/* Mixed LOD option - appears for Full scope only */}
+                          {(area.scope === "full" || !area.scope) && (
+                            <Collapsible>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground" data-testid={`toggle-mixed-lod-${kindIndex}`}>
+                                  <span className="text-sm">Mixed LOD (Int/Ext)</span>
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="pt-2">
+                                <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-muted/50">
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Interior LOD</Label>
+                                    <Select 
+                                      value={area.mixedInteriorLod || area.lod || "200"} 
+                                      onValueChange={(v) => updateArea(area.id, "mixedInteriorLod", v)}
+                                    >
+                                      <SelectTrigger data-testid={`select-interior-lod-${kindIndex}`}>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {LOD_OPTIONS.map((lod) => (
+                                          <SelectItem key={lod.id} value={lod.id}>
+                                            {lod.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Exterior LOD</Label>
+                                    <Select 
+                                      value={area.mixedExteriorLod || area.lod || "200"} 
+                                      onValueChange={(v) => updateArea(area.id, "mixedExteriorLod", v)}
+                                    >
+                                      <SelectTrigger data-testid={`select-exterior-lod-${kindIndex}`}>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {LOD_OPTIONS.map((lod) => (
+                                          <SelectItem key={lod.id} value={lod.id}>
+                                            {lod.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <p className="col-span-2 text-xs text-muted-foreground">
+                                    Set different LODs for interior (65%) and exterior (35%) portions
+                                  </p>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          )}
+
                           <div className="space-y-2">
                             <Label>Disciplines</Label>
                             <div className="flex flex-wrap gap-2">

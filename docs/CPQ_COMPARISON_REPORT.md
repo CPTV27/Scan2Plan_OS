@@ -38,13 +38,21 @@ Use this document to validate Scan2Plan-OS CPQ against the original CPQ system. 
 | 300 | 1.3× |
 | 350 | 1.5× |
 
-### Scope Portions
+### Scope Portions (ALIGNED WITH ORIGINAL CPQ)
 | Scope | Portion |
 |-------|---------|
-| Full Building | 100% |
+| Full Building | 100% (65% int + 35% ext) |
 | Interior Only | 65% |
 | Exterior Only | 35% |
 | Roof/Facades | 35% |
+| Facade Only | 25% |
+
+### Mixed LOD Support
+When a Full scope area has different interior and exterior LODs:
+- Interior portion: sqft × base_rate × interior_LOD_multiplier × 0.65
+- Exterior portion: sqft × base_rate × exterior_LOD_multiplier × 0.35
+- Total = Interior + Exterior
+- Effective rate = Total / sqft
 
 ### Special Rules
 - **Minimum sqft floor**: 3,000 sqft (areas < 3k billed as 3k)
@@ -67,14 +75,15 @@ Use this document to validate Scan2Plan-OS CPQ against the original CPQ system. 
 | Matterport | $0.10/sqft |
 | Georeferencing | $500 flat |
 
-### Payment Terms
+### Payment Terms (ALIGNED WITH ORIGINAL CPQ)
 | Terms | Adjustment |
 |-------|------------|
-| Due on Receipt | 0% |
-| Net 15 | 0% |
+| Standard/Due on Receipt | 0% |
+| Prepaid | -5% |
+| Partner | **-10%** |
 | Net 30 | +5% |
 | Net 60 | +10% |
-| Partner | -10% |
+| Net 90 | +15% |
 
 ---
 
