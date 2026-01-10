@@ -9,7 +9,9 @@ import { log } from "../lib/logger";
 
 export async function registerCpqRoutes(app: Express): Promise<void> {
   const CPQ_API_KEY = process.env.CPQ_API_KEY;
+  const CRM_API_KEY = process.env.CRM_API_KEY;
   
+  // Middleware for internal CPQ calls (CRM → CPQ direction)
   const verifyCpqAuth = (req: any, res: any, next: any) => {
     if (!CPQ_API_KEY) {
       log("WARN: CPQ_API_KEY not configured - CPQ endpoints disabled");
@@ -27,6 +29,34 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     
     const token = authHeader.substring(7);
     if (token !== CPQ_API_KEY) {
+      return res.status(403).json({ message: "Invalid API key" });
+    }
+    
+    next();
+  };
+  
+  // Middleware for external CPQ app calls (CPQ → CRM direction)
+  const verifyCrmApiKey = (req: any, res: any, next: any) => {
+    if (!CRM_API_KEY) {
+      log("WARN: CRM_API_KEY not configured - external CPQ integration disabled");
+      return res.status(503).json({ 
+        message: "CRM API integration not configured. Set CRM_API_KEY environment variable." 
+      });
+    }
+    
+    // Support both x-api-key header and Authorization Bearer
+    const apiKey = req.headers["x-api-key"] || 
+                   (req.headers.authorization?.startsWith("Bearer ") 
+                     ? req.headers.authorization.substring(7) 
+                     : null);
+    
+    if (!apiKey) {
+      return res.status(401).json({ 
+        message: "Missing API key. Use x-api-key header or Authorization: Bearer <CRM_API_KEY>" 
+      });
+    }
+    
+    if (apiKey !== CRM_API_KEY) {
       return res.status(403).json({ message: "Invalid API key" });
     }
     
@@ -540,5 +570,167 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       log("ERROR: Error submitting client answers - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to submit answers" });
     }
+  }));
+
+  // ============================================
+  // EXTERNAL CPQ APP INTEGRATION ENDPOINTS
+  // These endpoints allow an external CPQ application to:
+  // 1. Fetch lead details for pre-filling quotes
+  // 2. POST completed quotes back to the CRM
+  // ============================================
+
+  // GET /api/cpq/leads/:leadId - External CPQ fetches lead details
+  app.get("/api/cpq/leads/:leadId", verifyCrmApiKey, asyncHandler(async (req, res) => {
+    try {
+      const leadId = Number(req.params.leadId);
+      if (isNaN(leadId)) {
+        return res.status(400).json({ message: "Invalid lead ID" });
+      }
+      
+      const lead = await storage.getLead(leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      // Return full lead data for CPQ pre-fill
+      res.json({
+        leadId: lead.id,
+        company: lead.clientName,
+        contactName: lead.contactName,
+        contactEmail: lead.contactEmail,
+        contactPhone: lead.contactPhone,
+        projectName: lead.projectName,
+        projectAddress: lead.projectAddress,
+        buildingType: lead.buildingType,
+        estimatedSqft: lead.sqft,
+        scope: lead.scope,
+        disciplines: lead.disciplines,
+        bimDeliverable: lead.bimDeliverable,
+        dispatchLocation: lead.dispatchLocation,
+        paymentTerms: lead.paymentTerms,
+        timeline: lead.timeline,
+        notes: lead.notes,
+        dealStage: lead.dealStage,
+        value: lead.value,
+        // CRM metadata
+        crmLeadId: lead.id,
+        crmQuoteNumber: lead.quoteNumber,
+        crmQuoteVersion: lead.quoteVersion,
+      });
+    } catch (error) {
+      log("ERROR: External CPQ lead fetch error - " + (error as any)?.message);
+      res.status(500).json({ message: "Failed to fetch lead" });
+    }
+  }));
+
+  // Zod schema for incoming quotes from external CPQ
+  const externalQuoteSchema = z.object({
+    leadId: z.number(),
+    quoteNumber: z.string(),
+    version: z.number().optional().default(1),
+    clientName: z.string(),
+    projectName: z.string(),
+    projectAddress: z.string().optional(),
+    totalPrice: z.number(),
+    areas: z.array(z.object({
+      name: z.string(),
+      buildingType: z.string(),
+      squareFeet: z.number(),
+      scope: z.string(),
+      lod: z.string(),
+      disciplines: z.array(z.string()),
+    })).optional(),
+    pricingBreakdown: z.object({
+      items: z.array(z.object({
+        label: z.string(),
+        value: z.number(),
+      })).optional(),
+      subtotal: z.number().optional(),
+      totalClientPrice: z.number(),
+    }).optional(),
+    travel: z.object({
+      distance: z.number(),
+      cost: z.number(),
+    }).optional(),
+    paymentTerms: z.string().optional(),
+    margin: z.number().optional(),
+    status: z.enum(["draft", "sent", "accepted", "rejected"]).optional(),
+    externalQuoteId: z.string().optional(), // ID from the external CPQ system
+    externalQuoteUrl: z.string().optional(), // URL to view quote in external CPQ
+  });
+
+  // POST /api/cpq/quotes/webhook - External CPQ sends completed quote
+  app.post("/api/cpq/quotes/webhook", verifyCrmApiKey, asyncHandler(async (req, res) => {
+    try {
+      const input = externalQuoteSchema.parse(req.body);
+      
+      const lead = await storage.getLead(input.leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      
+      // Create a quote in the CRM from external CPQ data
+      const quote = await storage.createCpqQuote({
+        leadId: input.leadId,
+        quoteNumber: input.quoteNumber,
+        version: input.version,
+        clientName: input.clientName,
+        projectName: input.projectName,
+        projectAddress: input.projectAddress || lead.projectAddress,
+        totalPrice: input.totalPrice,
+        areas: input.areas || [],
+        pricingBreakdown: input.pricingBreakdown || { totalClientPrice: input.totalPrice },
+        travel: input.travel,
+        paymentTerms: input.paymentTerms || "standard",
+        margin: input.margin,
+        status: input.status || "draft",
+        createdBy: "external-cpq",
+        // Store external CPQ reference
+        externalCpqId: input.externalQuoteId,
+        externalCpqUrl: input.externalQuoteUrl,
+      });
+      
+      // Update lead with quote info
+      await storage.updateLead(input.leadId, {
+        quoteNumber: input.quoteNumber,
+        quoteVersion: input.version,
+        value: input.totalPrice,
+        quoteUrl: input.externalQuoteUrl,
+      });
+      
+      log(`External CPQ quote received for lead ${input.leadId}: ${input.quoteNumber} v${input.version} - $${input.totalPrice}`);
+      
+      res.status(201).json({
+        success: true,
+        quoteId: quote.id,
+        leadId: input.leadId,
+        message: "Quote received and linked to lead",
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid quote data", 
+          errors: error.errors 
+        });
+      }
+      log("ERROR: External CPQ quote webhook error - " + (error as any)?.message);
+      res.status(500).json({ message: "Failed to process quote" });
+    }
+  }));
+
+  // GET /api/cpq/config - Returns CRM configuration for external CPQ
+  app.get("/api/cpq/config", verifyCrmApiKey, asyncHandler(async (req, res) => {
+    res.json({
+      crmName: "Scan2Plan OS",
+      version: "1.0",
+      endpoints: {
+        getLeadDetails: "/api/cpq/leads/:leadId",
+        postQuote: "/api/cpq/quotes/webhook",
+      },
+      supportedFields: {
+        lead: ["leadId", "company", "contactName", "contactEmail", "contactPhone", "projectName", "projectAddress", "buildingType", "estimatedSqft", "scope", "disciplines"],
+        quote: ["leadId", "quoteNumber", "version", "clientName", "projectName", "projectAddress", "totalPrice", "areas", "pricingBreakdown", "travel", "paymentTerms", "margin"],
+      },
+    });
   }));
 }
