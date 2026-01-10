@@ -223,8 +223,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteLead(id: number): Promise<void> {
-    // First delete related research records to satisfy foreign key constraint
+    // Delete all CPQ quotes for this lead (which cascades to PandaDoc documents)
+    const leadQuotes = await this.getCpqQuotesByLead(id);
+    for (const quote of leadQuotes) {
+      await this.deleteCpqQuote(quote.id);
+    }
+    
+    // Delete related records to satisfy foreign key constraints
     await db.delete(leadResearch).where(eq(leadResearch.leadId, id));
+    await db.delete(projects).where(eq(projects.leadId, id));
+    await db.delete(fieldNotes).where(eq(fieldNotes.leadId, id));
+    await db.delete(dealAttributions).where(eq(dealAttributions.leadId, id));
+    await db.delete(quoteVersions).where(eq(quoteVersions.leadId, id));
+    
+    // Finally delete the lead
     await db.delete(leads).where(eq(leads.id, id));
   }
 
