@@ -1627,6 +1627,24 @@ export default function DealWorkspace() {
                               </span>
                             )}
                           </div>
+                          {/* Show Tier A cost breakdown if available */}
+                          {(quote as any).internalCosts?.tierAScanningCost != null && (
+                            <div className="flex items-center gap-4 text-sm mt-2 pt-2 border-t border-muted">
+                              <span className="text-muted-foreground">
+                                Scanning: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAScanningCost).toLocaleString()}</span>
+                              </span>
+                              {(quote as any).internalCosts?.tierAModelingCost != null && (
+                                <span className="text-muted-foreground">
+                                  Modeling: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAModelingCost).toLocaleString()}</span>
+                                </span>
+                              )}
+                              {(quote as any).internalCosts?.assumedMargin && (
+                                <span className="text-muted-foreground">
+                                  Target Margin: <span className="font-mono font-medium text-foreground">{(quote as any).internalCosts.assumedMargin}%</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
