@@ -178,15 +178,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   const [otherContact, setOtherContact] = useState("");
   const [proofLinks, setProofLinks] = useState("");
 
-  // === LEAD TRACKING ===
-  const [source, setSource] = useState("");
-  const [sourceNote, setSourceNote] = useState("");
-  const [assist, setAssist] = useState("");
-  const [probabilityOfClosing, setProbabilityOfClosing] = useState("");
-  const [projectStatus, setProjectStatus] = useState<"proposal" | "inhand" | "urgent" | "other" | "">("proposal");
-  const [projectStatusOther, setProjectStatusOther] = useState("");
-
-  // === TIMELINE ===
+  // === TIMELINE (quote-specific - CRM fields like lead source, probability are in DealWorkspace) ===
   const [estimatedTimeline, setEstimatedTimeline] = useState("");
   const [timelineNotes, setTimelineNotes] = useState("");
   
@@ -365,14 +357,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         if (sd.designProCompanyContact) setDesignProCompanyContact(sd.designProCompanyContact);
         if (sd.otherContact) setOtherContact(sd.otherContact);
         if (sd.proofLinks) setProofLinks(sd.proofLinks);
-        // Lead Tracking
-        if (sd.source) setSource(sd.source);
-        if (sd.sourceNote) setSourceNote(sd.sourceNote);
-        if (sd.assist) setAssist(sd.assist);
-        if (sd.probabilityOfClosing) setProbabilityOfClosing(sd.probabilityOfClosing);
-        if (sd.projectStatus) setProjectStatus(sd.projectStatus);
-        if (sd.projectStatusOther) setProjectStatusOther(sd.projectStatusOther);
-        // Timeline
+        // Timeline (CRM fields like source, probability are managed in DealWorkspace)
         if (sd.estimatedTimeline) setEstimatedTimeline(sd.estimatedTimeline);
         if (sd.timelineNotes) setTimelineNotes(sd.timelineNotes);
       }
@@ -473,12 +458,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       if (payload.designProCompanyContact) setDesignProCompanyContact(payload.designProCompanyContact);
       if (payload.otherContact) setOtherContact(payload.otherContact);
       if (payload.proofLinks) setProofLinks(payload.proofLinks);
-      if (payload.source) setSource(payload.source);
-      if (payload.sourceNote) setSourceNote(payload.sourceNote);
-      if (payload.assist) setAssist(payload.assist);
-      if (payload.probabilityOfClosing) setProbabilityOfClosing(payload.probabilityOfClosing);
-      if (payload.projectStatus) setProjectStatus(payload.projectStatus);
-      if (payload.projectStatusOther) setProjectStatusOther(payload.projectStatusOther);
+      // CRM fields (source, probability, projectStatus) are managed in DealWorkspace
       if (payload.estimatedTimeline) setEstimatedTimeline(payload.estimatedTimeline);
       if (payload.timelineNotes) setTimelineNotes(payload.timelineNotes);
       
@@ -781,14 +761,7 @@ Thanks!`.trim();
           designProCompanyContact,
           otherContact,
           proofLinks,
-          // Lead Tracking
-          source,
-          sourceNote,
-          assist,
-          probabilityOfClosing,
-          projectStatus,
-          projectStatusOther,
-          // Timeline
+          // Timeline (CRM fields managed in DealWorkspace)
           estimatedTimeline,
           timelineNotes,
         },
@@ -908,12 +881,7 @@ Thanks!`.trim();
           designProCompanyContact,
           otherContact,
           proofLinks,
-          source,
-          sourceNote,
-          assist,
-          probabilityOfClosing,
-          projectStatus,
-          projectStatusOther,
+          // Timeline (CRM fields managed in DealWorkspace)
           estimatedTimeline,
           timelineNotes,
         },
@@ -2100,112 +2068,12 @@ Thanks!`.trim();
 
             <Separator />
 
-            {/* Lead Tracking Section */}
+            {/* Timeline Section (CRM fields like lead source, probability are managed in Deal Details) */}
             <div className="space-y-4">
-              <h2 className="text-lg font-medium">Lead Tracking</h2>
+              <h2 className="text-lg font-medium">Timeline</h2>
               <Card>
                 <CardContent className="pt-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Lead Source</Label>
-                      <Select value={source} onValueChange={setSource}>
-                        <SelectTrigger data-testid="select-source">
-                          <SelectValue placeholder="Select source..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ABM">ABM</SelectItem>
-                          <SelectItem value="Cold outreach">Cold outreach</SelectItem>
-                          <SelectItem value="Referral - Client">Referral - Client</SelectItem>
-                          <SelectItem value="Referral - Partner">Referral - Partner</SelectItem>
-                          <SelectItem value="Existing customer">Existing customer</SelectItem>
-                          <SelectItem value="CEU">CEU</SelectItem>
-                          <SelectItem value="Proof Vault">Proof Vault</SelectItem>
-                          <SelectItem value="Spec/Standards">Spec/Standards</SelectItem>
-                          <SelectItem value="Podcast">Podcast</SelectItem>
-                          <SelectItem value="Site/SEO">Site/SEO</SelectItem>
-                          <SelectItem value="Permit trigger">Permit trigger</SelectItem>
-                          <SelectItem value="Compliance trigger">Compliance trigger</SelectItem>
-                          <SelectItem value="Procurement trigger">Procurement trigger</SelectItem>
-                          <SelectItem value="Event/Conference">Event/Conference</SelectItem>
-                          <SelectItem value="Social">Social</SelectItem>
-                          <SelectItem value="Vendor Onboarding">Vendor Onboarding</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                          <SelectItem value="Unknown">Unknown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Source Note</Label>
-                      <Input
-                        value={sourceNote}
-                        onChange={(e) => setSourceNote(e.target.value)}
-                        placeholder="Additional source details..."
-                        data-testid="input-source-note"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Assist Attribution</Label>
-                      <Select value={assist} onValueChange={setAssist}>
-                        <SelectTrigger data-testid="select-assist">
-                          <SelectValue placeholder="Select assist..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ABM">ABM</SelectItem>
-                          <SelectItem value="Cold outreach">Cold outreach</SelectItem>
-                          <SelectItem value="Referral - Client">Referral - Client</SelectItem>
-                          <SelectItem value="Referral - Partner">Referral - Partner</SelectItem>
-                          <SelectItem value="Existing customer">Existing customer</SelectItem>
-                          <SelectItem value="CEU">CEU</SelectItem>
-                          <SelectItem value="Proof Vault">Proof Vault</SelectItem>
-                          <SelectItem value="Spec/Standards">Spec/Standards</SelectItem>
-                          <SelectItem value="Podcast">Podcast</SelectItem>
-                          <SelectItem value="Site/SEO">Site/SEO</SelectItem>
-                          <SelectItem value="Event/Conference">Event/Conference</SelectItem>
-                          <SelectItem value="Social">Social</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                          <SelectItem value="Unknown">Unknown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Probability of Closing (%)</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={probabilityOfClosing}
-                        onChange={(e) => setProbabilityOfClosing(e.target.value)}
-                        placeholder="e.g., 75"
-                        data-testid="input-probability-of-closing"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Project Status</Label>
-                      <Select value={projectStatus} onValueChange={(v) => setProjectStatus(v as typeof projectStatus)}>
-                        <SelectTrigger data-testid="select-project-status">
-                          <SelectValue placeholder="Select status..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="proposal">Proposal</SelectItem>
-                          <SelectItem value="inhand">In-Hand</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {projectStatus === "other" && (
-                        <Input
-                          value={projectStatusOther}
-                          onChange={(e) => setProjectStatusOther(e.target.value)}
-                          placeholder="Specify status..."
-                          className="mt-2"
-                          data-testid="input-project-status-other"
-                        />
-                      )}
-                    </div>
                     <div className="space-y-2">
                       <Label>Estimated Timeline</Label>
                       <Select value={estimatedTimeline} onValueChange={setEstimatedTimeline}>
@@ -2222,15 +2090,16 @@ Thanks!`.trim();
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Timeline Notes</Label>
-                    <Textarea
-                      value={timelineNotes}
-                      onChange={(e) => setTimelineNotes(e.target.value)}
-                      placeholder="Any timeline notes or caveats..."
-                      data-testid="textarea-timeline-notes"
-                    />
+                    <div className="space-y-2">
+                      <Label>Timeline Notes</Label>
+                      <Textarea
+                        value={timelineNotes}
+                        onChange={(e) => setTimelineNotes(e.target.value)}
+                        placeholder="Any timeline notes or caveats..."
+                        rows={3}
+                        data-testid="textarea-timeline-notes"
+                      />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
