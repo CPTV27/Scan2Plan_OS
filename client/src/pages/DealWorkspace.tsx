@@ -90,8 +90,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest } from "@/lib/queryClient";
-import type { Lead, CpqQuote, DealAttribution } from "@shared/schema";
-import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD } from "@shared/schema";
+import type { Lead, CpqQuote, DealAttribution, CpqCalculateRequest, CpqCalculateResponse, CpqApiArea } from "@shared/schema";
+import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, CPQ_API_DISCIPLINES, CPQ_API_LODS, CPQ_API_SCOPES, CPQ_API_RISKS, CPQ_API_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
 import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
@@ -401,6 +405,651 @@ function MarketingInfluenceWidget({ leadId }: { leadId: number }) {
   );
 }
 
+interface QuoteBuilderArea {
+  id: string;
+  name: string;
+  buildingType: string;
+  squareFeet: string;
+  disciplines: string[];
+  disciplineLods: Record<string, { discipline: string; lod: string; scope: string }>;
+}
+
+interface QuoteBuilderTabProps {
+  lead: Lead;
+  leadId: number;
+  queryClient: ReturnType<typeof useQueryClient>;
+  toast: ReturnType<typeof useToast>["toast"];
+  onQuoteSaved: () => void;
+}
+
+function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved }: QuoteBuilderTabProps) {
+  const [areas, setAreas] = useState<QuoteBuilderArea[]>([{
+    id: "1",
+    name: "",
+    buildingType: "1",
+    squareFeet: "",
+    disciplines: ["arch"],
+    disciplineLods: {
+      arch: { discipline: "arch", lod: "300", scope: "full" }
+    }
+  }]);
+  
+  const [dispatchLocation, setDispatchLocation] = useState<string>("troy");
+  const [distance, setDistance] = useState<string>("");
+  const [risks, setRisks] = useState<string[]>([]);
+  const [matterport, setMatterport] = useState(false);
+  const [actScan, setActScan] = useState(false);
+  const [additionalElevations, setAdditionalElevations] = useState<string>("");
+  const [paymentTerms, setPaymentTerms] = useState<string>("partner");
+  
+  const [pricingResult, setPricingResult] = useState<CpqCalculateResponse | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (lead) {
+      // Pre-fill from lead data: estimatedSqft or default to 10000
+      const sqft = (lead as any).estimatedSqft || (lead as any).sqft || 10000;
+      setAreas([{
+        id: "1",
+        name: lead.projectName || "",
+        buildingType: "1",
+        squareFeet: sqft.toString(),
+        disciplines: ["arch"],
+        disciplineLods: {
+          arch: { discipline: "arch", lod: "300", scope: "full" }
+        }
+      }]);
+    }
+  }, [lead]);
+
+  const addArea = () => {
+    const newId = (areas.length + 1).toString();
+    setAreas([...areas, {
+      id: newId,
+      name: `Area ${newId}`,
+      buildingType: "1",
+      squareFeet: "",
+      disciplines: ["arch"],
+      disciplineLods: {
+        arch: { discipline: "arch", lod: "300", scope: "full" }
+      }
+    }]);
+  };
+
+  const removeArea = (id: string) => {
+    if (areas.length > 1) {
+      setAreas(areas.filter(a => a.id !== id));
+    }
+  };
+
+  const updateArea = (id: string, updates: Partial<QuoteBuilderArea>) => {
+    setAreas(areas.map(a => a.id === id ? { ...a, ...updates } : a));
+  };
+
+  const toggleDiscipline = (areaId: string, discipline: string) => {
+    const area = areas.find(a => a.id === areaId);
+    if (!area) return;
+    
+    const hasDiscipline = area.disciplines.includes(discipline);
+    let newDisciplines: string[];
+    let newLods = { ...area.disciplineLods };
+    
+    if (hasDiscipline) {
+      newDisciplines = area.disciplines.filter(d => d !== discipline);
+      delete newLods[discipline];
+    } else {
+      newDisciplines = [...area.disciplines, discipline];
+      newLods[discipline] = { discipline, lod: "300", scope: "full" };
+    }
+    
+    updateArea(areaId, { disciplines: newDisciplines, disciplineLods: newLods });
+  };
+
+  const updateDisciplineLod = (areaId: string, discipline: string, field: "lod" | "scope", value: string) => {
+    const area = areas.find(a => a.id === areaId);
+    if (!area) return;
+    
+    const newLods = {
+      ...area.disciplineLods,
+      [discipline]: {
+        ...area.disciplineLods[discipline],
+        [field]: value
+      }
+    };
+    
+    updateArea(areaId, { disciplineLods: newLods });
+  };
+
+  const toggleRisk = (risk: string) => {
+    if (risks.includes(risk)) {
+      setRisks(risks.filter(r => r !== risk));
+    } else {
+      setRisks([...risks, risk]);
+    }
+  };
+
+  const handleCalculate = async () => {
+    setIsCalculating(true);
+    try {
+      const request: CpqCalculateRequest = {
+        clientName: lead.clientName,
+        projectName: lead.projectName || undefined,
+        projectAddress: lead.projectAddress || undefined,
+        areas: areas.map(a => ({
+          name: a.name || undefined,
+          buildingType: a.buildingType,
+          squareFeet: a.squareFeet,
+          disciplines: a.disciplines as any,
+          disciplineLods: a.disciplineLods as any,
+        })),
+        risks: risks.length > 0 ? risks as any : undefined,
+        dispatchLocation: dispatchLocation as any,
+        distance: distance ? parseFloat(distance) : undefined,
+        services: {
+          matterport,
+          actScan,
+          additionalElevations: additionalElevations ? parseInt(additionalElevations) : undefined,
+        },
+        paymentTerms: paymentTerms as any,
+        leadId,
+      };
+
+      const response = await apiRequest("POST", "/api/cpq/calculate", request);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPricingResult(data);
+        toast({ title: "Pricing Calculated", description: `Total: $${data.totalClientPrice.toLocaleString()}` });
+      } else {
+        toast({ title: "Calculation Error", description: data.error || "Failed to calculate pricing", variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to calculate pricing", variant: "destructive" });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const handleSaveQuote = async () => {
+    if (!pricingResult) {
+      toast({ title: "Error", description: "Please calculate pricing first", variant: "destructive" });
+      return;
+    }
+
+    if (pricingResult.integrityStatus === "blocked") {
+      toast({ title: "Cannot Save", description: "Quote has blocking issues that must be resolved", variant: "destructive" });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const quoteData = {
+        leadId,
+        totalPrice: pricingResult.totalClientPrice,
+        totalCost: pricingResult.totalUpteamCost,
+        grossMargin: pricingResult.grossMargin,
+        grossMarginPercent: pricingResult.grossMarginPercent,
+        lineItems: pricingResult.lineItems,
+        subtotals: pricingResult.subtotals,
+        integrityStatus: pricingResult.integrityStatus,
+        integrityFlags: pricingResult.integrityFlags || [],
+        requestData: {
+          areas,
+          dispatchLocation,
+          distance: distance ? parseFloat(distance) : null,
+          risks,
+          services: { matterport, actScan, additionalElevations: additionalElevations ? parseInt(additionalElevations) : 0 },
+          paymentTerms,
+        },
+      };
+
+      const response = await apiRequest("POST", `/api/leads/${leadId}/cpq-quotes`, quoteData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to save quote");
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "cpq-quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      toast({ title: "Quote Saved", description: "Quote has been saved successfully" });
+      onQuoteSaved();
+    } catch (error) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save quote", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isLandscape = (buildingType: string) => buildingType === "14" || buildingType === "15";
+
+  const getIntegrityBadge = () => {
+    if (!pricingResult) return null;
+    const status = pricingResult.integrityStatus;
+    const variant = status === "pass" ? "default" : status === "warning" ? "secondary" : "destructive";
+    const colors = status === "pass" ? "bg-green-500/10 text-green-600 border-green-500/30" 
+      : status === "warning" ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
+      : "bg-red-500/10 text-red-600 border-red-500/30";
+    
+    return (
+      <Badge variant="outline" className={colors} data-testid="badge-integrity-status">
+        {status === "pass" ? "Pass" : status === "warning" ? "Warning" : "Blocked"}
+      </Badge>
+    );
+  };
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Project Info
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Client</Label>
+                    <div className="font-medium">{lead.clientName}</div>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Project</Label>
+                    <div className="font-medium">{lead.projectName || "—"}</div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Address</Label>
+                  <div className="font-medium text-sm">{lead.projectAddress || "—"}</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Areas
+                  </span>
+                  <Button size="sm" variant="outline" onClick={addArea} data-testid="button-add-area">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Area
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {areas.map((area, idx) => (
+                  <div key={area.id} className="p-3 border rounded-lg space-y-3" data-testid={`area-${area.id}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <Input
+                        placeholder={`Area ${idx + 1}`}
+                        value={area.name}
+                        onChange={(e) => updateArea(area.id, { name: e.target.value })}
+                        className="flex-1"
+                        data-testid={`input-area-name-${area.id}`}
+                      />
+                      {areas.length > 1 && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="text-destructive"
+                          onClick={() => removeArea(area.id)}
+                          data-testid={`button-remove-area-${area.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Building Type</Label>
+                        <Select 
+                          value={area.buildingType} 
+                          onValueChange={(v) => updateArea(area.id, { buildingType: v })}
+                        >
+                          <SelectTrigger data-testid={`select-building-type-${area.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(CPQ_BUILDING_TYPES).map(([id, label]) => (
+                              <SelectItem key={id} value={id}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">{isLandscape(area.buildingType) ? "Acres" : "Square Feet"}</Label>
+                        <Input
+                          type="number"
+                          placeholder={isLandscape(area.buildingType) ? "10" : "15000"}
+                          value={area.squareFeet}
+                          onChange={(e) => updateArea(area.id, { squareFeet: e.target.value })}
+                          data-testid={`input-sqft-${area.id}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Disciplines</Label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {CPQ_API_DISCIPLINES.map((disc) => (
+                          <Button
+                            key={disc}
+                            size="sm"
+                            variant={area.disciplines.includes(disc) ? "default" : "outline"}
+                            onClick={() => toggleDiscipline(area.id, disc)}
+                            className="h-7 text-xs"
+                            data-testid={`toggle-discipline-${area.id}-${disc}`}
+                          >
+                            {disc.toUpperCase()}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {area.disciplines.length > 0 && (
+                      <div className="space-y-2">
+                        {area.disciplines.map((disc) => (
+                          <div key={disc} className="flex items-center gap-2 p-2 bg-muted/30 rounded">
+                            <span className="text-xs font-medium w-16">{disc.toUpperCase()}</span>
+                            <Select
+                              value={area.disciplineLods[disc]?.lod || "300"}
+                              onValueChange={(v) => updateDisciplineLod(area.id, disc, "lod", v)}
+                            >
+                              <SelectTrigger className="h-7 w-20" data-testid={`select-lod-${area.id}-${disc}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CPQ_API_LODS.map((lod) => (
+                                  <SelectItem key={lod} value={lod}>LoD {lod}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={area.disciplineLods[disc]?.scope || "full"}
+                              onValueChange={(v) => updateDisciplineLod(area.id, disc, "scope", v)}
+                            >
+                              <SelectTrigger className="h-7 w-24" data-testid={`select-scope-${area.id}-${disc}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CPQ_API_SCOPES.map((scope) => (
+                                  <SelectItem key={scope} value={scope}>{scope}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Travel
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Dispatch Location</Label>
+                    <Select value={dispatchLocation} onValueChange={setDispatchLocation}>
+                      <SelectTrigger data-testid="select-dispatch-location">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CPQ_API_DISPATCH_LOCATIONS.map((loc) => (
+                          <SelectItem key={loc} value={loc}>{loc.charAt(0).toUpperCase() + loc.slice(1).replace("_", " ")}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs">Distance (miles)</Label>
+                    <Input
+                      type="number"
+                      placeholder="25"
+                      value={distance}
+                      onChange={(e) => setDistance(e.target.value)}
+                      data-testid="input-distance"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Risk Factors
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  {CPQ_API_RISKS.map((risk) => (
+                    <div key={risk} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`risk-${risk}`}
+                        checked={risks.includes(risk)}
+                        onCheckedChange={() => toggleRisk(risk)}
+                        data-testid={`checkbox-risk-${risk}`}
+                      />
+                      <label htmlFor={`risk-${risk}`} className="text-sm cursor-pointer">
+                        {risk === "occupied" ? "Occupied" : risk === "hazardous" ? "Hazardous" : "No Power"}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Additional Services
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="matterport">Matterport Virtual Tour</Label>
+                  <Switch id="matterport" checked={matterport} onCheckedChange={setMatterport} data-testid="switch-matterport" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="actScan">Above Ceiling Tile Scan</Label>
+                  <Switch id="actScan" checked={actScan} onCheckedChange={setActScan} data-testid="switch-act-scan" />
+                </div>
+                <div>
+                  <Label className="text-xs">Additional Interior Elevations</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={additionalElevations}
+                    onChange={(e) => setAdditionalElevations(e.target.value)}
+                    data-testid="input-additional-elevations"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Payment Terms
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                  <SelectTrigger data-testid="select-payment-terms">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="partner">Partner (no premium)</SelectItem>
+                    <SelectItem value="owner">Owner (no premium)</SelectItem>
+                    <SelectItem value="net30">Net 30 (+5%)</SelectItem>
+                    <SelectItem value="net60">Net 60 (+10%)</SelectItem>
+                    <SelectItem value="net90">Net 90 (+15%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            <Button 
+              className="w-full" 
+              onClick={handleCalculate} 
+              disabled={isCalculating || areas.some(a => !a.squareFeet)}
+              data-testid="button-calculate"
+            >
+              {isCalculating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Calculating...
+                </>
+              ) : (
+                <>
+                  <Calculator className="w-4 h-4 mr-2" />
+                  Calculate Price
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Pricing Breakdown
+                  </span>
+                  {getIntegrityBadge()}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pricingResult ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      {pricingResult.lineItems.filter(li => li.category !== "total").map((item) => (
+                        <div key={item.id} className="flex justify-between text-sm py-1 border-b border-dashed last:border-0">
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <span className="font-medium">${item.clientPrice.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Modeling</span>
+                        <span>${pricingResult.subtotals.modeling.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Travel</span>
+                        <span>${pricingResult.subtotals.travel.toLocaleString()}</span>
+                      </div>
+                      {pricingResult.subtotals.riskPremiums > 0 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span>Risk Premiums</span>
+                          <span>${pricingResult.subtotals.riskPremiums.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {pricingResult.subtotals.services > 0 && (
+                        <div className="flex justify-between">
+                          <span>Services</span>
+                          <span>${pricingResult.subtotals.services.toLocaleString()}</span>
+                        </div>
+                      )}
+                      {pricingResult.subtotals.paymentPremium > 0 && (
+                        <div className="flex justify-between text-amber-600">
+                          <span>Payment Premium</span>
+                          <span>${pricingResult.subtotals.paymentPremium.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Total Price</span>
+                        <span>${pricingResult.totalClientPrice.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Cost</span>
+                        <span>${pricingResult.totalUpteamCost.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Gross Margin</span>
+                        <span className={pricingResult.grossMarginPercent >= 45 ? "text-green-600" : "text-amber-600"}>
+                          ${pricingResult.grossMargin.toLocaleString()} ({pricingResult.grossMarginPercent.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    {pricingResult.integrityFlags && pricingResult.integrityFlags.length > 0 && (
+                      <div className="space-y-2 mt-4">
+                        {pricingResult.integrityFlags.map((flag, idx) => (
+                          <Alert key={idx} variant={flag.severity === "error" ? "destructive" : "default"} data-testid={`alert-flag-${idx}`}>
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>{flag.code}</AlertTitle>
+                            <AlertDescription>{flag.message}</AlertDescription>
+                          </Alert>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button 
+                      className="w-full mt-4" 
+                      onClick={handleSaveQuote}
+                      disabled={isSaving || pricingResult.integrityStatus === "blocked"}
+                      data-testid="button-save-quote"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Quote
+                        </>
+                      )}
+                    </Button>
+                    {pricingResult.integrityStatus === "blocked" && (
+                      <p className="text-xs text-destructive text-center">
+                        Cannot save: Quote has blocking issues
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calculator className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p>Configure project details and click "Calculate Price" to see pricing breakdown</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </ScrollArea>
+  );
+}
+
 const formSchema = insertLeadSchema.extend({
   clientName: z.string().min(1, "Client name is required"),
   projectAddress: z.string().min(1, "Project address is required"),
@@ -417,13 +1066,13 @@ export default function DealWorkspace() {
   const leadId = Number(params.id);
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
-    const validTabs = ["lead", "history", "ai", "documents"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents"];
     return validTabs.includes("lead") ? "lead" : "lead";
   });
   const { toast } = useToast();
   
   const handleTabChange = (value: string) => {
-    const validTabs = ["lead", "history", "ai", "documents"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
   };
   const queryClient = useQueryClient();
@@ -1078,6 +1727,10 @@ export default function DealWorkspace() {
               <FileText className="w-4 h-4" />
               Lead Details
             </TabsTrigger>
+            <TabsTrigger value="quote" className="gap-2" data-testid="tab-quote">
+              <Calculator className="w-4 h-4" />
+              Quote Builder
+            </TabsTrigger>
             <TabsTrigger value="history" className="gap-2" data-testid="tab-history">
               <History className="w-4 h-4" />
               Version History
@@ -1508,6 +2161,19 @@ export default function DealWorkspace() {
               </form>
             </Form>
           </ScrollArea>
+        </TabsContent>
+
+        {/* Quote Builder Tab */}
+        <TabsContent value="quote" className="flex-1 overflow-hidden m-0">
+          <QuoteBuilderTab 
+            lead={lead} 
+            leadId={leadId}
+            queryClient={queryClient}
+            toast={toast}
+            onQuoteSaved={() => {
+              handleTabChange("history");
+            }}
+          />
         </TabsContent>
 
         {/* Version History Tab */}

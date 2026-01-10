@@ -743,4 +743,52 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       },
     });
   }));
+
+  // POST /api/cpq/calculate - Proxy to external CPQ pricing calculation API
+  // This endpoint is used by the in-app quote builder to get pricing from external CPQ
+  app.post("/api/cpq/calculate", isAuthenticated, asyncHandler(async (req, res) => {
+    const CPQ_BASE_URL = process.env.CPQ_BASE_URL || "https://scan2plan-cpq.replit.app";
+    
+    if (!CPQ_API_KEY) {
+      return res.status(503).json({ 
+        success: false,
+        error: "CPQ integration not configured. Set CPQ_API_KEY environment variable." 
+      });
+    }
+
+    try {
+      // Forward the request to external CPQ API
+      const response = await fetch(`${CPQ_BASE_URL}/api/pricing/calculate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${CPQ_API_KEY}`,
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        log(`ERROR: CPQ service returned non-JSON response (${contentType}) - status ${response.status}`);
+        return res.status(502).json({ 
+          success: false,
+          error: "CPQ service unavailable",
+          message: "The external pricing service is currently unavailable. Please try again later or contact support." 
+        });
+      }
+
+      const data = await response.json();
+
+      // Forward the response status and body
+      res.status(response.status).json(data);
+    } catch (error) {
+      log("ERROR: CPQ calculate proxy error - " + (error as any)?.message);
+      res.status(502).json({ 
+        success: false,
+        error: "CPQ service unavailable",
+        message: "Unable to connect to the pricing service. Please try again later." 
+      });
+    }
+  }));
 }

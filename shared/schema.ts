@@ -2214,3 +2214,115 @@ export const insertIntelligenceGeneratedContentSchema = createInsertSchema(intel
 });
 export type IntelligenceGeneratedContent = typeof intelligenceGeneratedContent.$inferSelect;
 export type InsertIntelligenceGeneratedContent = z.infer<typeof insertIntelligenceGeneratedContentSchema>;
+
+// === CPQ PRICING CALCULATION API SCHEMAS ===
+// Uses existing constants: CPQ_BUILDING_TYPES, CPQ_DISCIPLINES, CPQ_LOD_VALUES, CPQ_SCOPE_VALUES, CPQ_RISK_FACTORS, CPQ_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS
+
+// API-specific discipline IDs (external CPQ uses these exact values)
+export const CPQ_API_DISCIPLINES = ["arch", "mepf", "structure", "site"] as const;
+export const CPQ_API_LODS = ["200", "300", "350"] as const;
+export const CPQ_API_SCOPES = ["full", "interior", "exterior", "mixed"] as const;
+export const CPQ_API_RISKS = ["occupied", "hazardous", "no_power"] as const;
+export const CPQ_API_DISPATCH_LOCATIONS = ["troy", "woodstock", "brooklyn", "fly_out"] as const;
+
+// API Discipline LOD configuration
+export const cpqApiDisciplineLodSchema = z.object({
+  discipline: z.enum(CPQ_API_DISCIPLINES),
+  lod: z.enum(CPQ_API_LODS),
+  scope: z.enum(CPQ_API_SCOPES).optional(),
+});
+export type CpqApiDisciplineLod = z.infer<typeof cpqApiDisciplineLodSchema>;
+
+// API Area configuration (matches external CPQ API structure)
+export const cpqApiAreaSchema = z.object({
+  name: z.string().optional(),
+  buildingType: z.string(), // Building type ID as string
+  squareFeet: z.string(), // Square feet or acres for landscape types
+  disciplines: z.array(z.enum(CPQ_API_DISCIPLINES)).optional(),
+  disciplineLods: z.record(z.string(), cpqApiDisciplineLodSchema).optional(),
+});
+export type CpqApiArea = z.infer<typeof cpqApiAreaSchema>;
+
+// Services configuration
+export const cpqServicesSchema = z.object({
+  matterport: z.boolean().optional(),
+  actScan: z.boolean().optional(),
+  additionalElevations: z.number().optional(),
+});
+export type CpqServices = z.infer<typeof cpqServicesSchema>;
+
+// Full calculate request
+export const cpqCalculateRequestSchema = z.object({
+  clientName: z.string().optional(),
+  projectName: z.string().optional(),
+  projectAddress: z.string().optional(),
+  areas: z.array(cpqApiAreaSchema).min(1),
+  risks: z.array(z.enum(CPQ_API_RISKS)).optional(),
+  dispatchLocation: z.enum(CPQ_API_DISPATCH_LOCATIONS),
+  distance: z.number().optional(),
+  customTravelCost: z.number().optional(),
+  services: cpqServicesSchema.optional(),
+  paymentTerms: z.enum(CPQ_PAYMENT_TERMS).optional(),
+  leadId: z.number().optional(),
+});
+export type CpqCalculateRequest = z.infer<typeof cpqCalculateRequestSchema>;
+
+// Line item in response
+export const cpqLineItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  category: z.enum(["discipline", "area", "risk", "travel", "service", "subtotal", "total"]),
+  clientPrice: z.number(),
+  upteamCost: z.number(),
+  details: z.object({
+    sqft: z.number().optional(),
+    discipline: z.string().optional(),
+    lod: z.string().optional(),
+    scope: z.string().optional(),
+    clientRate: z.number().optional(),
+    upteamRate: z.number().optional(),
+  }).optional(),
+});
+export type CpqLineItem = z.infer<typeof cpqLineItemSchema>;
+
+// Integrity flag
+export const cpqIntegrityFlagSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  severity: z.enum(["warning", "error"]),
+});
+export type CpqIntegrityFlag = z.infer<typeof cpqIntegrityFlagSchema>;
+
+// Full calculate response
+export const cpqCalculateResponseSchema = z.object({
+  success: z.literal(true),
+  totalClientPrice: z.number(),
+  totalUpteamCost: z.number(),
+  grossMargin: z.number(),
+  grossMarginPercent: z.number(),
+  lineItems: z.array(cpqLineItemSchema),
+  subtotals: z.object({
+    modeling: z.number(),
+    travel: z.number(),
+    riskPremiums: z.number(),
+    services: z.number(),
+    paymentPremium: z.number(),
+  }),
+  integrityStatus: z.enum(["pass", "warning", "blocked"]),
+  integrityFlags: z.array(cpqIntegrityFlagSchema).optional(),
+  calculatedAt: z.string(),
+  engineVersion: z.string(),
+});
+export type CpqCalculateResponse = z.infer<typeof cpqCalculateResponseSchema>;
+
+// Error response
+export const cpqErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string(),
+  message: z.string().optional(),
+  details: z.object({
+    formErrors: z.array(z.string()).optional(),
+    fieldErrors: z.record(z.string(), z.array(z.string())).optional(),
+  }).optional(),
+});
+export type CpqErrorResponse = z.infer<typeof cpqErrorResponseSchema>;
