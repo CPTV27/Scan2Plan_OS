@@ -13,6 +13,7 @@ import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, C
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ProposalGenerator, NegotiationConsole, MarketingGenerator } from "@/components/intelligence";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
 
 type BuyerType = "BP1" | "BP2" | "BP3" | "BP4" | "BP5" | "BP6" | "BP7" | "BP8";
 type PainPoint = "Rework_RFI" | "ScheduleVolatility" | "Inconsistency" | "Terms_Risk";
@@ -141,8 +142,14 @@ export default function BrandGenerator() {
   };
 
   return (
-    <div className="flex h-full">
-      <Tabs defaultValue="generate" className="flex flex-1" orientation="vertical">
+    <div className="flex min-h-screen bg-background text-foreground">
+      <Sidebar />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        <MobileHeader />
+        <main className="flex-1 overflow-auto">
+          <div className="flex h-full">
+            <Tabs defaultValue="generate" className="flex flex-1" orientation="vertical">
         <div className="w-56 border-r bg-muted/30 flex flex-col">
           <div className="p-4 border-b">
             <div className="flex items-center gap-2">
@@ -579,7 +586,10 @@ export default function BrandGenerator() {
           <MarketingGenerator />
         </TabsContent>
         </div>
-      </Tabs>
+            </Tabs>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
