@@ -2275,6 +2275,20 @@ Thanks!`.trim();
                         <span className="font-mono">${Math.round(pricing.disciplineTotals.risk * 0.65).toLocaleString()}</span>
                       </div>
                     )}
+                    {pricing.scanningEstimate && pricing.scanningEstimate.totalSqft > 0 && (
+                      <>
+                        <div className="flex justify-between text-muted-foreground pt-1 border-t border-muted">
+                          <span className="pl-4">Scanning ({pricing.scanningEstimate.scanDays} day{pricing.scanningEstimate.scanDays > 1 ? 's' : ''} @ ${pricing.scanningEstimate.dailyRate}/day)</span>
+                          <span className="font-mono">${pricing.scanningEstimate.scanningCost.toLocaleString()}</span>
+                        </div>
+                        {pricing.scanningEstimate.hotelPerDiemDays > 0 && (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span className="pl-4">Hotel + Per Diem ({pricing.scanningEstimate.hotelPerDiemDays} night{pricing.scanningEstimate.hotelPerDiemDays > 1 ? 's' : ''} @ $300/day)</span>
+                            <span className="font-mono">${pricing.scanningEstimate.hotelPerDiemCost.toLocaleString()}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
                     <div className="flex justify-between text-muted-foreground pt-1 border-t border-muted">
                       <span className="pl-4">Overhead (15%)</span>
                       <span className="font-mono">${Math.round(pricing.totalUpteamCost * 0.15).toLocaleString()}</span>

@@ -102,6 +102,17 @@ export interface PricingResult {
     travel: number;
     services: number;  // CAD, Matterport, elevations, etc.
     risk: number;      // Risk premiums
+    scanning: number;  // Scanning labor costs
+  };
+  // Scanning estimate breakdown
+  scanningEstimate?: {
+    totalSqft: number;
+    scanDays: number;
+    dailyRate: number;
+    scanningCost: number;
+    hotelPerDiemDays: number;
+    hotelPerDiemCost: number;
+    totalScanningCost: number;
   };
 }
 
@@ -256,6 +267,11 @@ const UPTEAM_MULTIPLIER = 0.65;
 
 // Minimum project charge
 const MINIMUM_PROJECT_CHARGE = 3000;
+
+// Scanning cost constants (for non-Tier A projects)
+const SCANNING_DAILY_RATE = 600;        // $600/day for scanning
+const SCANNING_SQFT_PER_DAY = 10000;    // 1 day per 10,000 sqft
+const HOTEL_PER_DIEM_DAILY = 300;       // $300/day for hotel + per diem (for multi-day scans)
 
 // Helper: Get area tier info
 export function getAreaTier(sqft: number): { tier: string; multiplier: number } {
@@ -670,6 +686,29 @@ export function calculatePricing(
     }
   }
 
+  // Calculate scanning estimate (for non-Tier A projects only)
+  // Tier A projects have manual scanning cost input, so this is for standard quotes
+  const scanDays = Math.max(1, Math.ceil(projectTotalSqft / SCANNING_SQFT_PER_DAY));
+  const baseScanningCost = scanDays * SCANNING_DAILY_RATE;
+  // For multi-day scans, add hotel + per diem for days beyond the first
+  const hotelPerDiemDays = Math.max(0, scanDays - 1);
+  const hotelPerDiemCost = hotelPerDiemDays * HOTEL_PER_DIEM_DAILY;
+  const totalScanningCost = baseScanningCost + hotelPerDiemCost;
+  
+  // Add scanning cost to internal (upteam) costs - this is our cost, not client-facing
+  // Scanning is 100% internal cost (no markup in this line)
+  upteamCost += totalScanningCost;
+  
+  const scanningEstimate = {
+    totalSqft: projectTotalSqft,
+    scanDays,
+    dailyRate: SCANNING_DAILY_RATE,
+    scanningCost: baseScanningCost,
+    hotelPerDiemDays,
+    hotelPerDiemCost,
+    totalScanningCost,
+  };
+
   // Calculate subtotal with explicit separation:
   // Architecture (with risk) + MEPF + Structure + Site + Other + Travel
   const architectureWithRisk = architectureBaseTotal + riskPremiumTotal;
@@ -730,7 +769,9 @@ export function calculatePricing(
       travel: Math.round(travelTotal * 100) / 100,
       services: Math.round(otherCostsTotal * 100) / 100,
       risk: Math.round(riskPremiumTotal * 100) / 100,
+      scanning: Math.round(totalScanningCost * 100) / 100,
     },
+    scanningEstimate,
   };
 }
 
