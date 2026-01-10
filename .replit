@@ -48,7 +48,7 @@ integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_openai_ai_int
 AIRTABLE_BASE_ID = "appmeFSst3UUcxnB9"
 VITE_CPQ_URL = "https://cpq.scan2plan.dev"
 APP_URL = "https://scan2plan-os.replit.app"
-CPQ_BASE_URL = "https://app-specs-ElijahScan2Plan.replit.app"
+CPQ_BASE_URL = "https://cpq.scan2plan.dev"
 VITE_CPQ_BASE_URL = "https://app-specs-ElijahScan2Plan.replit.app"
 
 [userenv.development]
