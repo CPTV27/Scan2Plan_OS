@@ -805,6 +805,71 @@ export class QuickBooksClient {
     const token = await this.getValidToken();
     return token?.realmId || null;
   }
+
+  // === INVOICE & ESTIMATE SYNC FOR PIPELINE ===
+
+  async fetchInvoices(startDate?: Date, endDate?: Date): Promise<any[]> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+
+    const query = `SELECT * FROM Invoice WHERE TxnDate >= '${start.toISOString().split("T")[0]}' AND TxnDate <= '${end.toISOString().split("T")[0]}' MAXRESULTS 500`;
+
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/query?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch invoices: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.QueryResponse?.Invoice || [];
+  }
+
+  async fetchEstimates(startDate?: Date, endDate?: Date): Promise<any[]> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+
+    const query = `SELECT * FROM Estimate WHERE TxnDate >= '${start.toISOString().split("T")[0]}' AND TxnDate <= '${end.toISOString().split("T")[0]}' MAXRESULTS 500`;
+
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/query?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch estimates: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.QueryResponse?.Estimate || [];
+  }
+
+  // Get QBO invoice URL for viewing
+  getInvoiceUrl(invoiceId: string, realmId: string): string {
+    const isSandbox = process.env.QB_SANDBOX === "true";
+    const domain = isSandbox ? "sandbox.qbo.intuit.com" : "qbo.intuit.com";
+    return `https://${domain}/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
+  }
 }
 
 export const quickbooksClient = new QuickBooksClient();

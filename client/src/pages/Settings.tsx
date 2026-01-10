@@ -133,6 +133,28 @@ export default function Settings() {
     },
   });
 
+  // QuickBooks pipeline sync mutation (invoices + estimates → leads)
+  const qbPipelineSyncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/sync-pipeline");
+      return response.json();
+    },
+    onSuccess: (data: { message: string; invoices: { imported: number; updated: number }; estimates: { imported: number; updated: number } }) => {
+      toast({ 
+        title: "Pipeline synced", 
+        description: data.message 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Pipeline sync failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
   const leadSources = (settings?.leadSources as LeadSourcesConfig) || { sources: [] };
   const staleness = (settings?.staleness as StalenessConfig) || { warningDays: 7, criticalDays: 14, penaltyPercent: 5 };
   const businessDefaults = (settings?.businessDefaults as BusinessDefaultsConfig) || { 
@@ -271,6 +293,20 @@ export default function Settings() {
                           <RefreshCw className="h-4 w-4 mr-2" />
                         )}
                         Sync Expenses
+                      </Button>
+                      <Button 
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => qbPipelineSyncMutation.mutate()}
+                        disabled={qbPipelineSyncMutation.isPending}
+                        data-testid="button-qb-sync-pipeline"
+                      >
+                        {qbPipelineSyncMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <DollarSign className="h-4 w-4 mr-2" />
+                        )}
+                        Sync Pipeline
                       </Button>
                       <Button 
                         size="sm" 

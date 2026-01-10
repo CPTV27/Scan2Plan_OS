@@ -286,4 +286,290 @@ export function registerQuickbooksRoutes(app: Express): void {
       res.status(500).json({ message: error.message });
     }
   }));
+
+  // === PIPELINE SYNC: Import Invoices & Estimates from QuickBooks ===
+  app.post("/api/quickbooks/sync-pipeline", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const isConnected = await quickbooksClient.isConnected();
+      if (!isConnected) {
+        return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
+      }
+
+      const realmId = await quickbooksClient.getRealmId();
+      if (!realmId) {
+        return res.status(400).json({ message: "Could not get QuickBooks company ID" });
+      }
+
+      const results = {
+        invoices: { imported: 0, updated: 0, errors: [] as string[] },
+        estimates: { imported: 0, updated: 0, errors: [] as string[] },
+      };
+
+      // Fetch invoices (Closed Won deals)
+      const invoices = await quickbooksClient.fetchInvoices();
+      for (const inv of invoices) {
+        try {
+          const customerName = inv.CustomerRef?.name || "Unknown Customer";
+          const projectName = inv.Line?.find((l: any) => l.Description)?.Description || `Invoice #${inv.DocNumber || inv.Id}`;
+          const address = inv.ShipAddr ? 
+            [inv.ShipAddr.Line1, inv.ShipAddr.City, inv.ShipAddr.CountrySubDivisionCode, inv.ShipAddr.PostalCode]
+              .filter(Boolean).join(", ") : null;
+
+          // Check if lead already exists with this QB invoice ID
+          const existingLead = await storage.getLeadByQboInvoiceId(inv.Id);
+          
+          const qboCustomerId = inv.CustomerRef?.value || null;
+          
+          if (existingLead) {
+            // Update existing lead with matching QBO Invoice ID - append audit notes
+            const existingNotes = existingLead.notes || "";
+            const syncNote = `\n[QB Invoice #${inv.DocNumber || inv.Id} synced: ${new Date().toISOString().split("T")[0]}]`;
+            await storage.updateLead(existingLead.id, {
+              value: String(inv.TotalAmt),
+              dealStage: "Closed Won",
+              probability: 100,
+              qboCustomerId: qboCustomerId,
+              qboSyncedAt: new Date(),
+              notes: existingNotes + syncNote,
+            });
+            results.invoices.updated++;
+          } else {
+            // Matching priority: 1. QBO Customer ID, 2. Name + Value
+            let candidateLeads: any[] = [];
+            const invoiceValue = parseFloat(String(inv.TotalAmt));
+            
+            // Try matching by QBO Customer ID first (deterministic)
+            if (qboCustomerId) {
+              candidateLeads = await storage.getLeadsByQboCustomerId(qboCustomerId);
+            }
+            
+            // Filter for eligible leads (not already Closed Won, value within range)
+            let eligibleLeads = candidateLeads.filter(lead => {
+              if (lead.dealStage === "Closed Won") return false;
+              if (!lead.value || lead.value === "0") return true;
+              const leadValue = parseFloat(lead.value);
+              const valueDiff = Math.abs(leadValue - invoiceValue) / Math.max(leadValue, invoiceValue, 1);
+              return valueDiff <= 0.30;
+            });
+            
+            // If all QBO Customer ID matches are ineligible, fall back to name matching
+            if (eligibleLeads.length === 0) {
+              candidateLeads = await storage.getLeadsByClientName(customerName);
+              eligibleLeads = candidateLeads.filter(lead => {
+                if (lead.dealStage === "Closed Won") return false;
+                if (!lead.value || lead.value === "0") return true;
+                const leadValue = parseFloat(lead.value);
+                const valueDiff = Math.abs(leadValue - invoiceValue) / Math.max(leadValue, invoiceValue, 1);
+                return valueDiff <= 0.30;
+              });
+            }
+            
+            if (eligibleLeads.length >= 1) {
+              // One or more matches - pick the best one using deterministic scoring
+              const scoredLeads = eligibleLeads.map(lead => {
+                let score = 0;
+                const leadValue = parseFloat(lead.value || "0");
+                // Closer value = higher score (0-100 points)
+                const valueDiff = Math.abs(leadValue - invoiceValue) / Math.max(leadValue, invoiceValue, 1);
+                score += (1 - valueDiff) * 100;
+                // Address match bonus (+50)
+                if (address && lead.projectAddress && lead.projectAddress.toLowerCase().includes(address.toLowerCase().substring(0, 20))) {
+                  score += 50;
+                }
+                // More recent activity bonus (+25 for last 30 days, scaled)
+                if (lead.lastContactDate) {
+                  const daysSinceContact = (Date.now() - new Date(lead.lastContactDate).getTime()) / (1000 * 60 * 60 * 24);
+                  score += Math.max(0, 25 - (daysSinceContact * 0.8));
+                }
+                // Deterministic tie-breaker: lower ID wins (first created)
+                score -= lead.id * 0.0001;
+                return { lead, score };
+              });
+              
+              scoredLeads.sort((a, b) => b.score - a.score);
+              const matchedLead = scoredLeads[0].lead;
+              const existingNotes = matchedLead.notes || "";
+              const multiMatchNote = eligibleLeads.length > 1 ? ` [Best match of ${eligibleLeads.length} candidates by value/address/recency]` : "";
+              
+              await storage.updateLead(matchedLead.id, {
+                value: String(inv.TotalAmt),
+                dealStage: "Closed Won",
+                probability: 100,
+                qboInvoiceId: inv.Id,
+                qboInvoiceNumber: inv.DocNumber || null,
+                qboCustomerId: qboCustomerId,
+                qboSyncedAt: new Date(),
+                notes: existingNotes + `\n[QB Invoice #${inv.DocNumber || inv.Id}: Promoted to Closed Won]${multiMatchNote}`,
+              });
+              results.invoices.updated++;
+            } else {
+              // No match - create new lead
+              await storage.createLead({
+                clientName: customerName,
+                projectName: projectName,
+                projectAddress: address,
+                value: String(inv.TotalAmt),
+                dealStage: "Closed Won",
+                probability: 100,
+                source: "quickbooks_sync",
+                qboInvoiceId: inv.Id,
+                qboInvoiceNumber: inv.DocNumber || null,
+                qboCustomerId: qboCustomerId,
+                qboSyncedAt: new Date(),
+                contactEmail: inv.BillEmail?.Address || null,
+                notes: `[Imported from QuickBooks Invoice #${inv.DocNumber || inv.Id}]`,
+              });
+              results.invoices.imported++;
+            }
+          }
+        } catch (err: any) {
+          results.invoices.errors.push(`Invoice ${inv.Id}: ${err.message}`);
+        }
+      }
+
+      // Fetch estimates (Proposal stage deals)
+      const estimates = await quickbooksClient.fetchEstimates();
+      for (const est of estimates) {
+        try {
+          const customerName = est.CustomerRef?.name || "Unknown Customer";
+          const projectName = est.Line?.find((l: any) => l.Description)?.Description || `Estimate #${est.DocNumber || est.Id}`;
+          const address = est.ShipAddr ? 
+            [est.ShipAddr.Line1, est.ShipAddr.City, est.ShipAddr.CountrySubDivisionCode, est.ShipAddr.PostalCode]
+              .filter(Boolean).join(", ") : null;
+
+          // Check if lead already exists with this QB estimate ID
+          const existingLead = await storage.getLeadByQboEstimateId(est.Id);
+          
+          const qboCustomerId = est.CustomerRef?.value || null;
+          
+          // Define deal stage order for regression prevention
+          const stageOrder = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"];
+          const getStageIndex = (stage: string) => stageOrder.indexOf(stage);
+          const proposalIndex = getStageIndex("Proposal");
+          
+          if (existingLead) {
+            // Update existing lead with matching QBO Estimate ID - don't change closed deals
+            if (existingLead.dealStage !== "Closed Won" && existingLead.dealStage !== "Closed Lost") {
+              const existingNotes = existingLead.notes || "";
+              const syncNote = `\n[QB Estimate #${est.DocNumber || est.Id} synced: ${new Date().toISOString().split("T")[0]}]`;
+              await storage.updateLead(existingLead.id, {
+                value: String(est.TotalAmt),
+                qboCustomerId: qboCustomerId,
+                qboSyncedAt: new Date(),
+                notes: existingNotes + syncNote,
+              });
+            }
+            results.estimates.updated++;
+          } else {
+            // Matching priority: 1. QBO Customer ID, 2. Name + Value
+            let candidateLeads: any[] = [];
+            const estimateValue = parseFloat(String(est.TotalAmt));
+            
+            // Try matching by QBO Customer ID first (deterministic)
+            if (qboCustomerId) {
+              candidateLeads = await storage.getLeadsByQboCustomerId(qboCustomerId);
+            }
+            
+            // Filter for eligible leads (not closed, value within range)
+            let eligibleLeads = candidateLeads.filter(lead => {
+              if (lead.dealStage === "Closed Won" || lead.dealStage === "Closed Lost") return false;
+              if (!lead.value || lead.value === "0") return true;
+              const leadValue = parseFloat(lead.value);
+              const valueDiff = Math.abs(leadValue - estimateValue) / Math.max(leadValue, estimateValue, 1);
+              return valueDiff <= 0.30;
+            });
+            
+            // If all QBO Customer ID matches are ineligible, fall back to name matching
+            if (eligibleLeads.length === 0) {
+              candidateLeads = await storage.getLeadsByClientName(customerName);
+              eligibleLeads = candidateLeads.filter(lead => {
+                if (lead.dealStage === "Closed Won" || lead.dealStage === "Closed Lost") return false;
+                if (!lead.value || lead.value === "0") return true;
+                const leadValue = parseFloat(lead.value);
+                const valueDiff = Math.abs(leadValue - estimateValue) / Math.max(leadValue, estimateValue, 1);
+                return valueDiff <= 0.30;
+              });
+            }
+            
+            if (eligibleLeads.length >= 1) {
+              // One or more matches - pick the best one using deterministic scoring
+              const scoredLeads = eligibleLeads.map(lead => {
+                let score = 0;
+                const leadValue = parseFloat(lead.value || "0");
+                // Closer value = higher score (0-100 points)
+                const valueDiff = Math.abs(leadValue - estimateValue) / Math.max(leadValue, estimateValue, 1);
+                score += (1 - valueDiff) * 100;
+                // Address match bonus (+50)
+                if (address && lead.projectAddress && lead.projectAddress.toLowerCase().includes(address.toLowerCase().substring(0, 20))) {
+                  score += 50;
+                }
+                // More recent activity bonus (+25 for last 30 days, scaled)
+                if (lead.lastContactDate) {
+                  const daysSinceContact = (Date.now() - new Date(lead.lastContactDate).getTime()) / (1000 * 60 * 60 * 24);
+                  score += Math.max(0, 25 - (daysSinceContact * 0.8));
+                }
+                // Deterministic tie-breaker: lower ID wins (first created)
+                score -= lead.id * 0.0001;
+                return { lead, score };
+              });
+              
+              scoredLeads.sort((a, b) => b.score - a.score);
+              const matchedLead = scoredLeads[0].lead;
+              const existingNotes = matchedLead.notes || "";
+              const currentStageIndex = getStageIndex(matchedLead.dealStage);
+              const multiMatchNote = eligibleLeads.length > 1 ? ` [Best match of ${eligibleLeads.length} candidates by value/address/recency]` : "";
+              
+              await storage.updateLead(matchedLead.id, {
+                value: String(est.TotalAmt),
+                // Only advance to Proposal if in earlier stage
+                ...(currentStageIndex < proposalIndex ? { dealStage: "Proposal", probability: 50 } : {}),
+                qboEstimateId: est.Id,
+                qboEstimateNumber: est.DocNumber || null,
+                qboCustomerId: qboCustomerId,
+                qboSyncedAt: new Date(),
+                notes: existingNotes + `\n[QB Estimate #${est.DocNumber || est.Id} linked]${multiMatchNote}`,
+              });
+              results.estimates.updated++;
+            } else {
+              // No match - create new lead
+              await storage.createLead({
+                clientName: customerName,
+                projectName: projectName,
+                projectAddress: address,
+                value: String(est.TotalAmt),
+                dealStage: "Proposal",
+                probability: 50,
+                source: "quickbooks_sync",
+                qboEstimateId: est.Id,
+                qboEstimateNumber: est.DocNumber || null,
+                qboCustomerId: qboCustomerId,
+                qboSyncedAt: new Date(),
+                contactEmail: est.BillEmail?.Address || null,
+                notes: `[Imported from QuickBooks Estimate #${est.DocNumber || est.Id}]`,
+              });
+              results.estimates.imported++;
+            }
+          }
+        } catch (err: any) {
+          results.estimates.errors.push(`Estimate ${est.Id}: ${err.message}`);
+        }
+      }
+
+      const totalImported = results.invoices.imported + results.estimates.imported;
+      const totalUpdated = results.invoices.updated + results.estimates.updated;
+      const totalErrors = results.invoices.errors.length + results.estimates.errors.length;
+
+      res.json({
+        message: `Synced ${totalImported} new deals, updated ${totalUpdated} existing deals${totalErrors > 0 ? `, ${totalErrors} errors` : ""}`,
+        ...results,
+      });
+    } catch (error: any) {
+      const errorMessage = error.message || "Pipeline sync failed";
+      if (errorMessage.includes("401") || errorMessage.includes("not connected")) {
+        res.status(401).json({ message: "QuickBooks authentication expired. Please reconnect.", needsReauth: true });
+      } else {
+        res.status(500).json({ message: errorMessage });
+      }
+    }
+  }));
 }

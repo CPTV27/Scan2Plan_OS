@@ -24,6 +24,11 @@ export interface IStorage {
   // Leads
   getLeads(): Promise<Lead[]>;
   getLead(id: number): Promise<Lead | undefined>;
+  getLeadByQboInvoiceId(qboInvoiceId: string): Promise<Lead | undefined>;
+  getLeadByQboEstimateId(qboEstimateId: string): Promise<Lead | undefined>;
+  getLeadByClientName(clientName: string): Promise<Lead | undefined>;
+  getLeadsByClientName(clientName: string): Promise<Lead[]>;
+  getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead>;
   deleteLead(id: number): Promise<void>;
@@ -158,6 +163,29 @@ export class DatabaseStorage implements IStorage {
   async getLead(id: number): Promise<Lead | undefined> {
     const [lead] = await db.select().from(leads).where(eq(leads.id, id));
     return lead;
+  }
+
+  async getLeadByQboInvoiceId(qboInvoiceId: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.qboInvoiceId, qboInvoiceId));
+    return lead;
+  }
+
+  async getLeadByQboEstimateId(qboEstimateId: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.qboEstimateId, qboEstimateId));
+    return lead;
+  }
+
+  async getLeadByClientName(clientName: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.clientName, clientName));
+    return lead;
+  }
+
+  async getLeadsByClientName(clientName: string): Promise<Lead[]> {
+    return await db.select().from(leads).where(eq(leads.clientName, clientName)).orderBy(desc(leads.lastContactDate));
+  }
+
+  async getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]> {
+    return await db.select().from(leads).where(eq(leads.qboCustomerId, qboCustomerId)).orderBy(desc(leads.lastContactDate));
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {

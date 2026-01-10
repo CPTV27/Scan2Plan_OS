@@ -618,6 +618,8 @@ export const leads = pgTable("leads", {
   // QuickBooks Online Integration
   qboEstimateId: text("qbo_estimate_id"), // QuickBooks Estimate ID (e.g., "1024")
   qboEstimateNumber: text("qbo_estimate_number"), // QuickBooks Estimate DocNumber (e.g., "EST-1024")
+  qboInvoiceId: text("qbo_invoice_id"), // QuickBooks Invoice ID (e.g., "2048")
+  qboInvoiceNumber: text("qbo_invoice_number"), // QuickBooks Invoice DocNumber (e.g., "INV-2048")
   qboCustomerId: text("qbo_customer_id"), // QuickBooks Customer ID
   qboSyncedAt: timestamp("qbo_synced_at"), // Last sync timestamp
   // PandaDoc Integration (E-Signature)
