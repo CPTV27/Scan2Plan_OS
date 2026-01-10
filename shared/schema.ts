@@ -1154,6 +1154,42 @@ export const quickbooksTokens = pgTable("quickbooks_tokens", {
 
 export type QuickBooksToken = typeof quickbooksTokens.$inferSelect;
 
+// === QUICKBOOKS CUSTOMERS (Synced from QuickBooks) ===
+export const qbCustomers = pgTable("qb_customers", {
+  id: serial("id").primaryKey(),
+  qbId: text("qb_id").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  companyName: text("company_name"),
+  email: text("email"),
+  phone: text("phone"),
+  mobile: text("mobile"),
+  fax: text("fax"),
+  billingLine1: text("billing_line1"),
+  billingLine2: text("billing_line2"),
+  billingCity: text("billing_city"),
+  billingState: text("billing_state"),
+  billingPostalCode: text("billing_postal_code"),
+  billingCountry: text("billing_country"),
+  shippingLine1: text("shipping_line1"),
+  shippingLine2: text("shipping_line2"),
+  shippingCity: text("shipping_city"),
+  shippingState: text("shipping_state"),
+  shippingPostalCode: text("shipping_postal_code"),
+  shippingCountry: text("shipping_country"),
+  balance: decimal("balance", { precision: 12, scale: 2 }),
+  active: boolean("active").default(true),
+  syncedAt: timestamp("synced_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQbCustomerSchema = createInsertSchema(qbCustomers).omit({
+  id: true,
+  createdAt: true,
+  syncedAt: true,
+});
+export type InsertQbCustomer = z.infer<typeof insertQbCustomerSchema>;
+export type QbCustomer = typeof qbCustomers.$inferSelect;
+
 // === EXPENSES (From QuickBooks or Field Entry) ===
 export const FIELD_EXPENSE_CATEGORIES = [
   "Parking",

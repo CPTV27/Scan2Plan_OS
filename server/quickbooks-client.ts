@@ -895,6 +895,85 @@ export class QuickBooksClient {
     const domain = isSandbox ? "sandbox.qbo.intuit.com" : "qbo.intuit.com";
     return `https://${domain}/app/invoice?txnId=${invoiceId}&companyId=${realmId}`;
   }
+
+  // Fetch all customers from QuickBooks
+  async getAllCustomers(): Promise<Array<{
+    id: string;
+    displayName: string;
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    mobile?: string;
+    fax?: string;
+    billingAddress?: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+    shippingAddress?: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+    balance?: number;
+    active?: boolean;
+  }>> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const query = "SELECT * FROM Customer MAXRESULTS 1000";
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/query?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch customers: ${error}`);
+    }
+
+    const data = await response.json();
+    const customers = data.QueryResponse?.Customer || [];
+
+    return customers.map((c: any) => ({
+      id: c.Id,
+      displayName: c.DisplayName,
+      companyName: c.CompanyName,
+      email: c.PrimaryEmailAddr?.Address,
+      phone: c.PrimaryPhone?.FreeFormNumber,
+      mobile: c.Mobile?.FreeFormNumber,
+      fax: c.Fax?.FreeFormNumber,
+      billingAddress: c.BillAddr ? {
+        line1: c.BillAddr.Line1,
+        line2: c.BillAddr.Line2,
+        city: c.BillAddr.City,
+        state: c.BillAddr.CountrySubDivisionCode,
+        postalCode: c.BillAddr.PostalCode,
+        country: c.BillAddr.Country,
+      } : undefined,
+      shippingAddress: c.ShipAddr ? {
+        line1: c.ShipAddr.Line1,
+        line2: c.ShipAddr.Line2,
+        city: c.ShipAddr.City,
+        state: c.ShipAddr.CountrySubDivisionCode,
+        postalCode: c.ShipAddr.PostalCode,
+        country: c.ShipAddr.Country,
+      } : undefined,
+      balance: c.Balance,
+      active: c.Active,
+    }));
+  }
 }
 
 export const quickbooksClient = new QuickBooksClient();

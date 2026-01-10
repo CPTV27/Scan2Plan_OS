@@ -3,7 +3,7 @@ import {
   leads, projects, fieldNotes, settings, leadResearch, scantechs,
   users, accounts, invoices, internalLoans, vendorPayables, quoteVersions, projectAttachments,
   cpqPricingMatrix, cpqUpteamPricingMatrix, cpqCadPricingMatrix, cpqPricingParameters, cpqQuotes,
-  caseStudies, notifications, dealAttributions, events, eventRegistrations,
+  caseStudies, notifications, dealAttributions, events, eventRegistrations, qbCustomers,
   type InsertLead, type InsertProject, type InsertFieldNote, type InsertLeadResearch,
   type Lead, type Project, type FieldNote, type Setting, type LeadResearch, type User, type UserRole,
   type Account, type InsertAccount, type Invoice, type InsertInvoice,
@@ -16,9 +16,10 @@ import {
   type CaseStudy, type InsertCaseStudy,
   type Notification, type InsertNotification,
   type DealAttribution, type InsertDealAttribution,
-  type Event, type InsertEvent, type EventRegistration, type InsertEventRegistration
+  type Event, type InsertEvent, type EventRegistration, type InsertEventRegistration,
+  type QbCustomer, type InsertQbCustomer
 } from "@shared/schema";
-import { eq, desc, and, lt, sql, max } from "drizzle-orm";
+import { eq, desc, and, lt, sql, max, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // Leads
@@ -153,6 +154,12 @@ export interface IStorage {
 
   // ABM Analytics
   getTierAAccountPenetration(): Promise<{ total: number; engaged: number; percentage: number }>;
+
+  // QuickBooks Customers (Synced)
+  getQbCustomers(): Promise<QbCustomer[]>;
+  searchQbCustomers(query: string): Promise<QbCustomer[]>;
+  getQbCustomerByQbId(qbId: string): Promise<QbCustomer | undefined>;
+  upsertQbCustomer(customer: InsertQbCustomer): Promise<QbCustomer>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -883,6 +890,39 @@ export class DatabaseStorage implements IStorage {
     const percentage = total > 0 ? Math.round((engaged / total) * 100) : 0;
 
     return { total, engaged, percentage };
+  }
+
+  // QuickBooks Customers
+  async getQbCustomers(): Promise<QbCustomer[]> {
+    return await db.select().from(qbCustomers).orderBy(qbCustomers.displayName);
+  }
+
+  async searchQbCustomers(query: string): Promise<QbCustomer[]> {
+    if (!query || query.length < 2) return [];
+    const searchPattern = `%${query}%`;
+    return await db.select().from(qbCustomers)
+      .where(ilike(qbCustomers.displayName, searchPattern))
+      .orderBy(qbCustomers.displayName)
+      .limit(20);
+  }
+
+  async getQbCustomerByQbId(qbId: string): Promise<QbCustomer | undefined> {
+    const [customer] = await db.select().from(qbCustomers).where(eq(qbCustomers.qbId, qbId));
+    return customer;
+  }
+
+  async upsertQbCustomer(customer: InsertQbCustomer): Promise<QbCustomer> {
+    const existing = await this.getQbCustomerByQbId(customer.qbId);
+    if (existing) {
+      const [updated] = await db.update(qbCustomers)
+        .set({ ...customer, syncedAt: new Date() })
+        .where(eq(qbCustomers.qbId, customer.qbId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(qbCustomers).values(customer).returning();
+      return created;
+    }
   }
 }
 
