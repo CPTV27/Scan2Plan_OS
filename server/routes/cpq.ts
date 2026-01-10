@@ -329,6 +329,19 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     }
   }));
 
+  app.delete("/api/cpq-quotes/:id", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const quoteId = Number(req.params.id);
+      const quote = await storage.getCpqQuote(quoteId);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      await storage.deleteCpqQuote(quoteId);
+      res.status(204).send();
+    } catch (error) {
+      log("ERROR: Error deleting CPQ quote - " + (error as any)?.message);
+      res.status(500).json({ message: "Failed to delete quote" });
+    }
+  }));
+
   app.post("/api/cpq-quotes/:id/versions", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const sourceQuoteId = Number(req.params.id);

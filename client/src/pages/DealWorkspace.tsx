@@ -64,15 +64,28 @@ import {
   Loader2,
   MapPin,
   MessageSquare,
+  MoreVertical,
   Plus,
   Save,
   Sparkles,
   Star,
+  Trash2,
   Upload,
   User,
   Users,
   X,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest } from "@/lib/queryClient";
 import type { Lead, CpqQuote, DealAttribution } from "@shared/schema";
@@ -440,6 +453,24 @@ export default function DealWorkspace() {
       toast({ 
         title: "Error", 
         description: error.message || "Failed to generate Project ID", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("DELETE", `/api/leads/${leadId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Deal Deleted", description: "The deal has been permanently removed." });
+      setLocation("/sales");
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to delete deal", 
         variant: "destructive" 
       });
     },
@@ -823,6 +854,52 @@ export default function DealWorkspace() {
           )}
           {/* QuickBooks Sync Status */}
           <QboEstimateBadge lead={lead} />
+          
+          {/* More Actions Menu with Delete */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" data-testid="button-more-actions">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem 
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-destructive focus:text-destructive"
+                    data-testid="menu-delete-deal"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Deal
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this deal?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete "{lead.clientName}" and all associated quotes. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteLeadMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      data-testid="button-confirm-delete"
+                    >
+                      {deleteLeadMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-2" />
+                      )}
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

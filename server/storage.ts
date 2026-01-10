@@ -117,6 +117,7 @@ export interface IStorage {
   getLatestCpqQuoteForLead(leadId: number): Promise<CpqQuote | undefined>;
   createCpqQuote(quote: InsertCpqQuote): Promise<CpqQuote>;
   updateCpqQuote(id: number, updates: Partial<InsertCpqQuote>): Promise<CpqQuote | undefined>;
+  deleteCpqQuote(id: number): Promise<void>;
   createCpqQuoteVersion(sourceQuoteId: number, versionName: string | undefined, createdBy: string): Promise<CpqQuote>;
 
   // Case Studies (Proof Vault)
@@ -652,6 +653,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(cpqQuotes.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteCpqQuote(id: number): Promise<void> {
+    // First delete any PandaDoc documents referencing this quote
+    await db.delete(pandaDocDocuments).where(eq(pandaDocDocuments.cpqQuoteId, id));
+    await db.delete(cpqQuotes).where(eq(cpqQuotes.id, id));
   }
 
   async createCpqQuoteVersion(sourceQuoteId: number, versionName: string | undefined, createdBy: string): Promise<CpqQuote> {
