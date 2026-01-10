@@ -103,6 +103,7 @@ import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
 import { Brain, Paperclip, Download, Eye } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
+import { SendProposalDialog } from "@/components/SendProposalDialog";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -1075,6 +1076,7 @@ export default function DealWorkspace() {
     return "lead";
   });
   const { toast } = useToast();
+  const [showProposalDialog, setShowProposalDialog] = useState(false);
   
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents"];
@@ -1192,11 +1194,12 @@ export default function DealWorkspace() {
   });
 
   const sendProposalMutation = useMutation({
-    mutationFn: async (recipientEmail?: string) => {
+    mutationFn: async ({ recipientEmail, customSubject }: { recipientEmail: string; customSubject: string }) => {
       if (!leadId) throw new Error("No lead ID");
       const response = await apiRequest("POST", "/api/google/gmail/send-proposal", {
         leadId,
         recipientEmail,
+        customSubject,
       });
       if (!response.ok) {
         const error = await response.json();
@@ -1205,6 +1208,7 @@ export default function DealWorkspace() {
       return response.json();
     },
     onSuccess: (data) => {
+      setShowProposalDialog(false);
       toast({ 
         title: "Proposal Sent", 
         description: `Proposal email sent to ${data.sentTo}` 
@@ -1602,15 +1606,10 @@ export default function DealWorkspace() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
-                disabled={sendProposalMutation.isPending}
+                onClick={() => setShowProposalDialog(true)}
                 data-testid="button-send-proposal"
               >
-                {sendProposalMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4 mr-2" />
-                )}
+                <Mail className="w-4 h-4 mr-2" />
                 Send Proposal
               </Button>
             </>
@@ -2424,6 +2423,23 @@ export default function DealWorkspace() {
           </ScrollArea>
         </TabsContent>
       </Tabs>
+
+      {lead && latestQuote && (
+        <SendProposalDialog
+          open={showProposalDialog}
+          onOpenChange={setShowProposalDialog}
+          leadId={leadId}
+          projectName={lead.projectName || ""}
+          clientName={lead.clientName}
+          contactName={lead.contactName || undefined}
+          contactEmail={lead.contactEmail || undefined}
+          billingContactName={lead.billingContactName || undefined}
+          billingContactEmail={lead.billingContactEmail || undefined}
+          quoteTotal={latestQuote.totalPrice ? Number(latestQuote.totalPrice) : undefined}
+          onSend={(email, subject) => sendProposalMutation.mutate({ recipientEmail: email, customSubject: subject })}
+          isSending={sendProposalMutation.isPending}
+        />
+      )}
     </div>
   );
 }
