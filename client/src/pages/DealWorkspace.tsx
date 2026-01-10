@@ -1482,11 +1482,18 @@ export default function DealWorkspace() {
               </div>
             )}
             <ScrollArea className="flex-1">
-              <CPQCalculator
-                leadId={leadId}
-                quoteId={currentQuoteId}
-                onClose={() => setLocation("/sales")}
-              />
+              {quotesLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <CPQCalculator
+                  key={currentQuoteId || "new"}
+                  leadId={leadId}
+                  quoteId={currentQuoteId}
+                  onClose={() => setLocation("/sales")}
+                />
+              )}
             </ScrollArea>
           </div>
         </TabsContent>
