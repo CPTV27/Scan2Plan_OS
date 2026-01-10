@@ -63,6 +63,7 @@ import {
   HardDrive,
   History,
   Loader2,
+  Mail,
   MapPin,
   MessageSquare,
   MoreVertical,
@@ -508,6 +509,34 @@ export default function DealWorkspace() {
     },
   });
 
+  const sendProposalMutation = useMutation({
+    mutationFn: async (recipientEmail?: string) => {
+      if (!leadId) throw new Error("No lead ID");
+      const response = await apiRequest("POST", "/api/google/gmail/send-proposal", {
+        leadId,
+        recipientEmail,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to send proposal email");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ 
+        title: "Proposal Sent", 
+        description: `Proposal email sent to ${data.sentTo}` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to send proposal email", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Check QuickBooks connection status
   const { data: qboStatus } = useQuery<{ connected: boolean }>({
     queryKey: ["/api/quickbooks/estimate-url", leadId],
@@ -933,6 +962,21 @@ export default function DealWorkspace() {
                 >
                   <FileDown className="w-4 h-4 mr-2" />
                   Download Estimate PDF
+                </DropdownMenuItem>
+              )}
+              {/* Send proposal email - requires quote */}
+              {latestQuote && (
+                <DropdownMenuItem 
+                  onClick={() => sendProposalMutation.mutate(lead.contactEmail || undefined)}
+                  disabled={sendProposalMutation.isPending}
+                  data-testid="menu-send-proposal"
+                >
+                  {sendProposalMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Mail className="w-4 h-4 mr-2" />
+                  )}
+                  Send Proposal Email
                 </DropdownMenuItem>
               )}
               <AlertDialog>

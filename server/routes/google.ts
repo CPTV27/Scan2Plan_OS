@@ -3,8 +3,150 @@ import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { getGmailClient, getCalendarClient, getDriveClient } from "../google-clients";
 import { log } from "../lib/logger";
+import { storage } from "../storage";
 import multer from "multer";
 import fs from "fs";
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function generateProposalEmailHtml(lead: any, quote: any): string {
+  const clientName = lead.contactName || lead.company || 'Valued Client';
+  const projectName = lead.projectName || lead.company || 'Your Project';
+  const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
+  const areas = quote?.areas || [];
+  
+  let areaDetails = '';
+  if (areas.length > 0) {
+    areaDetails = areas.map((area: any, i: number) => {
+      const sqft = area.kind === 'landscape' ? Math.round(area.acres * 43560) : area.sqft;
+      return `<tr>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${area.name || `Area ${i + 1}`}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb;">${area.buildingType || area.kind}</td>
+        <td style="padding: 8px 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${sqft?.toLocaleString() || '-'} sqft</td>
+      </tr>`;
+    }).join('');
+  }
+  
+  const pricingBreakdown = quote?.pricingBreakdown;
+  let servicesHtml = '';
+  if (pricingBreakdown?.services?.length > 0) {
+    servicesHtml = pricingBreakdown.services.map((svc: any) => 
+      `<li style="margin: 4px 0;">${svc.name}: ${formatCurrency(svc.price)}</li>`
+    ).join('');
+  }
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1f2937; max-width: 640px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+  <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); color: white; padding: 32px; border-radius: 12px 12px 0 0;">
+    <h1 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700;">Scan2Plan</h1>
+    <p style="margin: 0; opacity: 0.9; font-size: 14px;">Precision 3D Laser Scanning & BIM Services</p>
+  </div>
+  
+  <div style="background: white; padding: 32px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <p style="font-size: 16px; margin-bottom: 24px;">Dear ${clientName},</p>
+    
+    <p>Thank you for the opportunity to provide a proposal for <strong>${projectName}</strong>. Based on our discussions and site analysis, we are pleased to present the following scope and investment summary.</p>
+    
+    <div style="background: #f0f9ff; border-left: 4px solid #2563eb; padding: 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
+      <h2 style="margin: 0 0 12px 0; color: #1e40af; font-size: 18px;">Project Investment</h2>
+      <p style="margin: 0; font-size: 32px; font-weight: 700; color: #1e3a5f;">${formatCurrency(totalPrice)}</p>
+    </div>
+    
+    ${areas.length > 0 ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Scope of Work</h3>
+    <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+      <thead>
+        <tr style="background: #f3f4f6;">
+          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Area</th>
+          <th style="padding: 10px 12px; text-align: left; font-weight: 600;">Type</th>
+          <th style="padding: 10px 12px; text-align: right; font-weight: 600;">Size</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${areaDetails}
+      </tbody>
+    </table>
+    ` : ''}
+    
+    ${servicesHtml ? `
+    <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Services Included</h3>
+    <ul style="padding-left: 20px; margin: 16px 0;">
+      ${servicesHtml}
+    </ul>
+    ` : ''}
+    
+    <div style="margin-top: 32px;">
+      <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px;">What's Included</h3>
+      <ul style="padding-left: 20px;">
+        <li style="margin: 8px 0;">High-definition 3D laser scanning of all designated areas</li>
+        <li style="margin: 8px 0;">Point cloud registration and processing</li>
+        <li style="margin: 8px 0;">BIM/CAD deliverables per specified Level of Detail</li>
+        <li style="margin: 8px 0;">Quality assurance review and final delivery</li>
+      </ul>
+    </div>
+    
+    <div style="background: #fef3c7; border: 1px solid #fbbf24; padding: 16px; border-radius: 8px; margin: 24px 0;">
+      <p style="margin: 0; font-size: 14px;"><strong>Proposal Valid:</strong> This proposal is valid for 30 days from the date of this email.</p>
+    </div>
+    
+    <p style="margin-top: 32px;">We're confident our precision scanning services will provide the foundation for your project's success. Please don't hesitate to reach out with any questions.</p>
+    
+    <p style="margin-top: 24px;">
+      Best regards,<br>
+      <strong>The Scan2Plan Team</strong>
+    </p>
+  </div>
+  
+  <div style="text-align: center; padding: 24px; color: #6b7280; font-size: 12px;">
+    <p style="margin: 0;">Scan2Plan | Precision 3D Laser Scanning & BIM Services</p>
+    <p style="margin: 4px 0;">Brooklyn, NY | info@scan2plan.io</p>
+  </div>
+</body>
+</html>`;
+}
+
+function generateProposalEmailText(lead: any, quote: any): string {
+  const clientName = lead.contactName || lead.company || 'Valued Client';
+  const projectName = lead.projectName || lead.company || 'Your Project';
+  const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
+  
+  return `SCAN2PLAN - Precision 3D Laser Scanning & BIM Services
+
+Dear ${clientName},
+
+Thank you for the opportunity to provide a proposal for ${projectName}. Based on our discussions and site analysis, we are pleased to present the following scope and investment summary.
+
+PROJECT INVESTMENT: ${formatCurrency(totalPrice)}
+
+WHAT'S INCLUDED:
+- High-definition 3D laser scanning of all designated areas
+- Point cloud registration and processing
+- BIM/CAD deliverables per specified Level of Detail
+- Quality assurance review and final delivery
+
+This proposal is valid for 30 days from the date of this email.
+
+We're confident our precision scanning services will provide the foundation for your project's success. Please don't hesitate to reach out with any questions.
+
+Best regards,
+The Scan2Plan Team
+
+---
+Scan2Plan | Brooklyn, NY | info@scan2plan.io`;
+}
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -77,6 +219,82 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
     } catch (error: any) {
       log("ERROR: Gmail send error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Failed to send email" });
+    }
+  }));
+
+  app.post("/api/google/gmail/send-proposal", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    try {
+      const { leadId, recipientEmail, customSubject } = req.body;
+
+      if (!leadId) {
+        return res.status(400).json({ message: "leadId is required" });
+      }
+
+      const lead = await storage.getLead(leadId);
+      if (!lead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const quotes = await storage.getQuotesByLeadId(leadId);
+      const latestQuote = quotes.find(q => q.isLatest) || quotes[quotes.length - 1];
+
+      if (!latestQuote) {
+        return res.status(400).json({ message: "No quote found for this lead. Please create a quote first." });
+      }
+
+      const toEmail = recipientEmail || lead.contactEmail || lead.billingContactEmail || latestQuote.billingContactEmail;
+      if (!toEmail) {
+        return res.status(400).json({ message: "No recipient email provided and no contact email on lead or quote" });
+      }
+
+      const projectName = lead.projectName || lead.company || 'Your Project';
+      const subject = customSubject || `Scan2Plan Proposal - ${projectName}`;
+
+      const htmlBody = generateProposalEmailHtml(lead, latestQuote);
+      const textBody = generateProposalEmailText(lead, latestQuote);
+
+      const boundary = "----=_Part_" + Date.now().toString(36);
+      const email = [
+        `To: ${toEmail}`,
+        `Subject: ${subject}`,
+        'MIME-Version: 1.0',
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=utf-8',
+        'Content-Transfer-Encoding: quoted-printable',
+        '',
+        textBody,
+        '',
+        `--${boundary}`,
+        'Content-Type: text/html; charset=utf-8',
+        'Content-Transfer-Encoding: quoted-printable',
+        '',
+        htmlBody,
+        '',
+        `--${boundary}--`,
+      ].join('\r\n');
+
+      const encodedEmail = Buffer.from(email).toString('base64url');
+
+      const gmail = await getGmailClient();
+      const response = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: { raw: encodedEmail },
+      });
+
+      log(`INFO: Proposal email sent for lead ${leadId} to ${toEmail}`);
+
+      res.json({ 
+        success: true,
+        messageId: response.data.id, 
+        threadId: response.data.threadId,
+        sentTo: toEmail,
+        subject,
+      });
+    } catch (error: any) {
+      log("ERROR: Proposal email send error - " + (error?.message || error));
+      res.status(500).json({ message: error.message || "Failed to send proposal email" });
     }
   }));
 
