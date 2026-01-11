@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { buyerPersonas, personaInsights, leads, insertBuyerPersonaSchema, insertPersonaInsightSchema } from '@shared/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
+import { analyzeOutcome, suggestPersonaForLead, getBuyingModeGuidance, type DealContext } from '../services/personaLearning';
 
 export const personasRouter = Router();
 
@@ -215,6 +216,79 @@ personasRouter.get('/:id/insights', async (req, res) => {
     res.json(insights);
   } catch (error: any) {
     console.error('Error fetching insights:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+personasRouter.post('/analyze-outcome', async (req, res) => {
+  try {
+    const context: DealContext = req.body;
+    
+    if (!context.leadId || !context.personaCode || !context.outcome) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: leadId, personaCode, outcome' 
+      });
+    }
+
+    const result = await analyzeOutcome(context);
+    
+    if (!result) {
+      return res.status(500).json({ error: 'Failed to analyze outcome' });
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('Error analyzing outcome:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+personasRouter.post('/suggest', async (req, res) => {
+  try {
+    const { clientName, projectName, projectType, contactName, contactTitle, notes } = req.body;
+    
+    if (!clientName) {
+      return res.status(400).json({ error: 'clientName is required' });
+    }
+
+    const suggestion = await suggestPersonaForLead({
+      clientName,
+      projectName,
+      projectType,
+      contactName,
+      contactTitle,
+      notes,
+    });
+
+    if (!suggestion) {
+      return res.status(500).json({ error: 'Failed to generate suggestion' });
+    }
+
+    res.json(suggestion);
+  } catch (error: any) {
+    console.error('Error suggesting persona:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+personasRouter.get('/:code/guidance', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const mode = req.query.mode as string;
+
+    if (!mode) {
+      return res.status(400).json({ error: 'mode query parameter is required' });
+    }
+
+    const guidance = await getBuyingModeGuidance(code, mode);
+
+    if (!guidance) {
+      return res.status(404).json({ error: 'Persona not found or guidance unavailable' });
+    }
+
+    res.json(guidance);
+  } catch (error: any) {
+    console.error('Error getting guidance:', error);
     res.status(500).json({ error: error.message });
   }
 });

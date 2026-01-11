@@ -115,6 +115,7 @@ import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
 import { CorrespondenceTimeline } from "@/components/CorrespondenceTimeline";
 import { SalesCoPilot } from "@/components/SalesCoPilot";
+import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { Slider } from "@/components/ui/slider";
 import { 
   calculatePricing, 
@@ -2415,6 +2416,21 @@ export default function DealWorkspace() {
         <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full">
             <div className="p-4 space-y-4">
+              {/* Persona Suggestion for new leads */}
+              <PersonaSuggestion
+                leadId={leadId}
+                clientName={lead.clientName}
+                projectName={lead.projectName}
+                projectType={lead.projectType}
+                contactName={lead.contactName}
+                contactTitle={lead.contactTitle}
+                notes={lead.notes}
+                currentPersonaCode={lead.buyerPersona}
+                onPersonaAssigned={() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+                }}
+              />
+              
               {/* Sales CoPilot - Persona-based guidance */}
               <SalesCoPilot lead={lead} compact />
               

@@ -16,6 +16,7 @@ import fs from "fs";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { aiClient, createProjectSummary } from "../services/ai";
+import { analyzeOutcome } from "../services/personaLearning";
 
 async function precomputeEmbedding(lead: any) {
   if (!aiClient.isConfigured()) return;
@@ -424,6 +425,48 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
           
           log(`Auto-created production project for lead ${leadId} (${lead.clientName}) with UPID: ${universalProjectId}`);
         }
+        
+        // Trigger persona learning loop for won deals
+        if (lead.buyerPersona) {
+          const cycleDays = previousLead.createdAt 
+            ? Math.floor((Date.now() - new Date(previousLead.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+            : undefined;
+          
+          analyzeOutcome({
+            leadId: leadId,
+            personaCode: lead.buyerPersona,
+            buyingMode: undefined, // Could be stored on lead if tracked
+            outcome: 'won',
+            dealValue: lead.value || undefined,
+            cycleLengthDays: cycleDays,
+            stageAtClose: 'Closed Won',
+            projectType: lead.projectType || undefined,
+            notes: lead.notes || undefined,
+          }).catch(err => {
+            log(`[Persona Learning] Analysis failed for won lead ${leadId}: ${err.message}`);
+          });
+        }
+      }
+      
+      // Trigger persona learning loop for lost deals  
+      const isClosingLost = input.dealStage === "Closed Lost" && previousLead.dealStage !== "Closed Lost";
+      if (isClosingLost && lead.buyerPersona) {
+        const cycleDays = previousLead.createdAt 
+          ? Math.floor((Date.now() - new Date(previousLead.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+          : undefined;
+        
+        analyzeOutcome({
+          leadId: leadId,
+          personaCode: lead.buyerPersona,
+          outcome: 'lost',
+          dealValue: lead.value || undefined,
+          cycleLengthDays: cycleDays,
+          stageAtClose: 'Closed Lost',
+          projectType: lead.projectType || undefined,
+          notes: lead.notes || undefined,
+        }).catch(err => {
+          log(`[Persona Learning] Analysis failed for lost lead ${leadId}: ${err.message}`);
+        });
       }
       
       res.json(lead);
