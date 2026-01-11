@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, FileText, Send, RefreshCw, ExternalLink, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, FileText, Send, RefreshCw, ExternalLink, AlertCircle, Eye, Mail, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PandaDocEmbedProps {
@@ -11,8 +12,13 @@ interface PandaDocEmbedProps {
   documentName?: string;
   onDocumentCreated?: (docId: string) => void;
   onDocumentSent?: () => void;
+  onOpenSendDialog?: () => void;
   leadId?: number;
   quoteId?: number;
+  proposalEmails?: Array<{
+    openCount: number;
+    sentAt: string;
+  }>;
 }
 
 interface DocumentStatus {
@@ -28,8 +34,10 @@ export function PandaDocEmbed({
   documentName,
   onDocumentSent,
   onDocumentCreated,
+  onOpenSendDialog,
   leadId,
   quoteId,
+  proposalEmails,
 }: PandaDocEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
@@ -228,8 +236,46 @@ export function PandaDocEmbed({
           <FileText className="h-5 w-5" />
           <span className="font-medium">{documentName || documentStatus?.name || "Proposal"}</span>
           {getStatusBadge()}
+          {/* Email Status Badge */}
+          {proposalEmails && proposalEmails.length > 0 && (
+            proposalEmails[0].openCount > 0 ? (
+              <Badge variant="default" className="bg-green-600 text-white text-xs" data-testid="badge-proposal-opened">
+                <Eye className="w-3 h-3 mr-1" />
+                Viewed {proposalEmails[0].openCount}x
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-xs" data-testid="badge-proposal-sent">
+                <Clock className="w-3 h-3 mr-1" />
+                Sent
+              </Badge>
+            )
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Preview Proposal PDF */}
+          {leadId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`/api/google/gmail/preview-proposal/${leadId}`, '_blank')}
+              data-testid="button-preview-proposal"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              Preview PDF
+            </Button>
+          )}
+          {/* Send Proposal Email */}
+          {onOpenSendDialog && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSendDialog}
+              data-testid="button-send-proposal"
+            >
+              <Mail className="h-4 w-4 mr-1" />
+              Send Email
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

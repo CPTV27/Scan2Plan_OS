@@ -2257,44 +2257,6 @@ export default function DealWorkspace() {
           {/* QuickBooks Sync Status */}
           <QboEstimateBadge lead={lead} />
           
-          {/* Proposal Buttons - Preview and Send */}
-          {latestQuote && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => window.open(`/api/google/gmail/preview-proposal/${leadId}`, '_blank')}
-                data-testid="button-preview-proposal"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                Preview Proposal
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowProposalDialog(true)}
-                data-testid="button-send-proposal"
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                Send Proposal
-              </Button>
-              {proposalEmails && proposalEmails.length > 0 && (
-                <div className="flex items-center gap-2">
-                  {proposalEmails[0].openCount > 0 ? (
-                    <Badge variant="default" className="bg-green-600 text-white text-xs" data-testid="badge-proposal-opened">
-                      <Eye className="w-3 h-3 mr-1" />
-                      Viewed {proposalEmails[0].openCount}x
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs" data-testid="badge-proposal-sent">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Sent
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </>
-          )}
 
           {/* Delete Button - Standalone with Confirmation */}
           <AlertDialog>
@@ -3606,6 +3568,8 @@ export default function DealWorkspace() {
             onDocumentSent={() => {
               queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
             }}
+            onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
+            proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
           />
         </TabsContent>
       </Tabs>
