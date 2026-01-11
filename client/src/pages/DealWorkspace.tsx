@@ -113,6 +113,7 @@ import {
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
+import { CorrespondenceTimeline } from "@/components/CorrespondenceTimeline";
 import { Slider } from "@/components/ui/slider";
 import { 
   calculatePricing, 
@@ -3581,25 +3582,11 @@ export default function DealWorkspace() {
         {/* Communicate Tab - Email correspondence timeline */}
         <TabsContent value="communicate" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    Email Correspondence
-                  </CardTitle>
-                  <CardDescription>
-                    View email history with contacts for this deal
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
-                    <Mail className="w-12 h-12 mb-4 opacity-50" />
-                    <p className="text-sm font-medium">Coming Soon</p>
-                    <p className="text-xs mt-1">Email thread sync will be available here</p>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="p-4">
+              <CorrespondenceTimeline 
+                leadId={leadId} 
+                contactEmail={lead?.contactEmail}
+              />
             </div>
           </ScrollArea>
         </TabsContent>
