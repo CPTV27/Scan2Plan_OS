@@ -448,6 +448,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   const [pricingResult, setPricingResult] = useState<CpqCalculateResponse | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [marginTarget, setMarginTarget] = useState<number>(0.45);
 
   useEffect(() => {
     if (lead) {
@@ -578,6 +579,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         },
         paymentTerms: paymentTerms as any,
         leadId,
+        marginTarget,
       };
 
       const response = await apiRequest("POST", "/api/cpq/calculate", request);
@@ -963,6 +965,30 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Margin Target Slider - Always Visible */}
+                <div className="space-y-3 mb-4 pb-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Margin Target</Label>
+                    <span className="text-sm font-semibold text-primary" data-testid="text-margin-target-value">
+                      {(marginTarget * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[marginTarget * 100]}
+                    onValueChange={(value) => setMarginTarget(value[0] / 100)}
+                    min={35}
+                    max={60}
+                    step={1}
+                    className="w-full"
+                    data-testid="slider-margin-target"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>35%</span>
+                    <span className="text-amber-600 dark:text-amber-400">45%</span>
+                    <span>60%</span>
+                  </div>
+                </div>
+
                 {pricingResult ? (
                   <div className="space-y-4">
                     <div className="space-y-2">
