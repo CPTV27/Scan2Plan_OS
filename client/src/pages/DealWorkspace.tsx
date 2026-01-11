@@ -6,7 +6,7 @@
  * Supports quote versioning with history display.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { useForm } from "react-hook-form";
@@ -452,8 +452,6 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   const [additionalElevations, setAdditionalElevations] = useState<string>("");
   const [paymentTerms, setPaymentTerms] = useState<string>("standard");
   
-  const [pricingResult, setPricingResult] = useState<CpqCalculateResponse | null>(null);
-  const [isCalculating, setIsCalculating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
 
@@ -562,8 +560,24 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
     }
   };
 
-  const handleCalculate = () => {
-    setIsCalculating(true);
+  // Helper to infer category from line item label
+  const inferCategory = (label: string, isTotal?: boolean, isDiscount?: boolean): "discipline" | "risk" | "area" | "travel" | "service" | "subtotal" | "total" => {
+    if (isTotal) return "total";
+    const lowerLabel = label.toLowerCase();
+    if (lowerLabel.includes("risk premium")) return "risk";
+    if (lowerLabel.includes("travel") || lowerLabel.includes("mileage") || lowerLabel.includes("hotel")) return "travel";
+    if (lowerLabel.includes("matterport") || lowerLabel.includes("cad") || lowerLabel.includes("elevation") || lowerLabel.includes("facade")) return "service";
+    if (lowerLabel.includes("discount") || lowerLabel.includes("terms") || lowerLabel.includes("adjustment")) return "subtotal";
+    return "discipline";
+  };
+
+  // Reactive pricing calculation - updates instantly when any input changes
+  const pricingResult = useMemo((): CpqCalculateResponse | null => {
+    // Don't calculate if no areas have valid sqft
+    if (!areas.length || areas.every(a => !a.squareFeet || parseInt(a.squareFeet) <= 0)) {
+      return null;
+    }
+
     try {
       // Convert areas to pricing engine format
       const pricingAreas: PricingArea[] = areas.map(a => ({
@@ -627,17 +641,6 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         });
       }
 
-      // Helper to infer category from line item label
-      const inferCategory = (label: string, isTotal?: boolean, isDiscount?: boolean): "discipline" | "risk" | "area" | "travel" | "service" | "subtotal" | "total" => {
-        if (isTotal) return "total";
-        const lowerLabel = label.toLowerCase();
-        if (lowerLabel.includes("risk premium")) return "risk";
-        if (lowerLabel.includes("travel") || lowerLabel.includes("mileage") || lowerLabel.includes("hotel")) return "travel";
-        if (lowerLabel.includes("matterport") || lowerLabel.includes("cad") || lowerLabel.includes("elevation") || lowerLabel.includes("facade")) return "service";
-        if (lowerLabel.includes("discount") || lowerLabel.includes("terms") || lowerLabel.includes("adjustment")) return "subtotal";
-        return "discipline";
-      };
-
       // Calculate payment premium from line items
       let paymentPremiumTotal = 0;
       result.items.forEach(item => {
@@ -648,7 +651,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
       });
 
       // Convert PricingResult to CpqCalculateResponse format
-      const response: CpqCalculateResponse = {
+      return {
         success: true,
         totalClientPrice: result.totalClientPrice,
         totalUpteamCost: result.totalUpteamCost,
@@ -674,15 +677,11 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         calculatedAt: new Date().toISOString(),
         engineVersion: "client-1.0",
       };
-
-      setPricingResult(response);
-      toast({ title: "Pricing Calculated", description: `Total: $${response.totalClientPrice.toLocaleString()}` });
     } catch (error) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to calculate pricing", variant: "destructive" });
-    } finally {
-      setIsCalculating(false);
+      console.error("Pricing calculation error:", error);
+      return null;
     }
-  };
+  }, [areas, dispatchLocation, distance, matterport, actScan, additionalElevations, risks, paymentTerms, marginTarget]);
 
   const handleSaveQuote = async () => {
     if (!pricingResult) {
@@ -1019,24 +1018,6 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
               </CardContent>
             </Card>
 
-            <Button 
-              className="w-full" 
-              onClick={handleCalculate} 
-              disabled={isCalculating || areas.some(a => !a.squareFeet)}
-              data-testid="button-calculate"
-            >
-              {isCalculating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Calculating...
-                </>
-              ) : (
-                <>
-                  <Calculator className="w-4 h-4 mr-2" />
-                  Calculate Price
-                </>
-              )}
-            </Button>
           </div>
 
           <div className="space-y-4">
