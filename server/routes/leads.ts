@@ -10,11 +10,77 @@ import { isGoogleDriveConnected, createProjectFolder, uploadFileToDrive } from "
 import path from "path";
 import { log } from "../lib/logger";
 import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
-import { TIER_A_THRESHOLD } from "@shared/schema";
+import { TIER_A_THRESHOLD, CPQ_BUILDING_TYPES } from "@shared/schema";
 import multer from "multer";
 import fs from "fs";
 
 const upload = multer({ dest: "/tmp/uploads/" });
+
+function generateScopeSummary(lead: any): string {
+  const areas = lead.cpqAreas || [];
+  if (areas.length === 0) return "No areas configured";
+
+  const totalSqft = areas.reduce((sum: number, area: any) => sum + (parseInt(area.squareFeet) || 0), 0);
+  const disciplines = [...new Set(areas.flatMap((a: any) => a.disciplines || []))];
+  const buildingTypes = [...new Set(areas.map((a: any) => {
+    const typeId = a.buildingType?.toString();
+    return (CPQ_BUILDING_TYPES as any)[typeId] || `Type ${typeId}`;
+  }))];
+
+  const parts: string[] = [];
+  
+  if (areas.length === 1) {
+    parts.push(`${totalSqft.toLocaleString()} sqft ${buildingTypes[0] || 'building'}`);
+  } else {
+    parts.push(`${areas.length} areas totaling ${totalSqft.toLocaleString()} sqft`);
+  }
+
+  if (disciplines.length > 0) {
+    const disciplineNames = (disciplines as string[]).map(d => {
+      const map: Record<string, string> = {
+        arch: 'Architecture',
+        struct: 'Structure', 
+        mech: 'Mechanical',
+        elec: 'Electrical',
+        plumb: 'Plumbing',
+        site: 'Site'
+      };
+      return map[d] || d;
+    });
+    parts.push(disciplineNames.join(', '));
+  }
+
+  const lods = areas.map((a: any) => a.lod).filter(Boolean);
+  if (lods.length > 0) {
+    const maxLod = Math.max(...lods.map((l: string) => parseInt(l) || 200));
+    parts.push(`LOD ${maxLod}`);
+  }
+
+  const risks = lead.cpqRisks || {};
+  const activeRisks = Object.entries(risks).filter(([_, v]) => v === true).map(([k]) => k);
+  if (activeRisks.length > 0) {
+    const riskNames = activeRisks.map(r => {
+      const map: Record<string, string> = {
+        remote: 'Remote',
+        fastTrack: 'Fast Track',
+        occupied: 'Occupied',
+        hazardous: 'Hazardous',
+        noPower: 'No Power/HVAC'
+      };
+      return map[r] || r;
+    });
+    parts.push(`Risk: ${riskNames.join(', ')}`);
+  }
+
+  if (lead.dispatchLocation) {
+    parts.push(`Dispatch: ${lead.dispatchLocation}`);
+    if (lead.distance) {
+      parts.push(`${lead.distance} mi`);
+    }
+  }
+
+  return parts.join(' • ');
+}
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -266,6 +332,8 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             log("WARN: Google Drive folder creation failed (non-blocking): " + (err as any)?.message);
           }
           
+          const scopeSummaryPut = generateScopeSummary(lead);
+          
           await storage.createProject({
             name: `${lead.clientName} - ${lead.projectAddress || 'Project'}`,
             leadId: leadId,
@@ -277,6 +345,21 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             driveFolderUrl,
             driveFolderStatus,
             driveSubfolders,
+            quotedPrice: lead.value?.toString(),
+            quotedMargin: lead.grossMarginPercent?.toString(),
+            quotedAreas: lead.cpqAreas || [],
+            quotedRisks: lead.cpqRisks || {},
+            quotedTravel: lead.cpqTravel || {},
+            quotedServices: lead.cpqServices || {},
+            siteReadiness: lead.siteReadiness || {},
+            clientName: lead.clientName,
+            clientContact: lead.contactName,
+            clientEmail: lead.contactEmail,
+            clientPhone: lead.contactPhone,
+            projectAddress: lead.projectAddress,
+            dispatchLocation: lead.dispatchLocation,
+            distance: lead.distance,
+            scopeSummary: scopeSummaryPut,
           } as any);
           
           log(`Auto-created production project for lead ${leadId} (${lead.clientName}) with UPID: ${universalProjectId}`);
@@ -423,6 +506,8 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             log("WARN: Google Drive folder creation failed: " + (err as any)?.message);
           }
           
+          const scopeSummaryStage = generateScopeSummary(lead);
+          
           await storage.createProject({
             name: `${lead.clientName} - ${lead.projectAddress || 'Project'}`,
             leadId: leadId,
@@ -434,9 +519,24 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             driveFolderUrl,
             driveFolderStatus,
             driveSubfolders,
+            quotedPrice: lead.value?.toString(),
+            quotedMargin: lead.grossMarginPercent?.toString(),
+            quotedAreas: lead.cpqAreas || [],
+            quotedRisks: lead.cpqRisks || {},
+            quotedTravel: lead.cpqTravel || {},
+            quotedServices: lead.cpqServices || {},
+            siteReadiness: lead.siteReadiness || {},
+            clientName: lead.clientName,
+            clientContact: lead.contactName,
+            clientEmail: lead.contactEmail,
+            clientPhone: lead.contactPhone,
+            projectAddress: lead.projectAddress,
+            dispatchLocation: lead.dispatchLocation,
+            distance: lead.distance,
+            scopeSummary: scopeSummaryStage,
           } as any);
           
-          log(`Auto-created production project for lead ${leadId} (${lead.clientName}) with UPID: ${universalProjectId}`);
+          log(`Auto-created production project for lead ${leadId} (${lead.clientName}) with UPID: ${universalProjectId}, scope: ${scopeSummaryStage}`);
           
           // Migrate lead documents to Google Drive "Additional Documents" folder
           if (driveFolderStatus === "success" && driveSubfolders?.additionalDocuments) {
