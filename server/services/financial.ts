@@ -98,14 +98,18 @@ export async function calculateProjectProfitability(projectId: number): Promise<
   let lead = null;
   let revenue = 0;
   
+  // Fetch lead first for owner info
   if (project.leadId) {
     lead = await db.query.leads.findFirst({
       where: eq(leads.id, project.leadId)
     });
-    
-    if (lead?.quotedPrice) {
-      revenue = parseFloat(lead.quotedPrice);
-    }
+  }
+  
+  // Try project.quotedPrice first (inherited at Closed Won), then fall back to lead.value
+  if (project.quotedPrice) {
+    revenue = parseFloat(project.quotedPrice);
+  } else if (lead?.value) {
+    revenue = parseFloat(lead.value);
   }
 
   // 3. Calculate Direct Labor (COGS) from time logs

@@ -101,6 +101,18 @@ export function registerProjectRoutes(app: Express): void {
     }
   }));
 
+  app.get("/api/projects/:id/financials", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const { calculateProjectProfitability } = await import("../services/financial");
+      const profitability = await calculateProjectProfitability(projectId);
+      res.json(profitability);
+    } catch (error) {
+      log("ERROR: Project financials error - " + (error as any)?.message);
+      res.status(400).json({ message: (error as any)?.message || "Failed to calculate profitability" });
+    }
+  }));
+
   app.get("/api/scantechs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const scantechs = await storage.getScantechs();
     res.json(scantechs);
