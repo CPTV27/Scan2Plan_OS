@@ -2390,17 +2390,21 @@ export default function DealWorkspace() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="ai" className="gap-2" data-testid="tab-ai-assistant">
+            <TabsTrigger value="proposal" className="gap-2" data-testid="tab-proposal">
               <Brain className="w-4 h-4" />
-              AI Assistant
+              Proposal
+            </TabsTrigger>
+            <TabsTrigger value="pandadoc" className="gap-2" data-testid="tab-pandadoc">
+              <FileSignature className="w-4 h-4" />
+              PandaDoc
+            </TabsTrigger>
+            <TabsTrigger value="communicate" className="gap-2" data-testid="tab-communicate">
+              <Mail className="w-4 h-4" />
+              Communicate
             </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
               <Paperclip className="w-4 h-4" />
               Documents
-            </TabsTrigger>
-            <TabsTrigger value="proposal" className="gap-2" data-testid="tab-proposal">
-              <FileSignature className="w-4 h-4" />
-              Proposal
             </TabsTrigger>
           </TabsList>
         </div>
@@ -3428,8 +3432,8 @@ export default function DealWorkspace() {
           </ScrollArea>
         </TabsContent>
 
-        {/* AI Assistant Tab */}
-        <TabsContent value="ai" className="flex-1 overflow-hidden m-0">
+        {/* Proposal Tab - Evidence Vault + AI Assistant */}
+        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full">
             <div className="p-4">
               <DealAIAssistant lead={lead} />
@@ -3556,7 +3560,8 @@ export default function DealWorkspace() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
+        {/* PandaDoc Tab - Document editing and signature */}
+        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0">
           <PandaDocEmbed
             pandaDocId={lead?.pandaDocId || null}
             documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
@@ -3571,6 +3576,32 @@ export default function DealWorkspace() {
             onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
             proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
           />
+        </TabsContent>
+
+        {/* Communicate Tab - Email correspondence timeline */}
+        <TabsContent value="communicate" className="flex-1 overflow-hidden m-0">
+          <ScrollArea className="h-full">
+            <div className="p-4 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Email Correspondence
+                  </CardTitle>
+                  <CardDescription>
+                    View email history with contacts for this deal
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+                    <Mail className="w-12 h-12 mb-4 opacity-50" />
+                    <p className="text-sm font-medium">Coming Soon</p>
+                    <p className="text-xs mt-1">Email thread sync will be available here</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
         </TabsContent>
       </Tabs>
 

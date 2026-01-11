@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { EvidenceVaultPanel } from "./EvidenceVaultPanel";
 import type { Lead } from "@shared/schema";
 
 interface BuyerPersona {
@@ -258,6 +259,9 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
 
   return (
     <div className="space-y-4">
+      {/* Evidence Vault Panel - Collapsible research insights */}
+      <EvidenceVaultPanel lead={lead} defaultOpen={false} />
+
       {/* Deal Summary Card */}
       <Card>
         <CardHeader className="pb-3">
