@@ -676,6 +676,8 @@ export const leads = pgTable("leads", {
   siteReadinessCompletedAt: timestamp("site_readiness_completed_at"), // When client submitted answers
   clientToken: text("client_token"), // Magic link token for public access
   clientTokenExpiresAt: timestamp("client_token_expires_at"), // Token expiration
+  // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
+  fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(), // {contactPhone: true, proofLinks: true} = explicitly marked N/A
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
@@ -992,6 +994,9 @@ export const projects = pgTable("projects", {
   
   // === Scope Summary (auto-generated plain English) ===
   scopeSummary: text("scope_summary"),
+  
+  // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
+  fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
   
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -1599,6 +1604,9 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   pandadocSentAt: timestamp("pandadoc_sent_at"),
   pandadocCompletedAt: timestamp("pandadoc_completed_at"),
   pandadocSignedBy: text("pandadoc_signed_by"),
+  
+  // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
+  fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
   
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
