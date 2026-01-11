@@ -12,7 +12,7 @@ Scan2Plan OS is an enterprise-grade management system designed as a "Command Cen
 Scan2Plan OS is built with a modern web stack, featuring a React 18 + TypeScript frontend utilizing Vite, Wouter for routing, TanStack Query for data fetching, and Shadcn/ui with Radix primitives styled by TailwindCSS. The backend is powered by Node.js + Express.js, using Drizzle ORM with PostgreSQL for data persistence and Zod for validation. Authentication is managed via Replit Auth (OpenID Connect) with PostgreSQL session storage. AI capabilities are integrated using OpenAI GPT-4o-mini, with Gemini integration available.
 
 Key modules include:
-- **CPQ Calculator:** Configures, prices, and quotes projects with unified area inputs, standard and Tier A pricing modes, travel cost logic, and a price adjustment mechanism. It enforces a 40% margin floor (FY26_GOALS.MARGIN_FLOOR) to protect profitability.
+- **CPQ Calculator:** Configures, prices, and quotes projects with unified area inputs, standard and Tier A pricing modes, travel cost logic, and a price adjustment mechanism. It enforces a 40% margin floor (FY26_GOALS.MARGIN_FLOOR) to protect profitability. Supports margin target slider (35%-60% range) with automatic client price calculation using formula: `clientPrice = cost / (1 - marginTarget)`. Includes guardrail warnings at 45% (BELOW_GUARDRAIL) and 40% (BELOW_FLOOR).
 - **Sales Pipeline:** A 6-stage Kanban board (Lead to Closed) with drag-and-drop functionality, lead scoring, UPID generation, and a deal workspace.
 - **Production Module:** A 7-stage workflow Kanban with hard gates and margin tracking.
 - **Financial Module:** Integrates with QuickBooks for Balance Sheet/P&L display and features a Profit First dashboard.
