@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings, Target, Shield, Megaphone } from "lucide-react";
+import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings, Target, Shield, Megaphone, Building2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ProposalGenerator, NegotiationConsole, MarketingGenerator } from "@/components/intelligence";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
+import type { Lead } from "@shared/schema";
 
 type BuyerType = "BP1" | "BP2" | "BP3" | "BP4" | "BP5" | "BP6" | "BP7" | "BP8";
 type PainPoint = "Rework_RFI" | "ScheduleVolatility" | "Inconsistency" | "Terms_Risk";
@@ -83,18 +84,63 @@ const AUTHOR_MODE_OPTIONS: { value: AuthorMode; label: string; description: stri
   { value: "Fuller", label: "Fuller Mode", description: "Systems thinking, infrastructure framing" },
 ];
 
+function buildProjectContext(lead: Lead): string {
+  const parts: string[] = [];
+  
+  if (lead.projectName) parts.push(`Project: ${lead.projectName}`);
+  if (lead.clientName) parts.push(`Client: ${lead.clientName}`);
+  if (lead.projectAddress) parts.push(`Location: ${lead.projectAddress}`);
+  if (lead.buildingType) parts.push(`Building Type: ${lead.buildingType}`);
+  if (lead.sqft) parts.push(`Size: ${lead.sqft.toLocaleString()} sqft`);
+  if (lead.scope) parts.push(`Scope: ${lead.scope}`);
+  if (lead.disciplines) {
+    const disciplines = Array.isArray(lead.disciplines) ? lead.disciplines : [lead.disciplines];
+    if (disciplines.length > 0) {
+      parts.push(`Disciplines: ${disciplines.join(", ")}`);
+    }
+  }
+  if (lead.notes) parts.push(`Notes: ${lead.notes}`);
+  
+  return parts.join("\n");
+}
+
 export default function BrandGenerator() {
   const { toast } = useToast();
   const [buyerType, setBuyerType] = useState<BuyerType>("BP5");
   const [painPoint, setPainPoint] = useState<PainPoint>("Rework_RFI");
   const [authorMode, setAuthorMode] = useState<AuthorMode>("Twain");
+  const [selectedLeadId, setSelectedLeadId] = useState<string>("");
   const [projectContext, setProjectContext] = useState("");
   const [generatedContent, setGeneratedContent] = useState<GenerationResult | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const { data: leads } = useQuery<Lead[]>({
+    queryKey: ["/api/leads"],
+  });
+
   const { data: auditLogs, isLoading: logsLoading } = useQuery<{ success: boolean; data: AuditLog[] }>({
     queryKey: ["/api/brand/audit-logs"],
   });
+
+  const handleProjectSelect = (leadId: string) => {
+    setSelectedLeadId(leadId);
+    if (leadId && leads) {
+      const selected = leads.find(l => l.id.toString() === leadId);
+      if (selected) {
+        setProjectContext(buildProjectContext(selected));
+        if (selected.buyerPersona) {
+          const personaMap: Record<string, BuyerType> = {
+            "Design Principal": "BP5",
+            "Project Architect": "BP3",
+            "Owner Rep": "BP3",
+            "GC/CM": "BP2",
+          };
+          const mappedPersona = personaMap[selected.buyerPersona];
+          if (mappedPersona) setBuyerType(mappedPersona);
+        }
+      }
+    }
+  };
 
   const { data: standards } = useQuery<{ success: boolean; data: StandardDefinition[] }>({
     queryKey: ["/api/brand/standards"],
@@ -304,6 +350,33 @@ export default function BrandGenerator() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Select Project</Label>
+                  <Select value={selectedLeadId} onValueChange={handleProjectSelect}>
+                    <SelectTrigger data-testid="select-project">
+                      <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <SelectValue placeholder="Choose a project to auto-fill context..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No project selected</SelectItem>
+                      {leads?.map((lead) => (
+                        <SelectItem key={lead.id} value={lead.id.toString()} data-testid={`option-project-${lead.id}`}>
+                          <div>
+                            <div className="font-medium">{lead.projectName || lead.clientName || `Lead #${lead.id}`}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {lead.clientName && lead.projectName ? lead.clientName : ""} 
+                              {lead.projectAddress ? ` - ${lead.projectAddress}` : ""}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Select a project to auto-fill the context below.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
