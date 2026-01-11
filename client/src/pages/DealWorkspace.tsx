@@ -433,6 +433,8 @@ interface QuoteBuilderTabProps {
 }
 
 function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, existingQuotes }: QuoteBuilderTabProps) {
+  const updateLeadMutation = useUpdateLead();
+  
   const [areas, setAreas] = useState<QuoteBuilderArea[]>([{
     id: "1",
     name: "",
@@ -779,9 +781,16 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Building2 className="w-4 h-4" />
-                  Project Info
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Project Info
+                  </span>
+                  {lead.requiresOverride && (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30" data-testid="badge-tier-a">
+                      Tier A
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -798,6 +807,15 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                 <div>
                   <Label className="text-xs text-muted-foreground">Address</Label>
                   <div className="font-medium text-sm">{lead.projectAddress || "—"}</div>
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <Checkbox
+                    id="tierA"
+                    checked={lead.requiresOverride || false}
+                    onCheckedChange={(checked) => updateLeadMutation.mutate({ id: leadId, requiresOverride: checked === true })}
+                    data-testid="checkbox-tier-a"
+                  />
+                  <Label htmlFor="tierA" className="text-sm cursor-pointer">Tier A Job</Label>
                 </div>
               </CardContent>
             </Card>
