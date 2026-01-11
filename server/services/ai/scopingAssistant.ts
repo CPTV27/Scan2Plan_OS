@@ -27,7 +27,31 @@ Your task is to analyze project details and provide intelligent suggestions for:
 7. Estimated project timeline
 
 Provide confidence scores (0-100) for each suggestion based on available information.
-When information is limited, use industry standards and conservative estimates.`;
+When information is limited, use industry standards and conservative estimates.
+
+## EXAMPLES
+
+Example 1:
+Input: "Downtown office building renovation, 4 floors, mechanical upgrades needed, 123 Main St"
+Output:
+- buildingType: "office" (90%) - Multi-story downtown location indicates commercial office
+- estimatedSqft: 40000 (75%) - 4 floors × ~10,000 sqft average floor plate for downtown office
+- recommendedLOD: "300" (85%) - Mechanical upgrades require accurate MEP documentation
+- disciplines: ["architecture", "mepf"] (90%) - Renovation with MEP focus requires both
+- scope: "full" (80%) - Renovation typically needs complete documentation
+- risks: ["active operations", "limited access during business hours"] (70%)
+- timeline: "3-4 weeks" (65%) - Medium complexity with MEP focus
+
+Example 2:
+Input: "New warehouse scan for as-built, ABC Manufacturing, Greenfield Industrial Park"
+Output:
+- buildingType: "warehouse" (95%) - Industrial park manufacturing facility
+- estimatedSqft: 75000 (60%) - Industrial park warehouses typically 50k-100k sqft
+- recommendedLOD: "200" (80%) - As-built documentation often needs basic LOD
+- disciplines: ["architecture", "structure"] (85%) - Warehouse focus on shell and structure
+- scope: "full" (75%) - As-built typically captures complete building
+- risks: ["high ceilings", "active manufacturing", "heavy equipment"] (80%)
+- timeline: "2-3 weeks" (70%) - Large open space, simpler geometry`;
 
 export async function analyzeProjectScope(params: {
   description?: string;

@@ -331,12 +331,13 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       const lead = await storage.updateLead(leadId, updateData);
       
       // Re-compute embedding if key fields changed (background)
+      // Only check fields that were actually provided in the update
       const embeddingRelevantFieldsChanged = addressChanged || 
-        input.projectName !== previousLead.projectName ||
-        input.buildingType !== previousLead.buildingType ||
-        input.sqft !== previousLead.sqft ||
-        input.scope !== previousLead.scope ||
-        input.disciplines !== previousLead.disciplines;
+        (input.projectName !== undefined && input.projectName !== previousLead.projectName) ||
+        (input.buildingType !== undefined && input.buildingType !== previousLead.buildingType) ||
+        (input.sqft !== undefined && input.sqft !== previousLead.sqft) ||
+        (input.scope !== undefined && input.scope !== previousLead.scope) ||
+        (input.disciplines !== undefined && JSON.stringify(input.disciplines) !== JSON.stringify(previousLead.disciplines));
       
       if (embeddingRelevantFieldsChanged) {
         precomputeEmbedding(lead).catch(() => {});

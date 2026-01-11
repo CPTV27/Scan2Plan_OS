@@ -548,7 +548,33 @@ Transform the technician's shorthand and informal notes into:
 3. Any potential issues or concerns identified
 4. Recommended next steps
 
-Be concise but thorough. Maintain technical accuracy while improving clarity.`;
+Be concise but thorough. Maintain technical accuracy while improving clarity.
+
+## EXAMPLE
+
+Input (raw field notes):
+"bldg 4 floors, mech rm basement access thru loading dock only. hvac old - looks like 70s vintage. some ductwork hidden above drop ceiling need to verify. client wants arch+mep. coord w/ facilities guy joe - only avail mornings. parking lot scan needed for site plan. watch for forklift traffic in warehouse area"
+
+Output (professional scope summary):
+
+**Project Scope Summary**
+Four-story commercial building requiring comprehensive laser scanning for architecture and MEP documentation. Includes basement mechanical room access via loading dock entrance. Parking lot scan required for site plan development.
+
+**Key Observations**
+- HVAC systems appear to be 1970s vintage; documentation may require additional verification
+- Concealed ductwork above drop ceiling tiles requiring selective investigation
+- Active warehouse operations with material handling equipment in facility
+
+**Potential Issues**
+- Limited access window: Facilities contact (Joe) available mornings only
+- Site safety: Active forklift traffic in warehouse zone requires coordination
+- Hidden conditions: Concealed ductwork above drop ceilings may impact MEP modeling
+
+**Recommended Next Steps**
+1. Schedule morning site visits to coordinate with facilities contact
+2. Plan selective ceiling tile removal for ductwork verification
+3. Coordinate scan schedule around warehouse shift operations
+4. Obtain site safety orientation for warehouse protocols`;
 
       const result = await aiClient.generateText(
         FIELD_NOTE_PROMPT,

@@ -37,6 +37,13 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 11, 2026)
+- **AI Performance Improvements:**
+  - LRU caching for AI responses (500 items, 30 min TTL) reduces API costs with separate chat/embedding caches
+  - Cache monitoring endpoints: GET /api/ai/cache-stats, POST /api/ai/cache/clear
+  - Background embedding pre-computation on lead create/update for faster project matching
+  - Streaming proposal generation via SSE (POST /api/proposals/generate-stream)
+  - Field notes AI processing endpoint (POST /api/field-notes/:id/process) transforms technician notes to professional scopes
+  - Few-shot examples added to AI prompts: scoping assistant, proposal generator, field notes processor
 - **Code Cleanup:** Removed deprecated `/api/cpq/calculate` and `/api/cpq/pricing-matrix` endpoints (now handled client-side). Deleted orphaned GoHighLevel integration files (`server/routes/ghl.ts`, `server/services/gohighlevel.ts`) - integration was never configured.
 - **QBO Expense Auto-Linking:** Expenses and Bills synced from QuickBooks are automatically linked to leads/projects via CustomerRef. Uses deterministic selection: prioritizes Closed Won leads, then most recent.
 - **Bill Sync Multi-Line Support:** syncBills() aggregates all lines from vendor invoices, supports both AccountBased and ItemBased expense details, with getMostCommonCategory() for accurate categorization.

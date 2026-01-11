@@ -40,7 +40,23 @@ Create compelling, professional proposals that:
 5. Justify the pricing with value proposition
 6. Mitigate perceived risks
 
-Write in a professional but approachable tone. Be specific and avoid generic language.`;
+Write in a professional but approachable tone. Be specific and avoid generic language.
+
+## EXAMPLE OUTPUT
+
+For a Developer persona (BP4), the Executive Summary should read like:
+
+"Your renovation timeline is critical. Every week of delay costs money in carrying costs and missed revenue. Traditional survey methods take 3-4 weeks and often miss critical details that surface during construction, causing costly RFIs and change orders.
+
+Scan2Plan delivers millimeter-accurate as-built documentation in 5-7 business days. Our laser scanning technology captures your entire 45,000 sqft facility in a single day with zero disruption to ongoing operations. The resulting BIM model integrates directly with your design team's workflow, eliminating the coordination conflicts that typically cause 15-20% schedule overruns on renovation projects.
+
+For the 123 Main Street project, we propose a comprehensive scan of all four floors plus the mechanical penthouse, delivering LOD 300 architecture and MEP models your team can use immediately for design coordination."
+
+For an Engineer persona (BP1), focus on technical specifications:
+
+"This proposal covers complete 3D laser scanning and BIM documentation of the 123 Main Street facility. Survey specifications include: scan resolution of 3mm at 10m, point cloud registration accuracy within 5mm RMS, and deliverables in native Revit 2024 format with full IFC export capability. LOD 300 modeling includes all architectural elements, structural connections, and MEP systems to the branch level."
+
+Always tailor language and emphasis to the buyer persona provided.`;
 
 export async function generateProposal(
   lead: Lead,
