@@ -38,6 +38,7 @@ import {
   Loader2,
   PenTool,
   ChevronDown,
+  Check,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { BoundaryDrawer } from "@/components/BoundaryDrawer";
@@ -145,6 +146,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Margin target slider (35%-60%)
   const [marginTarget, setMarginTarget] = useState<number>(0.50);
+
+  // Audit counter - used to force recalculation when Re-run Audit is clicked
+  const [auditCounter, setAuditCounter] = useState(0);
 
   // Internal cost tracking / Tier A Pricing
   const [tierAScanningCost, setTierAScanningCost] = useState<string>("");
@@ -571,7 +575,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // Calculate base pricing in real-time (before adjustment)
   const basePricing: PricingResult = useMemo(() => {
     return calculatePricing(areas, services, travel, risks, paymentTerms, marginTarget);
-  }, [areas, services, travel, risks, paymentTerms, marginTarget]);
+  }, [areas, services, travel, risks, paymentTerms, marginTarget, auditCounter]);
 
   // Calculate adjusted pricing with markup percentage
   const pricing: PricingResult = useMemo(() => {
@@ -688,6 +692,79 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   }, [actScanning, scanningOnly, siteStatus, mepScope]);
 
   const hasRfiItems = rfiFields.length > 0;
+
+  // Calculate what services are included in the quote
+  const includedServices = useMemo(() => {
+    const items: { name: string; testId: string }[] = [];
+
+    // Check disciplines across all areas
+    const allDisciplines = new Set<string>();
+    areas.forEach((area) => {
+      area.disciplines.forEach((d) => allDisciplines.add(d));
+    });
+
+    // Map discipline IDs to human-readable names
+    const disciplineLabels: Record<string, string> = {
+      architecture: "Architecture Modeling",
+      mepf: "MEP Modeling",
+      structure: "Structural Modeling",
+      site: "Site Modeling",
+    };
+
+    // Add discipline items
+    if (allDisciplines.has("architecture")) {
+      items.push({ name: "Architecture Modeling", testId: "service-included-architecture" });
+    }
+    if (allDisciplines.has("mepf")) {
+      items.push({ name: "MEP Modeling", testId: "service-included-mep" });
+    }
+    if (allDisciplines.has("structure")) {
+      items.push({ name: "Structural Modeling", testId: "service-included-structure" });
+    }
+    if (allDisciplines.has("site")) {
+      items.push({ name: "Site Modeling", testId: "service-included-site" });
+    }
+
+    // Check for CAD deliverables - either through includeCadDeliverable or bimDeliverable
+    const hasCadDeliverable = areas.some((area) => area.includeCadDeliverable) || 
+                              bimDeliverable.length > 0 ||
+                              interiorCadElevations;
+    if (hasCadDeliverable) {
+      items.push({ name: "CAD Deliverables", testId: "service-included-cad" });
+    }
+
+    // Check ACT Scanning
+    if (actScanning === "yes") {
+      items.push({ name: "ACT Scanning (Above & Below Ceiling)", testId: "service-included-act" });
+    }
+
+    // Check Scanning Only modes
+    if (scanningOnly === "full_day") {
+      items.push({ name: "Scanning & Registration - Full Day", testId: "service-included-scanning-full" });
+    } else if (scanningOnly === "half_day") {
+      items.push({ name: "Scanning & Registration - Half Day", testId: "service-included-scanning-half" });
+    }
+
+    // Check additional services
+    const serviceLabels: Record<string, string> = {
+      matterport: "Matterport Capture",
+      georeferencing: "Georeferencing",
+      scanningFullDay: "Scanning - Full Day",
+      scanningHalfDay: "Scanning - Half Day",
+    };
+
+    Object.entries(services).forEach(([serviceId, value]) => {
+      if (value && value > 0) {
+        const label = serviceLabels[serviceId] || serviceId;
+        items.push({ 
+          name: label, 
+          testId: `service-included-${serviceId.toLowerCase()}` 
+        });
+      }
+    });
+
+    return items;
+  }, [areas, bimDeliverable, interiorCadElevations, actScanning, scanningOnly, services]);
 
   // Generate RFI email body
   const rfiEmailBody = useMemo(() => {
@@ -2333,19 +2410,57 @@ Thanks!`.trim();
                 /* Standard pricing items */
                 pricing.items
                   .filter((item) => !item.isTotal)
-                  .map((item, index) => (
-                    <div
-                      key={index}
-                      className={`flex justify-between text-sm ${
-                        item.isDiscount ? "text-green-600" : ""
-                      }`}
-                    >
-                      <span className="truncate flex-1 mr-2">{item.label}</span>
-                      <span className="font-mono">
-                        {item.isDiscount ? "-" : ""}${Math.abs(item.value).toLocaleString()}
-                      </span>
-                    </div>
-                  ))
+                  .map((item, index) => {
+                    // Determine if this is an area-based item that should show per-sqft pricing
+                    const isAreaBased = 
+                      // Area discipline items (contain " LOD " and area info)
+                      item.label.includes(" LOD ") ||
+                      // Area-related services (CAD, Elevations, Facades)
+                      item.label.includes("CAD Deliverable") ||
+                      item.label.includes("Additional Elevations") ||
+                      item.label.includes("Facade:");
+                    
+                    // Exclude travel, risk premiums, and other non-area items
+                    const isExcluded = 
+                      item.label.includes("Travel (") ||
+                      item.label.includes("Risk Premium:") ||
+                      item.label.includes("Price Adjustment");
+                    
+                    const shouldShowPerSqft = isAreaBased && !isExcluded && totalSqft > 0;
+                    
+                    const perSqftRate = shouldShowPerSqft 
+                      ? Math.abs(item.value) / totalSqft 
+                      : 0;
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={`space-y-0.5 ${
+                          item.isDiscount ? "text-green-600" : ""
+                        }`}
+                      >
+                        {/* Main price line */}
+                        <div className="flex justify-between text-sm">
+                          <span className="truncate flex-1 mr-2">{item.label}</span>
+                          <span className="font-mono">
+                            {item.isDiscount ? "-" : ""}${Math.abs(item.value).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        {/* Per-sqft pricing line (if applicable) */}
+                        {shouldShowPerSqft && (
+                          <div 
+                            className="flex justify-end text-xs text-muted-foreground pr-1"
+                            data-testid={`text-per-sqft-${index}`}
+                          >
+                            <span className="font-mono">
+                              ${perSqftRate.toFixed(2)}/sqft
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
               )}
               {/* Show areas summary when no items yet */}
               {!isTierA && pricing.items.length === 0 && areas.length > 0 && (
@@ -2360,6 +2475,33 @@ Thanks!`.trim();
               )}
             </div>
           </ScrollArea>
+
+          {/* What's Included Section */}
+          {includedServices.length > 0 && (
+            <div className="p-4 border-t border-b">
+              <Collapsible defaultOpen data-testid="collapsible-whats-included">
+                <CollapsibleTrigger className="flex items-center justify-between w-full text-sm font-medium hover:text-foreground transition-colors">
+                  <span className="flex items-center gap-2">
+                    <ChevronDown className="w-4 h-4 transition-transform" />
+                    What's Included
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3 space-y-2">
+                  {includedServices.map((service, index) => (
+                    <div 
+                      key={index}
+                      className="flex items-start gap-2 text-sm text-muted-foreground"
+                      data-testid={service.testId}
+                    >
+                      <Check className="w-4 h-4 text-green-600 dark:text-green-500 flex-shrink-0 mt-0.5" />
+                      <span>{service.name}</span>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          )}
+
           <div className="p-4 border-t bg-background space-y-3">
             {/* Show Tier A totals when in Tier A mode */}
             {isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0 ? (
@@ -2373,11 +2515,18 @@ Thanks!`.trim();
                   <span>Total</span>
                   <span className="font-mono">${tierAPricingResult.totalWithTravel.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Profit Margin</span>
-                  <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
-                    ${(tierAPricingResult.clientPrice - tierAPricingResult.subtotal).toLocaleString()} ({marginPercent.toFixed(1)}%)
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Profit Margin</span>
+                    <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
+                      ${(tierAPricingResult.clientPrice - tierAPricingResult.subtotal).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-end text-xs text-muted-foreground">
+                    <span className="font-mono" data-testid="text-markup-percentage">
+                      {((tierAPricingResult.clientPrice - tierAPricingResult.subtotal) / tierAPricingResult.subtotal * 100).toFixed(1)}% markup
+                    </span>
+                  </div>
                 </div>
               </>
             ) : (
@@ -2463,11 +2612,18 @@ Thanks!`.trim();
                   <span>Total</span>
                   <span className="font-mono">${pricing.totalClientPrice.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Profit Margin</span>
-                  <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
-                    ${pricing.profitMargin.toLocaleString()} ({marginPercent.toFixed(1)}%)
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Profit Margin</span>
+                    <span className={`font-mono ${isMarginBelowGate ? 'text-red-600' : 'text-green-600'}`}>
+                      ${pricing.profitMargin.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-end text-xs text-muted-foreground">
+                    <span className="font-mono" data-testid="text-markup-percentage">
+                      {(pricing.profitMargin / pricing.totalUpteamCost * 100).toFixed(1)}% markup
+                    </span>
+                  </div>
                 </div>
               </>
             )}
@@ -2476,6 +2632,28 @@ Thanks!`.trim();
                 Margin must be at least {(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% to save quote
               </div>
             )}
+            {/* Integrity Check Card */}
+            <div className="mt-4 p-3 border rounded-md bg-card" data-testid="integrity-check-status">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span className="text-sm font-medium">Integrity Check</span>
+                <Badge 
+                  variant={isMarginBelowGate ? "destructive" : "default"}
+                  className={!isMarginBelowGate ? "bg-green-600 hover:bg-green-700 text-white" : ""}
+                  data-testid={isMarginBelowGate ? "badge-integrity-failed" : "badge-integrity-passed"}
+                >
+                  {isMarginBelowGate ? "Failed" : "Passed"}
+                </Badge>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAuditCounter(auditCounter + 1)}
+                className="w-full"
+                data-testid="button-rerun-audit"
+              >
+                Re-run Audit
+              </Button>
+            </div>
             {/* Price Adjustment Control */}
             {(isMarginBelowGate || priceAdjustmentPercent > 0) && (
               <div className="mt-4 p-3 border rounded-md bg-muted/30 space-y-3" data-testid="price-adjustment-section">
