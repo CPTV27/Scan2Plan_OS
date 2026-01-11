@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { buyerPersonas, personaInsights, leads, insertBuyerPersonaSchema, insertPersonaInsightSchema } from '@shared/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
-import { analyzeOutcome, suggestPersonaForLead, getBuyingModeGuidance, type DealContext } from '../services/personaLearning';
+import { analyzeOutcome, suggestPersonaForLead, getBuyingModeGuidance, isAIConfigured, type DealContext } from '../services/personaLearning';
 
 export const personasRouter = Router();
 
@@ -249,6 +249,13 @@ personasRouter.post('/suggest', async (req, res) => {
     
     if (!clientName) {
       return res.status(400).json({ error: 'clientName is required' });
+    }
+
+    if (!isAIConfigured()) {
+      return res.status(503).json({ 
+        error: 'AI not configured',
+        message: 'Persona suggestions require OpenAI API key to be configured'
+      });
     }
 
     const suggestion = await suggestPersonaForLead({

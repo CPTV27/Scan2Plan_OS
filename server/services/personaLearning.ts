@@ -5,6 +5,10 @@ import { eq } from 'drizzle-orm';
 
 let openaiClient: OpenAI | null = null;
 
+export function isAIConfigured(): boolean {
+  return !!(process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
+}
+
 function getOpenAI(): OpenAI {
   if (!openaiClient) {
     const apiKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
@@ -51,6 +55,31 @@ export async function analyzeOutcome(context: DealContext): Promise<PersonaInsig
       return null;
     }
 
+    // Always record the basic insight, even without AI analysis
+    const basicInsight = {
+      personaId: persona.id,
+      leadId: context.leadId,
+      buyingModeUsed: context.buyingMode,
+      outcome: context.outcome,
+      dealValue: context.dealValue?.toString(),
+      cycleLengthDays: context.cycleLengthDays,
+      strategyNotes: context.notes || `Stage: ${context.stageAtClose}`,
+    };
+
+    // If AI is not configured, just record the basic outcome
+    if (!isAIConfigured()) {
+      await db.insert(personaInsights).values(basicInsight);
+      await recalculatePersonaStats(persona.id);
+      console.log(`[Persona Learning] Recorded basic insight for lead ${context.leadId} (AI not configured)`);
+      return {
+        tacticalLessons: [],
+        languageWins: [],
+        languageFailures: [],
+        refinementSuggestions: [],
+        confidenceScore: 0,
+      };
+    }
+
     const [lead] = await db
       .select()
       .from(leads)
@@ -77,9 +106,30 @@ Always respond with valid JSON matching the requested schema.`
     });
 
     const content = response.choices[0].message.content;
-    if (!content) return null;
+    if (!content) {
+      // Record basic insight without AI analysis
+      await db.insert(personaInsights).values(basicInsight);
+      await recalculatePersonaStats(persona.id);
+      console.log(`[Persona Learning] Recorded basic insight for lead ${context.leadId} (AI returned empty)`);
+      return null;
+    }
 
-    const result = JSON.parse(content) as PersonaInsightResult;
+    let result: PersonaInsightResult;
+    try {
+      result = JSON.parse(content) as PersonaInsightResult;
+      // Validate expected fields exist
+      if (!Array.isArray(result.tacticalLessons)) result.tacticalLessons = [];
+      if (!Array.isArray(result.languageWins)) result.languageWins = [];
+      if (!Array.isArray(result.languageFailures)) result.languageFailures = [];
+      if (!Array.isArray(result.refinementSuggestions)) result.refinementSuggestions = [];
+      if (typeof result.confidenceScore !== 'number') result.confidenceScore = 0.5;
+    } catch (parseError) {
+      console.error('[Persona Learning] Failed to parse AI response:', parseError);
+      // Still record basic insight
+      await db.insert(personaInsights).values(basicInsight);
+      await recalculatePersonaStats(persona.id);
+      return null;
+    }
     
     await db.insert(personaInsights).values({
       personaId: persona.id,
