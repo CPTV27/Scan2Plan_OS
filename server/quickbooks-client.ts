@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { quickbooksTokens, expenses, type Expense, type InsertExpense } from "@shared/schema";
+import { quickbooksTokens, expenses, leads, projects, type Expense, type InsertExpense } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { log } from "./lib/logger";
 
@@ -33,7 +33,26 @@ interface QBExpense {
   }>;
   EntityRef?: { name: string; value: string };
   AccountRef?: { name: string; value: string };
+  CustomerRef?: { name: string; value: string }; // Customer/Job reference for auto-linking
   PrivateNote?: string;
+}
+
+interface QBBill {
+  Id: string;
+  TxnDate: string;
+  TotalAmt: number;
+  VendorRef?: { name: string; value: string };
+  CustomerRef?: { name: string; value: string };
+  PrivateNote?: string;
+  Line?: Array<{
+    Description?: string;
+    Amount: number;
+    DetailType: string;
+    AccountBasedExpenseLineDetail?: {
+      AccountRef: { name: string; value: string };
+      BillableStatus?: string;
+    };
+  }>;
 }
 
 export class QuickBooksClient {
@@ -195,6 +214,32 @@ export class QuickBooksClient {
     return data.QueryResponse?.Purchase || [];
   }
 
+  // Helper method to auto-link expense to lead/project via CustomerRef
+  private async autoLinkToLeadAndProject(qboCustomerId: string): Promise<{ leadId: number | null; projectId: number | null }> {
+    let leadId: number | null = null;
+    let projectId: number | null = null;
+
+    // Find lead with matching qboCustomerId
+    const matchedLead = await db.select()
+      .from(leads)
+      .where(eq(leads.qboCustomerId, qboCustomerId))
+      .limit(1);
+
+    if (matchedLead.length > 0) {
+      leadId = matchedLead[0].id;
+      // Also link to project if one exists
+      const project = await db.select()
+        .from(projects)
+        .where(eq(projects.leadId, matchedLead[0].id))
+        .limit(1);
+      if (project.length > 0) {
+        projectId = project[0].id;
+      }
+    }
+
+    return { leadId, projectId };
+  }
+
   async syncExpenses(): Promise<{ synced: number; errors: string[] }> {
     const qbExpenses = await this.fetchExpenses();
     const results = { synced: 0, errors: [] as string[] };
@@ -216,7 +261,15 @@ export class QuickBooksClient {
           category: this.categorizeExpense(firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name),
           accountName: firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name || qbExp.AccountRef?.name || null,
           isBillable: firstLine?.AccountBasedExpenseLineDetail?.BillableStatus === "Billable",
+          source: "quickbooks",
         };
+
+        // Auto-link to lead/project via CustomerRef
+        if (qbExp.CustomerRef?.value) {
+          const { leadId, projectId } = await this.autoLinkToLeadAndProject(qbExp.CustomerRef.value);
+          if (leadId) expenseData.leadId = leadId;
+          if (projectId) expenseData.projectId = projectId;
+        }
 
         if (existing.length > 0) {
           await db.update(expenses)
@@ -232,6 +285,92 @@ export class QuickBooksClient {
     }
 
     return results;
+  }
+
+  // === BILL SYNC (Vendor Invoices / Accounts Payable) ===
+  async fetchBills(startDate?: Date, endDate?: Date): Promise<QBBill[]> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const start = startDate || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date();
+
+    const query = `SELECT * FROM Bill WHERE TxnDate >= '${start.toISOString().split("T")[0]}' AND TxnDate <= '${end.toISOString().split("T")[0]}' MAXRESULTS 1000`;
+
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/query?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to fetch bills: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.QueryResponse?.Bill || [];
+  }
+
+  async syncBills(): Promise<{ synced: number; errors: string[] }> {
+    const qbBills = await this.fetchBills();
+    const results = { synced: 0, errors: [] as string[] };
+
+    for (const bill of qbBills) {
+      try {
+        // Use BILL- prefix to distinguish from Purchase expenses
+        const qbExpenseId = `BILL-${bill.Id}`;
+        const existing = await db.select()
+          .from(expenses)
+          .where(eq(expenses.qbExpenseId, qbExpenseId))
+          .limit(1);
+
+        const firstLine = bill.Line?.find((l) => l.DetailType === "AccountBasedExpenseLineDetail");
+
+        const expenseData: InsertExpense = {
+          qbExpenseId,
+          vendorName: bill.VendorRef?.name || null,
+          description: firstLine?.Description || bill.PrivateNote || null,
+          amount: String(bill.TotalAmt),
+          expenseDate: new Date(bill.TxnDate),
+          category: this.categorizeExpense(firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name),
+          accountName: firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name || null,
+          source: "quickbooks",
+          isBillable: firstLine?.AccountBasedExpenseLineDetail?.BillableStatus === "Billable",
+        };
+
+        // Auto-link to lead/project via CustomerRef
+        if (bill.CustomerRef?.value) {
+          const { leadId, projectId } = await this.autoLinkToLeadAndProject(bill.CustomerRef.value);
+          if (leadId) expenseData.leadId = leadId;
+          if (projectId) expenseData.projectId = projectId;
+        }
+
+        if (existing.length > 0) {
+          await db.update(expenses)
+            .set({ ...expenseData, syncedAt: new Date() })
+            .where(eq(expenses.id, existing[0].id));
+        } else {
+          await db.insert(expenses).values(expenseData);
+        }
+        results.synced++;
+      } catch (err: any) {
+        results.errors.push(`Bill ${bill.Id}: ${err.message}`);
+      }
+    }
+
+    return results;
+  }
+
+  // Combined sync method for purchases + bills
+  async syncAllExpenses(): Promise<{ purchases: { synced: number; errors: string[] }; bills: { synced: number; errors: string[] } }> {
+    const purchases = await this.syncExpenses();
+    const bills = await this.syncBills();
+    return { purchases, bills };
   }
 
   private categorizeExpense(accountName?: string): string {
@@ -283,6 +422,142 @@ export class QuickBooksClient {
     }
 
     return { total, byCategory };
+  }
+
+  // === JOB COSTING ANALYTICS ===
+  async getJobCostingAnalytics(): Promise<{
+    jobProfitability: Array<{
+      leadId: number;
+      projectId: number | null;
+      clientName: string;
+      projectName: string;
+      quotedPrice: number;
+      quotedMargin: number;
+      actualRevenue: number;
+      actualCosts: number;
+      actualProfit: number;
+      actualMargin: number;
+      marginVariance: number;
+      costsByCategory: Record<string, number>;
+    }>;
+    overhead: {
+      total: number;
+      byCategory: Record<string, number>;
+      byMonth: Array<{ month: string; amount: number }>;
+    };
+    summary: {
+      totalRevenue: number;
+      totalDirectCosts: number;
+      totalOverhead: number;
+      grossProfit: number;
+      netProfit: number;
+      averageJobMargin: number;
+    };
+  }> {
+    const allExpenses = await db.select().from(expenses);
+    const allLeads = await db.select().from(leads).where(eq(leads.dealStage, "Closed Won"));
+    const allProjects = await db.select().from(projects);
+
+    // Group expenses by lead
+    const expensesByLead = new Map<number, typeof allExpenses>();
+    const overheadExpenses: typeof allExpenses = [];
+
+    for (const exp of allExpenses) {
+      if (exp.leadId) {
+        const existing = expensesByLead.get(exp.leadId) || [];
+        existing.push(exp);
+        expensesByLead.set(exp.leadId, existing);
+      } else {
+        overheadExpenses.push(exp);
+      }
+    }
+
+    // Calculate job profitability
+    const jobProfitability = allLeads.map(lead => {
+      const project = allProjects.find(p => p.leadId === lead.id);
+      const leadExpenses = expensesByLead.get(lead.id) || [];
+
+      const actualRevenue = parseFloat(lead.value || "0");
+      const actualCosts = leadExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      const actualProfit = actualRevenue - actualCosts;
+      const actualMargin = actualRevenue > 0 ? (actualProfit / actualRevenue) * 100 : 0;
+
+      // Get quoted margin from project or estimate from CPQ
+      const quotedPrice = project?.quotedPrice ? parseFloat(String(project.quotedPrice)) : actualRevenue;
+      const quotedMargin = project?.quotedMargin ? parseFloat(String(project.quotedMargin)) : 45; // Default 45%
+
+      const marginVariance = actualMargin - quotedMargin;
+
+      // Group costs by category
+      const costsByCategory: Record<string, number> = {};
+      for (const exp of leadExpenses) {
+        const cat = exp.category || "Other";
+        costsByCategory[cat] = (costsByCategory[cat] || 0) + parseFloat(exp.amount);
+      }
+
+      return {
+        leadId: lead.id,
+        projectId: project?.id || null,
+        clientName: lead.clientName,
+        projectName: lead.projectName || lead.projectAddress || "Unknown",
+        quotedPrice,
+        quotedMargin,
+        actualRevenue,
+        actualCosts,
+        actualProfit,
+        actualMargin,
+        marginVariance,
+        costsByCategory,
+      };
+    }).sort((a, b) => b.actualProfit - a.actualProfit);
+
+    // Calculate overhead (unlinked expenses)
+    const overheadByCategory: Record<string, number> = {};
+    const overheadByMonth: Record<string, number> = {};
+    let totalOverhead = 0;
+
+    for (const exp of overheadExpenses) {
+      const amount = parseFloat(exp.amount);
+      totalOverhead += amount;
+
+      const cat = exp.category || "Other";
+      overheadByCategory[cat] = (overheadByCategory[cat] || 0) + amount;
+
+      if (exp.expenseDate) {
+        const monthKey = exp.expenseDate.toISOString().slice(0, 7); // YYYY-MM
+        overheadByMonth[monthKey] = (overheadByMonth[monthKey] || 0) + amount;
+      }
+    }
+
+    const overheadByMonthArray = Object.entries(overheadByMonth)
+      .map(([month, amount]) => ({ month, amount }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    // Summary calculations
+    const totalRevenue = jobProfitability.reduce((sum, j) => sum + j.actualRevenue, 0);
+    const totalDirectCosts = jobProfitability.reduce((sum, j) => sum + j.actualCosts, 0);
+    const grossProfit = totalRevenue - totalDirectCosts;
+    const netProfit = grossProfit - totalOverhead;
+    const averageJobMargin = jobProfitability.length > 0
+      ? jobProfitability.reduce((sum, j) => sum + j.actualMargin, 0) / jobProfitability.length
+      : 0;
+
+    return {
+      jobProfitability,
+      overhead: {
+        total: totalOverhead,
+        byCategory: overheadByCategory,
+        byMonth: overheadByMonthArray,
+      },
+      summary: {
+        totalRevenue,
+        totalDirectCosts,
+        totalOverhead,
+        grossProfit,
+        netProfit,
+        averageJobMargin,
+      },
+    };
   }
 
   // === CHART OF ACCOUNTS ===
