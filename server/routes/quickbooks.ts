@@ -568,6 +568,51 @@ export function registerQuickbooksRoutes(app: Express): void {
     }
   }));
 
+  // === SYNC ALL EXPENSES (Purchases + Bills) ===
+  app.post("/api/quickbooks/sync-expenses", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const isConnected = await quickbooksClient.isConnected();
+      if (!isConnected) {
+        return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
+      }
+      const result = await quickbooksClient.syncAllExpenses();
+      res.json({ 
+        success: true, 
+        purchases: result.purchases,
+        bills: result.bills,
+        total: {
+          synced: result.purchases.synced + result.bills.synced,
+          errors: [...result.purchases.errors, ...result.bills.errors],
+        }
+      });
+    } catch (error: any) {
+      log("ERROR: Sync expenses error - " + error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }));
+
+  // === JOB COSTING ANALYTICS ===
+  app.get("/api/analytics/job-costing", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const analytics = await quickbooksClient.getJobCostingAnalytics();
+      res.json(analytics);
+    } catch (error: any) {
+      log("ERROR: Job costing analytics error - " + error.message);
+      res.status(500).json({ error: error.message });
+    }
+  }));
+
+  // === OVERHEAD BREAKDOWN ===
+  app.get("/api/analytics/overhead", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const analytics = await quickbooksClient.getJobCostingAnalytics();
+      res.json(analytics.overhead);
+    } catch (error: any) {
+      log("ERROR: Overhead analytics error - " + error.message);
+      res.status(500).json({ error: error.message });
+    }
+  }));
+
   // === PIPELINE SYNC: Import Invoices & Estimates from QuickBooks ===
   app.post("/api/quickbooks/sync-pipeline", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
