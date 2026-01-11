@@ -144,8 +144,8 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // Price adjustment for margin gate compliance
   const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState<number>(0);
 
-  // Margin target slider (35%-60%)
-  const [marginTarget, setMarginTarget] = useState<number>(0.50);
+  // Margin target slider (35%-60%, default 45% matches guardrail)
+  const [marginTarget, setMarginTarget] = useState<number>(0.45);
 
   // Audit counter - used to force recalculation when Re-run Audit is clicked
   const [auditCounter, setAuditCounter] = useState(0);
