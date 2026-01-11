@@ -204,6 +204,74 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // PUBLIC routes that bypass all authentication
+  // These must be registered BEFORE the global auth middleware
+  // Format: { type: 'exact' | 'prefix' | 'pattern', path: string }
+  // exact: must match exactly
+  // prefix: route must start with this path
+  // pattern: regex pattern (for routes with params like /proposals/:token)
+  const publicPaths: Array<{ path: string; type: 'exact' | 'prefix' | 'pattern' }> = [
+    // Auth flow endpoints (handled before this middleware by registerAuthRoutes)
+    { path: '/login', type: 'exact' },
+    { path: '/callback', type: 'exact' },
+    { path: '/logout', type: 'exact' },
+    { path: '/test-login', type: 'exact' },
+    // Password verification endpoints (needed for password flow)
+    { path: '/auth/session-status', type: 'exact' },
+    { path: '/auth/password-status', type: 'exact' },
+    { path: '/auth/set-password', type: 'exact' },
+    { path: '/auth/verify-password', type: 'exact' },
+    { path: '/auth/user', type: 'exact' },
+    // Public proposal viewing (client-facing, token-protected)
+    // IMPORTANT: /proposals/generate is NOT included - it requires auth
+    { path: '/proposals/track/', type: 'prefix' },  // Tracking pixel and redirect
+    // Site readiness forms (magic link protected)
+    { path: '/site-readiness/', type: 'prefix' },
+    // Webhooks (have their own authentication via API keys/signatures)
+    { path: '/webhooks/', type: 'prefix' },
+  ];
+
+  // Regex patterns for public routes with dynamic segments
+  // These routes are public but have specific token-based paths
+  // IMPORTANT: Token patterns must be specific enough to not match reserved route names
+  // Nanoid tokens are 24 characters: [a-zA-Z0-9_-]{24}
+  // This ensures routes like /proposals/generate (8 chars) don't match
+  const publicPatterns: RegExp[] = [
+    /^\/proposals\/[a-zA-Z0-9_-]{24}$/, // /proposals/:token - proposal data (24-char nanoid only)
+    /^\/proposals\/[a-zA-Z0-9_-]{24}\/pdf$/, // /proposals/:token/pdf - PDF download
+    /^\/client-input\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/, // /client-input/:uuid (UUID format)
+  ];
+
+  // Global security middleware - applies to ALL /api/* routes
+  // Enforces email domain and password verification for protected routes
+  app.use('/api', (req, res, next) => {
+    // Use req.path which is the path relative to the mount point (/api)
+    // This is safe from query string manipulation
+    const routePath = req.path;
+    
+    // Check if this is a public path that should bypass auth
+    const isPublicPath = publicPaths.some(({ path, type }) => {
+      if (type === 'exact') {
+        return routePath === path;
+      }
+      if (type === 'prefix') {
+        return routePath.startsWith(path);
+      }
+      return false;
+    });
+    
+    // Check regex patterns for dynamic public routes
+    const matchesPublicPattern = publicPatterns.some(pattern => pattern.test(routePath));
+    
+    if (isPublicPath || matchesPublicPattern) {
+      return next();
+    }
+    
+    // For all other /api routes, require full authentication
+    // The isAuthenticated middleware handles session, domain, and password checks
+    isAuthenticated(req, res, next);
+  });
+
   registerChatRoutes(app);
   registerImageRoutes(app);
 

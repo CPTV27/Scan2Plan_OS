@@ -175,6 +175,15 @@ export async function setupAuth(app: Express) {
   }
 }
 
+// Allowed email domain for access
+const ALLOWED_EMAIL_DOMAIN = "scan2plan.io";
+
+function isEmailDomainAllowed(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  return domain === ALLOWED_EMAIL_DOMAIN;
+}
+
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
@@ -192,6 +201,31 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!user.expires_at) {
     log(`DEBUG: [Auth Debug] User exists but no expires_at. User keys: ${Object.keys(user).join(", ")}`);
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // SECURITY: Enforce email domain restriction server-side
+  const userEmail = user.claims?.email;
+  if (!isEmailDomainAllowed(userEmail)) {
+    log(`SECURITY: Access denied for non-allowed email domain: ${userEmail}`);
+    return res.status(403).json({ 
+      message: "Access denied. This application is restricted to @scan2plan.io email addresses only.",
+      code: "DOMAIN_NOT_ALLOWED"
+    });
+  }
+
+  // SECURITY: Check if password has been verified this session
+  // Skip this check for password-related endpoints
+  const passwordEndpoints = ['/api/auth/session-status', '/api/auth/password-status', '/api/auth/set-password', '/api/auth/verify-password'];
+  const isPasswordEndpoint = passwordEndpoints.some(ep => req.path === ep);
+  
+  if (!isPasswordEndpoint) {
+    const session = req.session as any;
+    if (!session?.passwordVerified) {
+      return res.status(403).json({ 
+        message: "Password verification required",
+        code: "PASSWORD_NOT_VERIFIED"
+      });
+    }
   }
 
   const now = Math.floor(Date.now() / 1000);

@@ -34,41 +34,13 @@ import BrandGenerator from "@/pages/BrandGenerator";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
+import PasswordGate from "@/pages/PasswordGate";
 
-function Router() {
-  const { user, isLoading } = useAuth();
+function ProtectedRoutes() {
+  const { user } = useAuth();
   
-  const path = window.location.pathname;
-  if (path === "/privacy") {
-    return <PrivacyPolicy />;
-  }
-  if (path === "/terms") {
-    return <TermsOfService />;
-  }
-  if (path.startsWith("/client-input/")) {
-    return <ClientInput />;
-  }
-  if (path.startsWith("/site-readiness/")) {
-    return <SiteReadinessForm />;
-  }
-  if (path.startsWith("/proposals/")) {
-    return <ProposalViewer />;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthPage />;
-  }
-
   // Production role redirect to Field Hub
-  const userRole = (user.role as string) || 'ceo';
+  const userRole = (user?.role as string) || 'ceo';
   if (userRole === 'production' && window.location.pathname === '/') {
     window.location.href = '/field';
     return null;
@@ -184,6 +156,32 @@ function Router() {
       </Route>
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function Router() {
+  const path = window.location.pathname;
+  
+  if (path === "/privacy") {
+    return <PrivacyPolicy />;
+  }
+  if (path === "/terms") {
+    return <TermsOfService />;
+  }
+  if (path.startsWith("/client-input/")) {
+    return <ClientInput />;
+  }
+  if (path.startsWith("/site-readiness/")) {
+    return <SiteReadinessForm />;
+  }
+  if (path.startsWith("/proposals/")) {
+    return <ProposalViewer />;
+  }
+
+  return (
+    <PasswordGate>
+      <ProtectedRoutes />
+    </PasswordGate>
   );
 }
 
