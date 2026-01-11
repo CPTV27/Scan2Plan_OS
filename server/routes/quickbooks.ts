@@ -45,6 +45,67 @@ function getStageProbability(stage: string): number {
   }
 }
 
+// Helper: Create a project from a Closed Won lead (if not already exists)
+async function ensureProjectForClosedWonLead(leadId: number): Promise<boolean> {
+  try {
+    // Check if project already exists for this lead
+    const existingProject = await storage.getProjectByLeadId(leadId);
+    if (existingProject) {
+      log(`[Project Creation] Project already exists for lead ${leadId} (project ID: ${existingProject.id})`);
+      return false; // Already exists
+    }
+    
+    // Fetch the full lead to get all details
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      log(`[Project Creation] Lead ${leadId} not found`);
+      return false;
+    }
+    
+    // Only create projects for Closed Won deals
+    if (lead.dealStage !== "Closed Won") {
+      log(`[Project Creation] Lead ${leadId} is not Closed Won (stage: ${lead.dealStage})`);
+      return false;
+    }
+    
+    // Get latest CPQ quote for additional data
+    const quotes = await storage.getCpqQuotesByLead(leadId);
+    const latestQuote = quotes.find(q => q.isLatest) || quotes[0];
+    
+    // Create project with data inherited from lead
+    const project = await storage.createProject({
+      name: lead.projectName || `${lead.clientName} Project`,
+      leadId: lead.id,
+      status: "Scheduling",
+      priority: "Medium",
+      clientName: lead.clientName,
+      clientContact: lead.contactName,
+      clientEmail: lead.contactEmail,
+      clientPhone: lead.contactPhone,
+      projectAddress: lead.projectAddress,
+      dispatchLocation: lead.dispatchLocation,
+      distance: lead.distance ? parseInt(String(lead.distance)) : undefined,
+      estimatedSqft: latestQuote?.areas ? 
+        (latestQuote.areas as any[])?.reduce((sum: number, area: any) => sum + (area.sqft || 0), 0) : undefined,
+      // CPQ inheritance
+      quotedPrice: latestQuote?.clientPrice ? String(latestQuote.clientPrice) : lead.value,
+      quotedMargin: latestQuote?.marginPercent ? String(latestQuote.marginPercent) : undefined,
+      quotedAreas: latestQuote?.areas,
+      quotedRisks: latestQuote?.risks,
+      quotedTravel: latestQuote?.travel,
+      quotedServices: latestQuote?.services,
+      siteReadiness: lead.siteReadiness as any,
+      scopeSummary: latestQuote?.generatedScope || undefined,
+    });
+    
+    log(`[Project Creation] Created project ID ${project.id} from Closed Won lead ${leadId}`);
+    return true;
+  } catch (error: any) {
+    log(`[Project Creation] Error creating project for lead ${leadId}: ${error.message}`);
+    return false;
+  }
+}
+
 export function registerQuickbooksRoutes(app: Express): void {
   app.get("/api/quickbooks/status", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
