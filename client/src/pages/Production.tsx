@@ -1,7 +1,7 @@
 import { useProjects, useCreateProject, useUpdateProject } from "@/hooks/use-projects";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, Check, Scan, Layers, Box, ClipboardCheck, Package, CalendarClock, MapPin, Building2, Users, Truck, AlertTriangle, FileText, Phone, Mail, User, HelpCircle } from "lucide-react";
+import { Plus, Check, Scan, Layers, Box, ClipboardCheck, Package, CalendarClock, MapPin, Building2, Users, Truck, AlertTriangle, FileText, Phone, Mail, User, HelpCircle, ScrollText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProjectCard } from "@/components/ProjectCard";
 import { useForm } from "react-hook-form";
@@ -495,13 +495,28 @@ function ProjectDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>{project ? "Edit Project" : "New Project"}</DialogTitle>
-          {projectAddress && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-              <MapPin className="w-4 h-4" />
-              <span>{projectAddress}</span>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <DialogTitle>{project ? "Edit Project" : "New Project"}</DialogTitle>
+              {projectAddress && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                  <MapPin className="w-4 h-4" />
+                  <span>{projectAddress}</span>
+                </div>
+              )}
             </div>
-          )}
+            {project && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(`/projects/${project.id}/mission-brief`, '_blank')}
+                data-testid={`button-mission-brief-${project.id}`}
+              >
+                <ScrollText className="w-4 h-4 mr-2" />
+                Mission Brief
+              </Button>
+            )}
+          </div>
         </DialogHeader>
         
         {project && projectAddress ? (

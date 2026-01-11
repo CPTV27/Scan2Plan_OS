@@ -4,6 +4,8 @@ import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { calculateTravelDistance, validateShiftGate, createScanCalendarEvent, getTechnicianAvailability } from "../travel-scheduling";
 import { log } from "../lib/logger";
+import { generateMissionBrief } from "../missionBrief";
+import { generateMissionBriefPdf } from "../missionBriefPdf";
 
 export function registerProjectRoutes(app: Express): void {
   app.get("/api/projects", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
@@ -326,6 +328,34 @@ export function registerProjectRoutes(app: Express): void {
       log("ERROR: Site reality audit error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to perform site audit" });
     }
+  }));
+
+  app.get("/api/projects/:id/mission-brief", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const project = await storage.getProject(projectId);
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const brief = generateMissionBrief(project);
+    res.json(brief);
+  }));
+
+  app.get("/api/projects/:id/mission-brief/pdf", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const project = await storage.getProject(projectId);
+
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const brief = generateMissionBrief(project);
+    const pdfBuffer = await generateMissionBriefPdf(brief);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Mission-Brief-${project.universalProjectId || project.id}.pdf"`);
+    res.send(pdfBuffer);
   }));
 
   let cashflowCache: { data: any; timestamp: number } | null = null;

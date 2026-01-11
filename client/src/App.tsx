@@ -35,6 +35,7 @@ import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
 import PasswordGate from "@/pages/PasswordGate";
+import MissionBriefPage from "@/pages/MissionBriefPage";
 
 function ProtectedRoutes() {
   const { user } = useAuth();
@@ -97,6 +98,13 @@ function ProtectedRoutes() {
         <RoleGuard allowedRoles={["ceo", "production"]}>
           <Production />
         </RoleGuard>
+      </Route>
+      <Route path="/projects/:id/mission-brief">
+        {(params) => (
+          <RoleGuard allowedRoles={["ceo", "production"]}>
+            <MissionBriefPage />
+          </RoleGuard>
+        )}
       </Route>
       <Route path="/analytics">
         <RoleGuard allowedRoles={["ceo"]}>
