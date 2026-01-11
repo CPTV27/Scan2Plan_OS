@@ -925,4 +925,88 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       });
     }
   }));
+
+  // Send quote for signature via PandaDoc
+  app.post("/api/cpq-quotes/:id/send-pandadoc", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    if (!process.env.PANDADOC_API_KEY) {
+      return res.status(503).json({ error: "PandaDoc integration not configured. Add PANDADOC_API_KEY to secrets." });
+    }
+
+    const quoteId = parseInt(req.params.id);
+    const { message, subject } = req.body;
+
+    const quote = await storage.getCpqQuote(quoteId);
+    if (!quote) {
+      return res.status(404).json({ error: "Quote not found" });
+    }
+
+    const lead = quote.leadId ? await storage.getLead(quote.leadId) : null;
+    
+    const recipientEmail = lead?.contactEmail || req.body.recipientEmail;
+    const recipientName = lead?.contactName || req.body.recipientName;
+
+    if (!recipientEmail || !recipientName) {
+      return res.status(400).json({ error: "Recipient email and name required. Add contact info to the lead first." });
+    }
+
+    try {
+      const { createDocumentFromPdf, sendDocument, waitForDocumentReady } = await import("../pandadoc");
+      const { generateEstimatePDF } = await import("../pdf-generator");
+
+      if (!lead) {
+        return res.status(400).json({ error: "Quote must be associated with a lead to generate proposal" });
+      }
+
+      const doc = generateEstimatePDF({ lead });
+      
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+        doc.on('end', () => resolve());
+        doc.on('error', reject);
+        doc.end();
+      });
+      const pdfBuffer = Buffer.concat(chunks);
+
+      const documentName = `Proposal - ${quote.projectName || lead.projectName || 'Quote'} - ${quote.quoteNumber}`;
+      const pandaDocDocument = await createDocumentFromPdf({
+        name: documentName,
+        pdfBuffer,
+        recipientEmail,
+        recipientName,
+      });
+
+      await waitForDocumentReady(pandaDocDocument.id);
+
+      await sendDocument(
+        pandaDocDocument.id, 
+        message || 'Please review and sign the attached proposal.',
+        subject || `Proposal: ${quote.projectName || lead.projectName}`
+      );
+
+      await storage.updateCpqQuote(quoteId, {
+        pandadocDocumentId: pandaDocDocument.id,
+        pandadocStatus: 'sent',
+        pandadocSentAt: new Date(),
+      });
+
+      if (lead && lead.dealStage !== 'Proposal' && lead.dealStage !== 'Negotiation') {
+        await storage.updateLead(lead.id, {
+          dealStage: 'Proposal',
+          lastContactDate: new Date(),
+        });
+      }
+
+      log(`[PandaDoc] Proposal sent for quote ${quoteId} to ${recipientEmail}`);
+
+      res.json({ 
+        success: true, 
+        documentId: pandaDocDocument.id,
+        message: 'Proposal sent via PandaDoc for signature' 
+      });
+    } catch (error) {
+      log("ERROR: PandaDoc send error - " + (error as any)?.message);
+      res.status(500).json({ error: (error as any)?.message || 'Failed to send via PandaDoc' });
+    }
+  }));
 }

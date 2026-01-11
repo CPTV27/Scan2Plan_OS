@@ -1589,6 +1589,13 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   externalCpqId: text("external_cpq_id"),
   externalCpqUrl: text("external_cpq_url"),
   
+  // PandaDoc Integration
+  pandadocDocumentId: text("pandadoc_document_id"),
+  pandadocStatus: text("pandadoc_status"),
+  pandadocSentAt: timestamp("pandadoc_sent_at"),
+  pandadocCompletedAt: timestamp("pandadoc_completed_at"),
+  pandadocSignedBy: text("pandadoc_signed_by"),
+  
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

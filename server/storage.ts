@@ -119,6 +119,7 @@ export interface IStorage {
   getCpqPricingParameters(): Promise<CpqPricingParameter[]>;
   getCpqQuote(id: number): Promise<CpqQuote | undefined>;
   getCpqQuoteByToken(token: string): Promise<CpqQuote | undefined>;
+  getCpqQuoteByPandadocId(documentId: string): Promise<CpqQuote | undefined>;
   getCpqQuotesByLead(leadId: number): Promise<CpqQuote[]>;
   getLatestCpqQuoteForLead(leadId: number): Promise<CpqQuote | undefined>;
   createCpqQuote(quote: InsertCpqQuote): Promise<CpqQuote>;
@@ -666,6 +667,11 @@ export class DatabaseStorage implements IStorage {
 
   async getCpqQuoteByToken(token: string): Promise<CpqQuote | undefined> {
     const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.clientToken, token));
+    return quote;
+  }
+
+  async getCpqQuoteByPandadocId(documentId: string): Promise<CpqQuote | undefined> {
+    const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.pandadocDocumentId, documentId));
     return quote;
   }
 

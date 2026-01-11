@@ -41,6 +41,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -1491,6 +1492,36 @@ export default function DealWorkspace() {
     },
   });
 
+  const sendToPandadocMutation = useMutation({
+    mutationFn: async () => {
+      if (!latestQuote?.id) throw new Error("No quote to send");
+      const response = await apiRequest("POST", `/api/cpq-quotes/${latestQuote.id}/send-pandadoc`, {
+        message: "Please review and sign the attached proposal.",
+        subject: `Proposal: ${lead?.projectName || latestQuote.projectName}`,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || error.error || "Failed to send via PandaDoc");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cpq-quotes", { leadId }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      toast({ 
+        title: "Proposal Sent", 
+        description: "The proposal has been sent via PandaDoc for signature."
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to send via PandaDoc", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Check QuickBooks connection status
   const { data: qboStatus } = useQuery<{ connected: boolean }>({
     queryKey: ["/api/quickbooks/estimate-url", leadId],
@@ -1977,6 +2008,34 @@ export default function DealWorkspace() {
                 >
                   <FileDown className="w-4 h-4 mr-2" />
                   Download Estimate PDF
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              {/* Send for Signature via PandaDoc */}
+              {latestQuote && lead.contactEmail && lead.contactName && (
+                <DropdownMenuItem 
+                  onClick={() => sendToPandadocMutation.mutate()}
+                  disabled={sendToPandadocMutation.isPending}
+                  data-testid="menu-send-pandadoc"
+                >
+                  {sendToPandadocMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Send for Signature
+                </DropdownMenuItem>
+              )}
+              {latestQuote && (!lead.contactEmail || !lead.contactName) && (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  <Send className="w-4 h-4 mr-2" />
+                  Add contact info first
+                </DropdownMenuItem>
+              )}
+              {!latestQuote && (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  <Send className="w-4 h-4 mr-2" />
+                  Create quote first
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

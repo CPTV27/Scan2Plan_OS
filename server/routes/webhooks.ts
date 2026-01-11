@@ -78,6 +78,64 @@ export async function registerWebhookRoutes(app: Express): Promise<void> {
     }
   }));
 
+  // PandaDoc webhook for signature events
+  app.post("/api/webhooks/pandadoc", asyncHandler(async (req, res) => {
+    try {
+      const event = req.body;
+      
+      const documentId = event.data?.id;
+      const eventType = event.event;
+
+      if (!documentId) {
+        log("[PandaDoc Webhook] Missing document ID in event");
+        return res.status(200).json({ received: true });
+      }
+
+      log(`[PandaDoc Webhook] Received ${eventType} for document ${documentId}`);
+
+      const quote = await storage.getCpqQuoteByPandadocId(documentId);
+      if (!quote) {
+        log(`[PandaDoc Webhook] No quote found for PandaDoc document ${documentId}`);
+        return res.status(200).json({ received: true });
+      }
+
+      if (eventType === 'document_state_changed') {
+        const rawStatus = event.data?.status || '';
+        const normalizedStatus = rawStatus.replace('document.', '');
+        
+        await storage.updateCpqQuote(quote.id, {
+          pandadocStatus: normalizedStatus,
+        });
+
+        log(`[PandaDoc Webhook] Updated quote ${quote.id} status to ${normalizedStatus}`);
+
+        if (normalizedStatus === 'completed') {
+          const signerName = event.data?.recipients?.find((r: any) => r.has_completed)?.first_name;
+          
+          await storage.updateCpqQuote(quote.id, {
+            pandadocCompletedAt: new Date(),
+            pandadocSignedBy: signerName || 'Client',
+          });
+
+          if (quote.leadId) {
+            const lead = await storage.getLead(quote.leadId);
+            if (lead && lead.dealStage !== 'Closed Won') {
+              await storage.updateLead(quote.leadId, {
+                dealStage: 'Closed Won',
+              });
+              log(`[PandaDoc Webhook] Auto-closed lead ${quote.leadId} to Closed Won after signature`);
+            }
+          }
+        }
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error) {
+      log("ERROR: PandaDoc webhook error - " + (error as Error)?.message);
+      res.status(500).json({ error: (error as Error)?.message });
+    }
+  }));
+
   app.post("/api/google-chat/webhook", asyncHandler(async (req, res) => {
     const event = req.body;
     log("Google Chat webhook received: " + (event.type || "unknown event"));
