@@ -29,7 +29,6 @@ import Marketing from "@/pages/Marketing";
 import HelpCenter from "@/pages/HelpCenter";
 import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
-import ProposalVault from "@/pages/ProposalVault";
 import BrandGenerator from "@/pages/BrandGenerator";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
@@ -133,11 +132,6 @@ function ProtectedRoutes() {
         </RoleGuard>
       </Route>
       <Route path="/settings" component={Settings} />
-      <Route path="/proposal-vault">
-        <RoleGuard allowedRoles={["ceo", "sales"]}>
-          <ProposalVault />
-        </RoleGuard>
-      </Route>
       <Route path="/help" component={HelpCenter} />
       <Route path="/brand-engine">
         <RoleGuard allowedRoles={["ceo", "sales"]}>
