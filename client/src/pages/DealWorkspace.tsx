@@ -102,7 +102,14 @@ import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2, FileSignature } from "lucide-react";
+import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2, FileSignature, ChevronRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
@@ -1434,6 +1441,7 @@ export default function DealWorkspace() {
   });
   const { toast } = useToast();
   const [showProposalDialog, setShowProposalDialog] = useState(false);
+  const [viewingQuote, setViewingQuote] = useState<CpqQuote | null>(null);
   
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents"];
@@ -3203,10 +3211,11 @@ export default function DealWorkspace() {
                       {quotes.map((quote) => (
                         <div
                           key={quote.id}
-                          className={`p-4 rounded-lg border transition-colors ${
+                          className={`p-4 rounded-lg border transition-colors cursor-pointer hover-elevate ${
                             quote.isLatest ? "border-primary/50 bg-primary/5" : "border-border"
                           }`}
                           data-testid={`version-card-${quote.id}`}
+                          onClick={() => setViewingQuote(quote)}
                         >
                           <div className="flex items-center justify-between gap-4 mb-2">
                             <div className="flex items-center gap-2">
@@ -3231,6 +3240,7 @@ export default function DealWorkspace() {
                               <Clock className="w-4 h-4" />
                               {quote.createdAt &&
                                 formatDistanceToNow(new Date(quote.createdAt), { addSuffix: true })}
+                              <ChevronRight className="w-4 h-4 ml-1" />
                             </div>
                           </div>
                           <div className="flex items-center gap-4 text-sm">
@@ -3479,6 +3489,142 @@ export default function DealWorkspace() {
           isSending={sendProposalMutation.isPending}
         />
       )}
+
+      {/* Quote Version Detail Dialog */}
+      <Dialog open={!!viewingQuote} onOpenChange={(open) => !open && setViewingQuote(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Quote Version {viewingQuote?.versionNumber}
+              {viewingQuote?.isLatest && (
+                <Badge variant="default" className="ml-2">Current</Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Quote #{viewingQuote?.quoteNumber} - Created {viewingQuote?.createdAt && formatDistanceToNow(new Date(viewingQuote.createdAt), { addSuffix: true })}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingQuote && (
+            <div className="space-y-6 mt-4">
+              {/* Quote Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Project</Label>
+                  <p className="font-medium">{viewingQuote.projectName}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Total Price</Label>
+                  <p className="font-semibold text-lg">
+                    ${Number(viewingQuote.totalPrice || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Address</Label>
+                  <p className="text-sm">{viewingQuote.projectAddress}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-muted-foreground text-xs">Building Type</Label>
+                  <p className="text-sm">{viewingQuote.typeOfBuilding}</p>
+                </div>
+                {viewingQuote.paymentTerms && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Payment Terms</Label>
+                    <p className="text-sm">{CPQ_PAYMENT_TERMS_DISPLAY[viewingQuote.paymentTerms as keyof typeof CPQ_PAYMENT_TERMS_DISPLAY] || viewingQuote.paymentTerms}</p>
+                  </div>
+                )}
+                {viewingQuote.dispatchLocation && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Dispatch Location</Label>
+                    <p className="text-sm capitalize">{viewingQuote.dispatchLocation}</p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Areas */}
+              {viewingQuote.areas && Array.isArray(viewingQuote.areas) && (viewingQuote.areas as any[]).length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    Areas ({(viewingQuote.areas as any[]).length})
+                  </h4>
+                  <div className="space-y-2">
+                    {(viewingQuote.areas as any[]).map((area: any, idx: number) => (
+                      <div key={idx} className="p-3 rounded-lg bg-muted/50 border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{area.name || `Area ${idx + 1}`}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {Number(area.squareFeet || area.sqft || 0).toLocaleString()} SF
+                          </span>
+                        </div>
+                        {area.disciplines && area.disciplines.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {area.disciplines.map((disc: any, dIdx: number) => (
+                              <Badge key={dIdx} variant="secondary" className="text-xs">
+                                {typeof disc === 'string' ? disc.toUpperCase() : disc.discipline?.toUpperCase()}
+                                {typeof disc !== 'string' && disc.lod && ` (LOD ${disc.lod})`}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pricing Breakdown */}
+              {viewingQuote.pricingBreakdown && (viewingQuote.pricingBreakdown as any).items && (
+                <div className="space-y-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Pricing Breakdown
+                  </h4>
+                  <div className="space-y-1">
+                    {((viewingQuote.pricingBreakdown as any).items as any[]).map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-1.5 border-b border-muted last:border-0">
+                        <span className="text-sm">{item.label}</span>
+                        <span className="font-mono text-sm">${Number(item.value || 0).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Risks */}
+              {viewingQuote.risks && Array.isArray(viewingQuote.risks) && (viewingQuote.risks as string[]).length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Risk Factors
+                  </h4>
+                  <div className="flex flex-wrap gap-1">
+                    {(viewingQuote.risks as string[]).map((risk: string, idx: number) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        {risk.replace(/_/g, ' ')}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {viewingQuote.notes && (
+                <div className="space-y-2">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Notes
+                  </h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{viewingQuote.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
