@@ -761,6 +761,118 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
 
   const isLandscape = (buildingType: string) => buildingType === "14" || buildingType === "15";
 
+  // === QUOTE CONFIDENCE SCORING SYSTEM ===
+  const CONFIDENCE_WEIGHTS = {
+    buildingType: 0.15,     // 15%
+    sqft: 0.15,             // 15%
+    disciplines: 0.20,      // 20%
+    mepScope: 0.15,         // 15% (having MEPF discipline with scope details)
+    dispatchLocation: 0.10, // 10%
+    siteStatus: 0.10,       // 10% (risks selection indicates site knowledge)
+    actScanning: 0.10,      // 10% (actScan decision made)
+    distance: 0.05,         // 5%
+  };
+
+  const calculateConfidenceScore = useMemo(() => {
+    let score = 0;
+    
+    // Check each area for completeness
+    const primaryArea = areas[0];
+    if (!primaryArea) return 0;
+    
+    // Building Type (15%) - any valid selection (truthy value)
+    if (primaryArea.buildingType && primaryArea.buildingType.length > 0) {
+      score += CONFIDENCE_WEIGHTS.buildingType * 100;
+    }
+    
+    // Square Feet (15%) - has a valid value
+    const sqftValue = parseInt(primaryArea.squareFeet);
+    if (sqftValue && sqftValue > 0) {
+      score += CONFIDENCE_WEIGHTS.sqft * 100;
+    }
+    
+    // Disciplines (20%) - at least one selected
+    if (primaryArea.disciplines.length > 0) {
+      score += CONFIDENCE_WEIGHTS.disciplines * 100;
+    }
+    
+    // MEP Scope (15%) - has MEPF discipline with non-default LOD (not just 300/full defaults)
+    const hasMepf = primaryArea.disciplines.includes("mepf");
+    const mepfConfig = primaryArea.disciplineLods["mepf"];
+    const mepfHasCustomConfig = hasMepf && mepfConfig && (
+      mepfConfig.lod !== "300" || mepfConfig.scope !== "full"
+    );
+    if (hasMepf && mepfHasCustomConfig) {
+      score += CONFIDENCE_WEIGHTS.mepScope * 100;
+    } else if (hasMepf) {
+      // Partial credit for having MEPF selected (7.5%)
+      score += (CONFIDENCE_WEIGHTS.mepScope * 100) / 2;
+    }
+    
+    // Dispatch Location (10%) - any selection
+    if (dispatchLocation && dispatchLocation.length > 0) {
+      score += CONFIDENCE_WEIGHTS.dispatchLocation * 100;
+    }
+    
+    // Site Status / Risks (10%) - at least one risk factor considered
+    if (risks.length > 0) {
+      score += CONFIDENCE_WEIGHTS.siteStatus * 100;
+    }
+    
+    // ActScanning (10%) - actScan is explicitly set (true or false, but we track if it's been considered)
+    // Since actScan defaults to false, we'll give credit if any service option is configured
+    if (actScan || matterport || (additionalElevations && parseInt(additionalElevations) > 0)) {
+      score += CONFIDENCE_WEIGHTS.actScanning * 100;
+    }
+    
+    // Distance (5%) - has a valid distance value
+    const distValue = parseFloat(distance);
+    if (distValue && distValue > 0) {
+      score += CONFIDENCE_WEIGHTS.distance * 100;
+    }
+    
+    return Math.round(score);
+  }, [areas, dispatchLocation, risks, actScan, matterport, additionalElevations, distance]);
+
+  // Field completion status for "hungry field" styling
+  const fieldCompletionStatus = useMemo(() => {
+    const primaryArea = areas[0];
+    return {
+      buildingType: primaryArea?.buildingType && primaryArea.buildingType.length > 0,
+      sqft: parseInt(primaryArea?.squareFeet || "0") > 0,
+      disciplines: (primaryArea?.disciplines.length || 0) > 0,
+      dispatchLocation: dispatchLocation && dispatchLocation.length > 0,
+      distance: parseFloat(distance || "0") > 0,
+      risks: risks.length > 0,
+    };
+  }, [areas, dispatchLocation, distance, risks]);
+
+  // Helper to get "hungry field" styling classes
+  const getHungryFieldClass = (fieldName: keyof typeof fieldCompletionStatus) => {
+    const isComplete = fieldCompletionStatus[fieldName];
+    if (isComplete) {
+      return "transition-all duration-300"; // Neutral, no glow
+    }
+    return "ring-2 ring-amber-400/40 bg-amber-500/5 transition-all duration-300"; // Hungry amber glow
+  };
+
+  // Confidence badge component
+  const ConfidenceBadge = () => {
+    const score = calculateConfidenceScore;
+    const colorClass = score >= 90 
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+      : score >= 70 
+        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
+        : "bg-muted text-muted-foreground border-muted-foreground/30";
+    
+    return (
+      <Badge variant="outline" className={`${colorClass} gap-1`} data-testid="badge-quote-confidence">
+        <span className="text-xs">Confidence:</span>
+        <span className="font-semibold">{score}%</span>
+      </Badge>
+    );
+  };
+
   const getIntegrityBadge = () => {
     if (!pricingResult) return null;
     const status = pricingResult.integrityStatus;
@@ -866,7 +978,10 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                           value={area.buildingType} 
                           onValueChange={(v) => updateArea(area.id, { buildingType: v })}
                         >
-                          <SelectTrigger data-testid={`select-building-type-${area.id}`}>
+                          <SelectTrigger 
+                            className={idx === 0 ? getHungryFieldClass("buildingType") : ""}
+                            data-testid={`select-building-type-${area.id}`}
+                          >
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -883,6 +998,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                           placeholder={isLandscape(area.buildingType) ? "10" : "15000"}
                           value={area.squareFeet}
                           onChange={(e) => updateArea(area.id, { squareFeet: e.target.value })}
+                          className={idx === 0 ? getHungryFieldClass("sqft") : ""}
                           data-testid={`input-sqft-${area.id}`}
                         />
                       </div>
@@ -890,7 +1006,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
 
                     <div>
                       <Label className="text-xs">Disciplines</Label>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <div className={`flex flex-wrap gap-2 mt-1 p-2 rounded-md ${idx === 0 ? getHungryFieldClass("disciplines") : ""}`}>
                         {CPQ_API_DISCIPLINES.map((disc) => (
                           <Button
                             key={disc}
@@ -958,7 +1074,10 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                   <div>
                     <Label className="text-xs">Dispatch Location</Label>
                     <Select value={dispatchLocation} onValueChange={setDispatchLocation}>
-                      <SelectTrigger data-testid="select-dispatch-location">
+                      <SelectTrigger 
+                        className={getHungryFieldClass("dispatchLocation")}
+                        data-testid="select-dispatch-location"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -975,6 +1094,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                       placeholder="25"
                       value={distance}
                       onChange={(e) => setDistance(e.target.value)}
+                      className={getHungryFieldClass("distance")}
                       data-testid="input-distance"
                     />
                   </div>
@@ -990,7 +1110,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-3">
+                <div className={`flex flex-wrap gap-3 p-2 rounded-md ${getHungryFieldClass("risks")}`}>
                   {CPQ_API_RISKS.map((risk) => (
                     <div key={risk} className="flex items-center gap-2">
                       <Checkbox
@@ -1070,7 +1190,10 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                     <DollarSign className="w-4 h-4" />
                     Pricing Breakdown
                   </span>
-                  {getIntegrityBadge()}
+                  <div className="flex items-center gap-2">
+                    <ConfidenceBadge />
+                    {getIntegrityBadge()}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
