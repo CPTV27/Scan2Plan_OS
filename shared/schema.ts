@@ -2213,14 +2213,30 @@ export type InsertGenerationAuditLog = z.infer<typeof insertGenerationAuditLogSc
 // Enhanced Buyer Personas - Detailed psychological profiles for targeted content
 export const buyerPersonas = pgTable("buyer_personas", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(), // BP-A, BP-B, BP-C, BP-D
+  code: text("code").notNull().unique(), // BP1, BP2, BP3, etc.
+  name: text("name").notNull(), // "The Architect", "The GC"
+  icon: text("icon"), // lucide icon name
+  
+  // Identity
   roleTitle: text("role_title").notNull(),
   roleVariants: jsonb("role_variants").$type<string[]>(),
   organizationType: text("organization_type"),
+  description: text("description"),
+  
+  // Cognitive Blueprint
+  coreValues: jsonb("core_values").$type<string[]>(),
   primaryPain: text("primary_pain").notNull(),
   secondaryPain: text("secondary_pain"),
   hiddenFear: text("hidden_fear"),
+  purchaseTriggers: jsonb("purchase_triggers").$type<string[]>(),
+  
+  // Sales Strategy
   valueDriver: text("value_driver").notNull(),
+  valueHook: text("value_hook"), // "Design with confidence..."
+  exactLanguage: jsonb("exact_language").$type<string[]>(), // phrases TO use
+  avoidWords: jsonb("avoid_words").$type<string[]>(), // phrases to NEVER use
+  
+  // Decision Making
   decisionCriteria: jsonb("decision_criteria").$type<string[]>(),
   dealbreakers: jsonb("dealbreakers").$type<string[]>(),
   projectPhases: jsonb("project_phases").$type<string[]>(),
@@ -2231,13 +2247,36 @@ export const buyerPersonas = pgTable("buyer_personas", {
     needsApprovalFrom: string[];
     influencedBy: string[];
   }>(),
+  
+  // Communication
   tonePreference: text("tone_preference").notNull(),
   communicationStyle: text("communication_style"),
   attentionSpan: text("attention_span"),
   technicalTriggers: jsonb("technical_triggers").$type<string[]>(),
   emotionalTriggers: jsonb("emotional_triggers").$type<string[]>(),
-  avoidWords: jsonb("avoid_words").$type<string[]>(),
+  
+  // Risk Profile
+  vetoPower: boolean("veto_power").default(false),
+  defaultRiskLevel: text("default_risk_level").default("medium"), // low, medium, high
   disqualifiers: jsonb("disqualifiers").$type<string[]>(),
+  
+  // Buying Mode Overrides (Firefighter/Optimizer/Innovator strategies)
+  buyingModeStrategies: jsonb("buying_mode_strategies").$type<{
+    firefighter?: string;
+    optimizer?: string;
+    innovator?: string;
+  }>(),
+  
+  // Asset Mapping
+  requiredAssets: jsonb("required_assets").$type<string[]>(), // ["precision_validation_report", "technical_appendix"]
+  proposalSections: jsonb("proposal_sections").$type<string[]>(), // PandaDoc section IDs to auto-include
+  
+  // AI Learning Metrics
+  winRate: decimal("win_rate", { precision: 5, scale: 2 }),
+  avgDealSize: decimal("avg_deal_size", { precision: 12, scale: 2 }),
+  avgSalesCycleDays: integer("avg_sales_cycle_days"),
+  totalDeals: integer("total_deals").default(0),
+  
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -2250,6 +2289,43 @@ export const insertBuyerPersonaSchema = createInsertSchema(buyerPersonas).omit({
 });
 export type BuyerPersona = typeof buyerPersonas.$inferSelect;
 export type InsertBuyerPersona = z.infer<typeof insertBuyerPersonaSchema>;
+
+// Persona Insights - Track which strategies actually work for learning loop
+export const personaInsights = pgTable("persona_insights", {
+  id: serial("id").primaryKey(),
+  personaId: integer("persona_id").references(() => buyerPersonas.id),
+  leadId: integer("lead_id").references(() => leads.id),
+  
+  // What was used
+  buyingModeUsed: text("buying_mode_used"), // firefighter, optimizer, innovator
+  strategyNotes: text("strategy_notes"),
+  assetsDelivered: jsonb("assets_delivered").$type<string[]>(),
+  
+  // Outcome
+  outcome: text("outcome").notNull(), // won, lost, stalled
+  dealValue: decimal("deal_value", { precision: 12, scale: 2 }),
+  cycleLengthDays: integer("cycle_length_days"),
+  lossReason: text("loss_reason"),
+  
+  // AI-generated learnings
+  aiAnalysis: text("ai_analysis"),
+  suggestedRefinements: jsonb("suggested_refinements").$type<{
+    valueHook?: string;
+    languageToAdd?: string[];
+    languageToAvoid?: string[];
+    buyingModeStrategy?: string;
+    otherNotes?: string;
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPersonaInsightSchema = createInsertSchema(personaInsights).omit({
+  id: true,
+  createdAt: true,
+});
+export type PersonaInsight = typeof personaInsights.$inferSelect;
+export type InsertPersonaInsight = z.infer<typeof insertPersonaInsightSchema>;
 
 // Brand Voices - Communication style profiles for different content types
 export const brandVoices = pgTable("brand_voices", {
