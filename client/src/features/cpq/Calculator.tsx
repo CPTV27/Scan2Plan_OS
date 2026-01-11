@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -141,6 +142,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   
   // Price adjustment for margin gate compliance
   const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState<number>(0);
+
+  // Margin target slider (35%-60%)
+  const [marginTarget, setMarginTarget] = useState<number>(0.50);
 
   // Internal cost tracking / Tier A Pricing
   const [tierAScanningCost, setTierAScanningCost] = useState<string>("");
@@ -566,8 +570,8 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Calculate base pricing in real-time (before adjustment)
   const basePricing: PricingResult = useMemo(() => {
-    return calculatePricing(areas, services, travel, risks, paymentTerms);
-  }, [areas, services, travel, risks, paymentTerms]);
+    return calculatePricing(areas, services, travel, risks, paymentTerms, marginTarget);
+  }, [areas, services, travel, risks, paymentTerms, marginTarget]);
 
   // Calculate adjusted pricing with markup percentage
   const pricing: PricingResult = useMemo(() => {
@@ -2054,25 +2058,35 @@ Thanks!`.trim();
               <h2 className="text-lg font-medium">Internal Notes & Assumptions</h2>
               <Card>
                 <CardContent className="pt-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Assumed Gross Margin</Label>
-                      <Input
-                        value={assumedGrossMargin}
-                        onChange={(e) => setAssumedGrossMargin(e.target.value)}
-                        placeholder="e.g., 45%"
-                        data-testid="input-assumed-gross-margin"
-                      />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Margin Target</Label>
+                      <span className="text-sm font-semibold text-primary" data-testid="text-margin-target-value">
+                        {(marginTarget * 100).toFixed(0)}%
+                      </span>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Insurance Requirements</Label>
-                      <Input
-                        value={insuranceRequirements}
-                        onChange={(e) => setInsuranceRequirements(e.target.value)}
-                        placeholder="e.g., $2M umbrella required"
-                        data-testid="input-insurance-requirements"
-                      />
+                    <Slider
+                      value={[marginTarget * 100]}
+                      onValueChange={(value) => setMarginTarget(value[0] / 100)}
+                      min={35}
+                      max={60}
+                      step={1}
+                      className="w-full"
+                      data-testid="slider-margin-target"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>35%</span>
+                      <span>60%</span>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Assumed Gross Margin</Label>
+                    <Input
+                      value={assumedGrossMargin}
+                      onChange={(e) => setAssumedGrossMargin(e.target.value)}
+                      placeholder="e.g., 45%"
+                      data-testid="input-assumed-gross-margin"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Square Footage Assumptions</Label>
@@ -2099,6 +2113,15 @@ Thanks!`.trim();
                       onChange={(e) => setMixedScope(e.target.value)}
                       placeholder="Describe mixed scope if applicable..."
                       data-testid="input-mixed-scope"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Insurance Requirements</Label>
+                    <Textarea
+                      value={insuranceRequirements}
+                      onChange={(e) => setInsuranceRequirements(e.target.value)}
+                      placeholder="Describe insurance requirements if applicable..."
+                      data-testid="textarea-insurance-requirements"
                     />
                   </div>
                 </CardContent>
@@ -2232,6 +2255,53 @@ Thanks!`.trim();
                   </p>
                 </CardContent>
               </Card>
+            </div>
+          )}
+          
+          {/* Margin Guardrail Warnings */}
+          {pricing.marginWarnings && pricing.marginWarnings.length > 0 && (
+            <div className="p-4 border-b space-y-2">
+              {pricing.marginWarnings.map((warning, index) => (
+                <div 
+                  key={index}
+                  data-testid={`margin-warning-${warning.code.toLowerCase().replace(/_/g, "-")}`}
+                  className={
+                    warning.code === "BELOW_FLOOR" 
+                      ? "p-3 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
+                      : "p-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                  }
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle 
+                      className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
+                        warning.code === "BELOW_FLOOR" 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-amber-600 dark:text-amber-400"
+                      }`}
+                    />
+                    <div className="flex-1">
+                      <p 
+                        className={`text-xs font-medium ${
+                          warning.code === "BELOW_FLOOR" 
+                            ? "text-red-800 dark:text-red-200" 
+                            : "text-amber-800 dark:text-amber-200"
+                        }`}
+                      >
+                        {warning.code === "BELOW_FLOOR" ? "Critical Margin Warning" : "Margin Warning"}
+                      </p>
+                      <p 
+                        className={`text-xs mt-1 ${
+                          warning.code === "BELOW_FLOOR" 
+                            ? "text-red-700 dark:text-red-300" 
+                            : "text-amber-700 dark:text-amber-300"
+                        }`}
+                      >
+                        {warning.message}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           
