@@ -43,14 +43,26 @@ function toBool(val: any): boolean {
   return !!val;
 }
 
+// Unwrap nested 'lead' container if present
+function unwrapLeadContainer(data: any): any {
+  if (!data) return {};
+  // Check if data is wrapped in a 'lead' key
+  if (data.lead && typeof data.lead === 'object') {
+    return { ...data, ...data.lead };
+  }
+  return data;
+}
+
 export function generateMissionBrief(project: any): MissionBrief {
   // Synthesize data from multiple sources in order of priority:
   // 1. quotedAreas/quotedServices/quotedRisks (from closed deals)
   // 2. liveScopingData (active scoping)
   // 3. scopingData (legacy scoping)
   // 4. Project-level fallbacks
-  const liveScopingData = project.liveScopingData || {};
-  const scopingData = project.scopingData || {};
+  // 
+  // Note: liveScopingData and scopingData may have data nested under 'lead' key
+  const liveScopingData = unwrapLeadContainer(project.liveScopingData || {});
+  const scopingData = unwrapLeadContainer(project.scopingData || {});
   
   // Synthesize areas from multiple sources
   let areas = project.quotedAreas || [];
