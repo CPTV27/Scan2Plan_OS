@@ -1,6 +1,7 @@
 # SYSTEM ARCHITECTURE EXPORT
 ## Scan2Plan OS (CEO Hub) - Technical Audit
 **Generated:** January 8, 2026
+**Last Updated:** January 11, 2026
 
 ---
 
@@ -346,6 +347,99 @@ The pricing engine uses embedded static configuration rather than database looku
 // - calculateAreaPrice(): Computes price per area based on building type, LOD, sqft
 // - calculateTotalQuote(): Aggregates all areas, travel, risks, services
 // - applyRiskMultipliers(): Applies risk factor percentages from schema
+```
+
+### Margin Target Slider & Post-Proxy Normalization (Added January 11, 2026)
+
+**Frontend Location:** `client/src/pages/DealWorkspace.tsx`
+**Backend Location:** `server/routes/cpq.ts` (POST /api/cpq/calculate)
+
+The CPQ system now includes a margin target slider that allows dynamic price adjustment:
+
+```typescript
+// Frontend: Margin slider in DealWorkspace pricing sidebar
+// Range: 35% - 60%, Default: 45%
+const [marginTarget, setMarginTarget] = useState(0.45);
+
+// Passed to backend with calculate request:
+const requestBody = {
+  areas,
+  dispatchLocation,
+  distance,
+  risks,
+  marginTarget, // 0.35 to 0.60
+  // ...
+};
+```
+
+**Backend Post-Proxy Margin Normalization:**
+
+The `/api/cpq/calculate` endpoint proxies to an external CPQ service, then applies margin target adjustment:
+
+```typescript
+// After receiving response from external CPQ service:
+if (marginTarget && marginTarget >= 0.35 && marginTarget <= 0.60) {
+  // Recalculate each line item using margin formula
+  data.lineItems = data.lineItems.map((item) => {
+    if (item.category !== "total" && item.upteamCost) {
+      const newClientPrice = item.upteamCost / (1 - marginTarget);
+      return { ...item, clientPrice: newClientPrice };
+    }
+    return item;
+  });
+  
+  // Recalculate totals
+  data.totalClientPrice = /* sum of new client prices */;
+  data.grossMargin = data.totalClientPrice - data.totalUpteamCost;
+  data.grossMarginPercent = (data.grossMargin / data.totalClientPrice) * 100;
+}
+```
+
+**Margin Guardrails (FY26 Goals):**
+
+| Threshold | Status | Action |
+|-----------|--------|--------|
+| < 40% (MARGIN_FLOOR) | `blocked` | Quote cannot be saved |
+| < 45% (GUARDRAIL) | `warning` | Quote can be saved with warning |
+| >= 45% | `passed` | Quote saves normally |
+
+```typescript
+// Integrity status updated based on margin
+const FY26_MARGIN_FLOOR = 0.40;
+const GUARDRAIL_THRESHOLD = 0.45;
+
+if (actualMargin < FY26_MARGIN_FLOOR) {
+  data.integrityStatus = "blocked";
+  data.integrityFlags.push({
+    code: "LOW_MARGIN",
+    message: `Gross margin ${margin}% is below 40% threshold`,
+    severity: "error"
+  });
+} else if (actualMargin < GUARDRAIL_THRESHOLD) {
+  data.integrityStatus = "warning";
+  data.integrityFlags.push({
+    code: "MARGIN_BELOW_GUARDRAIL", 
+    message: `Gross margin ${margin}% is below recommended 45%`,
+    severity: "warning"
+  });
+}
+```
+
+### Quote Creation - Areas Extraction Fix (Added January 11, 2026)
+
+**Location:** `server/routes/cpq.ts` (POST /api/leads/:id/cpq-quotes)
+
+The frontend sends `areas` nested inside `requestData`. The backend now extracts it:
+
+```typescript
+// Extract areas from requestData if not at top level
+const areas = normalizedData.areas || normalizedData.requestData?.areas || [];
+
+const quote = await storage.createCpqQuote({
+  ...normalizedData,
+  areas, // Explicitly include at top level for DB
+  // ...
+});
 ```
 
 ---

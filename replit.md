@@ -35,3 +35,9 @@ Key modules include:
 - **Airtable:** Key required for project handoff synchronization.
 - **PandaDoc:** Key required for document signing and proposal import.
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
+
+## Recent Changes (January 11, 2026)
+- **Margin Target Slider:** Added to DealWorkspace.tsx pricing sidebar (35%-60% range, default 45%)
+- **Post-Proxy Margin Normalization:** Backend `/api/cpq/calculate` now recalculates pricing after external CPQ response using formula: `clientPrice = upteamCost / (1 - marginTarget)`
+- **Margin Guardrails:** Integrity checks updated to use recalculated margin values (40% floor = blocked, 45% guardrail = warning)
+- **Quote Save Fix:** Backend now extracts `areas` from nested `requestData` to resolve NOT NULL constraint errors
