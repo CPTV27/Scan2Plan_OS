@@ -114,6 +114,7 @@ import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
 import { CorrespondenceTimeline } from "@/components/CorrespondenceTimeline";
+import { SalesCoPilot } from "@/components/SalesCoPilot";
 import { Slider } from "@/components/ui/slider";
 import { 
   calculatePricing, 
@@ -2413,10 +2414,14 @@ export default function DealWorkspace() {
         {/* Lead Details Tab - Consolidated form with bordered sections */}
         <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
           <ScrollArea className="h-full">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-4">
-                {/* Project Information Section */}
-                <Card>
+            <div className="p-4 space-y-4">
+              {/* Sales CoPilot - Persona-based guidance */}
+              <SalesCoPilot lead={lead} compact />
+              
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {/* Project Information Section */}
+                  <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Building2 className="w-4 h-4" />
@@ -3271,6 +3276,7 @@ export default function DealWorkspace() {
                 </div>
               </form>
             </Form>
+            </div>
           </ScrollArea>
         </TabsContent>
 
