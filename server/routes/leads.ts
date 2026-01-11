@@ -10,9 +10,45 @@ import { isGoogleDriveConnected, createProjectFolder, uploadFileToDrive } from "
 import path from "path";
 import { log } from "../lib/logger";
 import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
-import { TIER_A_THRESHOLD, CPQ_BUILDING_TYPES } from "@shared/schema";
+import { TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, projectEmbeddings } from "@shared/schema";
 import multer from "multer";
 import fs from "fs";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
+import { aiClient, createProjectSummary } from "../services/ai";
+
+async function precomputeEmbedding(lead: any) {
+  if (!aiClient.isConfigured()) return;
+  
+  try {
+    const summary = createProjectSummary(lead);
+    const embeddingResult = await aiClient.embed(summary);
+    
+    if (!embeddingResult) return;
+    
+    const [existing] = await db.select().from(projectEmbeddings).where(eq(projectEmbeddings.leadId, lead.id));
+    
+    if (existing) {
+      await db.update(projectEmbeddings)
+        .set({
+          embedding: JSON.stringify(embeddingResult.embedding),
+          projectSummary: summary,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectEmbeddings.id, existing.id));
+    } else {
+      await db.insert(projectEmbeddings).values({
+        leadId: lead.id,
+        embedding: JSON.stringify(embeddingResult.embedding),
+        projectSummary: summary,
+      });
+    }
+    
+    log(`[Embedding] Pre-computed embedding for lead ${lead.id}`);
+  } catch (err: any) {
+    log(`[Embedding] Pre-computation failed for lead ${lead.id}: ${err.message}`);
+  }
+}
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -191,6 +227,9 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       const lead = await storage.createLead(leadData);
       log("[Lead Create] Success, lead ID: " + lead.id);
       
+      // Pre-compute embedding for project matching (background)
+      precomputeEmbedding(lead).catch(() => {});
+      
       if (lead.projectAddress && process.env.GOOGLE_MAPS_API_KEY) {
         enrichLeadWithGoogleIntel(lead.projectAddress)
           .then(async (googleIntel) => {
@@ -290,6 +329,18 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       }
       
       const lead = await storage.updateLead(leadId, updateData);
+      
+      // Re-compute embedding if key fields changed (background)
+      const embeddingRelevantFieldsChanged = addressChanged || 
+        input.projectName !== previousLead.projectName ||
+        input.buildingType !== previousLead.buildingType ||
+        input.sqft !== previousLead.sqft ||
+        input.scope !== previousLead.scope ||
+        input.disciplines !== previousLead.disciplines;
+      
+      if (embeddingRelevantFieldsChanged) {
+        precomputeEmbedding(lead).catch(() => {});
+      }
       
       if (addressChanged && process.env.GOOGLE_MAPS_API_KEY) {
         enrichLeadWithGoogleIntel(input.projectAddress!)
