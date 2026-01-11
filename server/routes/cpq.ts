@@ -830,6 +830,82 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
 
       const data = await response.json();
 
+      // Apply margin target adjustment if specified
+      const marginTarget = req.body.marginTarget;
+      if (marginTarget && typeof marginTarget === 'number' && marginTarget >= 0.35 && marginTarget <= 0.60 && data.success) {
+        // Recalculate pricing using margin target formula: clientPrice = upteamCost / (1 - marginTarget)
+        let newTotalClientPrice = 0;
+        
+        if (data.lineItems && Array.isArray(data.lineItems)) {
+          data.lineItems = data.lineItems.map((item: any) => {
+            if (item.category !== "total" && item.upteamCost) {
+              const newClientPrice = Math.round((item.upteamCost / (1 - marginTarget)) * 100) / 100;
+              newTotalClientPrice += newClientPrice;
+              return { ...item, clientPrice: newClientPrice };
+            }
+            newTotalClientPrice += item.clientPrice || 0;
+            return item;
+          });
+        }
+        
+        // Update totals
+        if (newTotalClientPrice > 0) {
+          data.totalClientPrice = Math.round(newTotalClientPrice * 100) / 100;
+          data.grossMargin = Math.round((data.totalClientPrice - data.totalUpteamCost) * 100) / 100;
+          data.grossMarginPercent = Math.round((data.grossMargin / data.totalClientPrice) * 100 * 10) / 10;
+          
+          // Update subtotals.modeling if it exists
+          if (data.subtotals) {
+            const modelingItems = data.lineItems?.filter((item: any) => 
+              item.category === "discipline" || item.category === "modeling"
+            ) || [];
+            data.subtotals.modeling = modelingItems.reduce((sum: number, item: any) => sum + (item.clientPrice || 0), 0);
+          }
+        }
+        
+        // Update integrity status based on new margin
+        const FY26_MARGIN_FLOOR = 0.40;
+        const GUARDRAIL_THRESHOLD = 0.45;
+        const actualMargin = data.grossMarginPercent / 100;
+        
+        // Clear existing flags and recalculate
+        data.integrityFlags = data.integrityFlags?.filter((f: any) => 
+          f.code !== "LOW_MARGIN" && f.code !== "MARGIN_BELOW_FLOOR" && f.code !== "MARGIN_BELOW_GUARDRAIL"
+        ) || [];
+        
+        if (actualMargin < FY26_MARGIN_FLOOR) {
+          data.integrityStatus = "blocked";
+          data.integrityFlags.push({
+            code: "LOW_MARGIN",
+            message: `Gross margin ${data.grossMarginPercent.toFixed(1)}% is below ${(FY26_MARGIN_FLOOR * 100).toFixed(0)}% threshold`,
+            severity: "error"
+          });
+        } else if (actualMargin < GUARDRAIL_THRESHOLD) {
+          data.integrityStatus = data.integrityStatus === "blocked" ? "blocked" : "warning";
+          data.integrityFlags.push({
+            code: "MARGIN_BELOW_GUARDRAIL",
+            message: `Gross margin ${data.grossMarginPercent.toFixed(1)}% is below recommended ${(GUARDRAIL_THRESHOLD * 100).toFixed(0)}%`,
+            severity: "warning"
+          });
+        } else if (data.integrityStatus === "blocked" && data.integrityFlags.length === 0) {
+          data.integrityStatus = "passed";
+        }
+        
+        // Add margin warnings array for frontend display
+        data.marginWarnings = [];
+        if (actualMargin < FY26_MARGIN_FLOOR) {
+          data.marginWarnings.push({
+            code: "BELOW_FLOOR",
+            message: `Gross margin ${data.grossMarginPercent.toFixed(1)}% is below the 40% floor. Quote cannot be saved.`
+          });
+        } else if (actualMargin < GUARDRAIL_THRESHOLD) {
+          data.marginWarnings.push({
+            code: "BELOW_GUARDRAIL",
+            message: `Gross margin ${data.grossMarginPercent.toFixed(1)}% is below the recommended 45% guardrail.`
+          });
+        }
+      }
+
       // Forward the response status and body
       res.status(response.status).json(data);
     } catch (error) {
