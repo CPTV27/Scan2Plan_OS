@@ -17,6 +17,7 @@ import { GHLImport } from "@/components/GHLImport";
 import { PersonaSelect } from "@/components/PersonaSelect";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { format, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +105,53 @@ function IntegrityAuditBadge({ lead }: { lead: Lead }) {
   }
   
   return null;
+}
+
+function QBOImportBadge({ lead }: { lead: Lead }) {
+  const importSource = (lead as any).importSource;
+  const qboEstimateStatus = (lead as any).qboEstimateStatus;
+  const qboHasLinkedInvoice = (lead as any).qboHasLinkedInvoice;
+  
+  if (importSource !== 'qbo_sync') return null;
+  
+  return (
+    <div className="flex gap-1 flex-shrink-0">
+      <Badge 
+        variant="outline" 
+        className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30"
+        data-testid={`badge-qbo-import-${lead.id}`}
+        title="Imported from QuickBooks"
+      >
+        QBO
+      </Badge>
+      {qboEstimateStatus && (
+        <Badge 
+          variant="outline"
+          className={clsx(
+            "text-xs",
+            qboEstimateStatus === 'Accepted' && "bg-green-500/20 text-green-400 border-green-500/30",
+            qboEstimateStatus === 'Rejected' && "bg-red-500/20 text-red-400 border-red-500/30",
+            qboEstimateStatus === 'Pending' && "bg-amber-500/20 text-amber-400 border-amber-500/30",
+            qboEstimateStatus === 'Closed' && "bg-gray-500/20 text-gray-400 border-gray-500/30"
+          )}
+          data-testid={`badge-qbo-status-${lead.id}`}
+          title={`QBO Status: ${qboEstimateStatus}`}
+        >
+          {qboEstimateStatus}
+        </Badge>
+      )}
+      {qboHasLinkedInvoice && (
+        <Badge 
+          variant="outline" 
+          className="text-xs bg-green-500/20 text-green-400 border-green-500/30"
+          data-testid={`badge-qbo-invoiced-${lead.id}`}
+          title="Has linked invoice in QuickBooks"
+        >
+          Invoiced
+        </Badge>
+      )}
+    </div>
+  );
 }
 
 function ProbabilityBadge({ lead }: { lead: Lead }) {
@@ -289,6 +337,7 @@ function DealCard({
               </Badge>
             )}
             <IntegrityAuditBadge lead={lead} />
+            <QBOImportBadge lead={lead} />
           </div>
         )}
 
@@ -474,6 +523,10 @@ export default function Sales() {
   const [vaultLead, setVaultLead] = useState<Lead | null>(null);
   const [commLead, setCommLead] = useState<Lead | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  // QBO Filter State
+  const [filterSource, setFilterSource] = useState<string>("all");
+  const [filterQboStatus, setFilterQboStatus] = useState<string>("all");
+  const [filterHasInvoice, setFilterHasInvoice] = useState<string>("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -584,6 +637,31 @@ export default function Sales() {
     },
   });
 
+  const bulkUpdateStageMutation = useMutation({
+    mutationFn: async ({ leadIds, stage }: { leadIds: number[], stage: string }) => {
+      const res = await apiRequest("POST", "/api/leads/bulk-update-stage", {
+        leadIds,
+        dealStage: stage,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
+      setSelectedLeads([]);
+      toast({ 
+        title: "Leads Updated", 
+        description: data.message || `Updated ${data.updated} leads` 
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Update Failed", 
+        description: error.message || "Could not update leads.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handleMove = (leadId: number, direction: 'prev' | 'next') => {
     const lead = leads?.find(l => l.id === leadId);
     if (!lead) return;
@@ -598,7 +676,7 @@ export default function Sales() {
 
   const filteredLeads = leads?.filter(l => {
     const searchLower = search.toLowerCase();
-    return (
+    const matchesSearch = (
       l.clientName.toLowerCase().includes(searchLower) ||
       (l.projectAddress && l.projectAddress.toLowerCase().includes(searchLower)) ||
       (l.projectName && l.projectName.toLowerCase().includes(searchLower)) ||
@@ -606,6 +684,25 @@ export default function Sales() {
       (l.contactEmail && l.contactEmail.toLowerCase().includes(searchLower)) ||
       (l.contactPhone && l.contactPhone.toLowerCase().includes(searchLower))
     );
+    
+    // Import source filter
+    const leadSource = (l as any).importSource || 'manual';
+    const matchesSource = filterSource === 'all' || leadSource === filterSource;
+    
+    // QBO status filter (only applies when source filter is qbo_sync)
+    const qboStatus = (l as any).qboEstimateStatus;
+    const matchesQboStatus = filterSource !== 'qbo_sync' || 
+      filterQboStatus === 'all' || 
+      qboStatus === filterQboStatus;
+    
+    // Has invoice filter (only applies when source filter is qbo_sync)
+    const hasInvoice = (l as any).qboHasLinkedInvoice;
+    const matchesInvoice = filterSource !== 'qbo_sync' || 
+      filterHasInvoice === 'all' || 
+      (filterHasInvoice === 'yes' && hasInvoice) ||
+      (filterHasInvoice === 'no' && !hasInvoice);
+    
+    return matchesSearch && matchesSource && matchesQboStatus && matchesInvoice;
   });
 
   const totalValue = leads?.reduce((sum, lead) => sum + Number(lead.value), 0) || 0;
@@ -752,6 +849,70 @@ export default function Sales() {
                   data-testid="input-search-deals"
                 />
               </div>
+              
+              {/* QBO Filters */}
+              <Select value={filterSource} onValueChange={(val) => {
+                setFilterSource(val);
+                // Reset QBO-specific filters when switching away from QBO
+                if (val !== 'qbo_sync') {
+                  setFilterQboStatus('all');
+                  setFilterHasInvoice('all');
+                }
+              }}>
+                <SelectTrigger className="w-[130px]" data-testid="select-filter-source">
+                  <SelectValue placeholder="Source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="qbo_sync">QBO Import</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="hubspot">HubSpot</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {filterSource === 'qbo_sync' && (
+                <>
+                  <Select value={filterQboStatus} onValueChange={setFilterQboStatus}>
+                    <SelectTrigger className="w-[120px]" data-testid="select-filter-qbo-status">
+                      <SelectValue placeholder="QBO Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Accepted">Accepted</SelectItem>
+                      <SelectItem value="Closed">Closed</SelectItem>
+                      <SelectItem value="Rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={filterHasInvoice} onValueChange={setFilterHasInvoice}>
+                    <SelectTrigger className="w-[110px]" data-testid="select-filter-has-invoice">
+                      <SelectValue placeholder="Invoice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any</SelectItem>
+                      <SelectItem value="yes">Has Invoice</SelectItem>
+                      <SelectItem value="no">No Invoice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              
+              {(filterSource !== 'all' || filterQboStatus !== 'all' || filterHasInvoice !== 'all') && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setFilterSource('all');
+                    setFilterQboStatus('all');
+                    setFilterHasInvoice('all');
+                  }}
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
+              
               <div className="flex items-center gap-4">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Pipeline: </span>
@@ -775,6 +936,40 @@ export default function Sales() {
             </div>
           </div>
         </header>
+
+        {/* Bulk Action Bar */}
+        {selectedLeads.length > 0 && (
+          <div className="bg-primary/10 border-b px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium" data-testid="text-selected-count">
+                {selectedLeads.length} selected
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setSelectedLeads([])}
+                data-testid="button-clear-selection"
+              >
+                Clear Selection
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Move to:</span>
+              {STAGES.map((stage) => (
+                <Button
+                  key={stage}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => bulkUpdateStageMutation.mutate({ leadIds: selectedLeads, stage })}
+                  disabled={bulkUpdateStageMutation.isPending}
+                  data-testid={`button-bulk-move-${stage.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  {stage}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden p-6">
           {isLoading ? (

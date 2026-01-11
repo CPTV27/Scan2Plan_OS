@@ -34,6 +34,7 @@ export interface IStorage {
   getLeadByClientName(clientName: string): Promise<Lead | undefined>;
   getLeadsByClientName(clientName: string): Promise<Lead[]>;
   getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]>;
+  getLeadsByImportSource(importSource: string): Promise<Lead[]>;
   getLeadByClientToken(token: string): Promise<Lead | undefined>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead>;
@@ -227,6 +228,15 @@ export class DatabaseStorage implements IStorage {
 
   async getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]> {
     return await db.select().from(leads).where(eq(leads.qboCustomerId, qboCustomerId)).orderBy(desc(leads.lastContactDate));
+  }
+
+  async getLeadsByImportSource(importSource: string): Promise<Lead[]> {
+    return await db.select().from(leads).where(
+      and(
+        eq(leads.importSource, importSource),
+        isNull(leads.deletedAt)
+      )
+    ).orderBy(desc(leads.lastContactDate));
   }
 
   async getLeadByClientToken(token: string): Promise<Lead | undefined> {

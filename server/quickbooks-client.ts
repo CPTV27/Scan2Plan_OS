@@ -889,6 +889,32 @@ export class QuickBooksClient {
     return data.QueryResponse?.Estimate || [];
   }
 
+  async getEstimate(estimateId: string): Promise<any | null> {
+    const token = await this.getValidToken();
+    if (!token) throw new Error("QuickBooks not connected");
+
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${token.realmId}/estimate/${estimateId}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${token.accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      const error = await response.text();
+      throw new Error(`Failed to fetch estimate ${estimateId}: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.Estimate || null;
+  }
+
   // Get QBO invoice URL for viewing
   getInvoiceUrl(invoiceId: string, realmId: string): string {
     const isSandbox = process.env.QB_SANDBOX === "true";

@@ -10,6 +10,41 @@ import { z } from "zod";
 import crypto from "crypto";
 import { log } from "../lib/logger";
 
+// Map QBO estimate status to deal stage
+function mapQboStatusToDealStage(estimate: any): string {
+  const status = estimate.TxnStatus;
+  
+  // Check if estimate was converted to invoice
+  if (estimate.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice')) {
+    return 'Closed Won';
+  }
+  
+  switch (status) {
+    case 'Accepted':
+      return 'Closed Won';
+    case 'Rejected':
+      return 'Closed Lost';
+    case 'Closed':
+      // Closed without acceptance is usually a loss
+      return 'Closed Lost';
+    case 'Pending':
+    default:
+      return 'Proposal';
+  }
+}
+
+// Get probability based on deal stage
+function getStageProbability(stage: string): number {
+  switch (stage) {
+    case 'Closed Won': return 100;
+    case 'Closed Lost': return 0;
+    case 'Negotiation': return 75;
+    case 'Proposal': return 50;
+    case 'Qualified': return 25;
+    default: return 10;
+  }
+}
+
 export function registerQuickbooksRoutes(app: Express): void {
   app.get("/api/quickbooks/status", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
@@ -694,17 +729,35 @@ export function registerQuickbooksRoutes(app: Express): void {
           const proposalIndex = getStageIndex("Proposal");
           
           if (existingLead) {
-            // Update existing lead with matching QBO Estimate ID - don't change closed deals
+            // Update existing lead with matching QBO Estimate ID
+            const hasLinkedInvoice = est.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice') || false;
+            const mappedStage = mapQboStatusToDealStage(est);
+            
+            // Always update status tracking fields
+            const updateData: any = {
+              value: String(est.TotalAmt),
+              qboEstimateStatus: est.TxnStatus || null,
+              qboHasLinkedInvoice: hasLinkedInvoice,
+              qboCustomerId: qboCustomerId,
+              qboSyncedAt: new Date(),
+            };
+            
+            // Don't regress closed deals unless QBO shows a different closed state
             if (existingLead.dealStage !== "Closed Won" && existingLead.dealStage !== "Closed Lost") {
+              // Only advance stage if QBO status indicates more advanced stage
+              const currentStageIndex = stageOrder.indexOf(existingLead.dealStage);
+              const mappedStageIndex = stageOrder.indexOf(mappedStage);
+              if (mappedStageIndex > currentStageIndex) {
+                updateData.dealStage = mappedStage;
+                updateData.probability = getStageProbability(mappedStage);
+              }
+              
               const existingNotes = existingLead.notes || "";
-              const syncNote = `\n[QB Estimate #${est.DocNumber || est.Id} synced: ${new Date().toISOString().split("T")[0]}]`;
-              await storage.updateLead(existingLead.id, {
-                value: String(est.TotalAmt),
-                qboCustomerId: qboCustomerId,
-                qboSyncedAt: new Date(),
-                notes: existingNotes + syncNote,
-              });
+              const syncNote = `\n[QB Estimate #${est.DocNumber || est.Id} synced: ${new Date().toISOString().split("T")[0]}] Status: ${est.TxnStatus || 'Pending'}`;
+              updateData.notes = existingNotes + syncNote;
             }
+            
+            await storage.updateLead(existingLead.id, updateData);
             results.estimates.updated++;
           } else {
             // Matching priority: 1. QBO Customer ID, 2. Name + Value
@@ -765,33 +818,52 @@ export function registerQuickbooksRoutes(app: Express): void {
               const currentStageIndex = getStageIndex(matchedLead.dealStage);
               const multiMatchNote = eligibleLeads.length > 1 ? ` [Best match of ${eligibleLeads.length} candidates by value/address/recency]` : "";
               
+              const mappedStage = mapQboStatusToDealStage(est);
+              const mappedStageIndex = getStageIndex(mappedStage);
+              const hasLinkedInvoice = est.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice') || false;
+              
+              // Determine if we should update the stage (only if mapped stage is more advanced)
+              const shouldUpdateStage = mappedStageIndex > currentStageIndex;
+              
               await storage.updateLead(matchedLead.id, {
                 value: String(est.TotalAmt),
-                // Only advance to Proposal if in earlier stage
-                ...(currentStageIndex < proposalIndex ? { dealStage: "Proposal", probability: 50 } : {}),
+                // Update stage if QBO status indicates more advanced stage
+                ...(shouldUpdateStage ? { 
+                  dealStage: mappedStage, 
+                  probability: getStageProbability(mappedStage) 
+                } : {}),
                 qboEstimateId: est.Id,
                 qboEstimateNumber: est.DocNumber || null,
+                qboEstimateStatus: est.TxnStatus || null,
+                qboHasLinkedInvoice: hasLinkedInvoice,
                 qboCustomerId: qboCustomerId,
                 qboSyncedAt: new Date(),
-                notes: existingNotes + `\n[QB Estimate #${est.DocNumber || est.Id} linked]${multiMatchNote}`,
+                importSource: matchedLead.importSource || "qbo_sync",
+                notes: existingNotes + `\n[QB Estimate #${est.DocNumber || est.Id} linked (${est.TxnStatus || 'Pending'})]${multiMatchNote}`,
               });
               results.estimates.updated++;
             } else {
-              // No match - create new lead
+              // No match - create new lead with status mapping
+              const mappedStage = mapQboStatusToDealStage(est);
+              const hasLinkedInvoice = est.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice') || false;
+              
               await storage.createLead({
                 clientName: customerName,
                 projectName: projectName,
                 projectAddress: address,
                 value: String(est.TotalAmt),
-                dealStage: "Proposal",
-                probability: 50,
+                dealStage: mappedStage,
+                probability: getStageProbability(mappedStage),
                 source: "quickbooks_sync",
                 qboEstimateId: est.Id,
                 qboEstimateNumber: est.DocNumber || null,
+                qboEstimateStatus: est.TxnStatus || null,
+                qboHasLinkedInvoice: hasLinkedInvoice,
                 qboCustomerId: qboCustomerId,
                 qboSyncedAt: new Date(),
+                importSource: "qbo_sync",
                 contactEmail: est.BillEmail?.Address || null,
-                notes: `[Imported from QuickBooks Estimate #${est.DocNumber || est.Id}]`,
+                notes: `[Imported from QuickBooks Estimate #${est.DocNumber || est.Id}] Status: ${est.TxnStatus || 'Pending'}`,
               });
               results.estimates.imported++;
             }
@@ -811,6 +883,76 @@ export function registerQuickbooksRoutes(app: Express): void {
       });
     } catch (error: any) {
       const errorMessage = error.message || "Pipeline sync failed";
+      if (errorMessage.includes("401") || errorMessage.includes("not connected")) {
+        res.status(401).json({ message: "QuickBooks authentication expired. Please reconnect.", needsReauth: true });
+      } else {
+        res.status(500).json({ message: errorMessage });
+      }
+    }
+  }));
+
+  // Re-sync statuses for existing QBO imports
+  app.post("/api/quickbooks/resync-statuses", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const isConnected = await quickbooksClient.isConnected();
+      if (!isConnected) {
+        return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
+      }
+
+      // Get all leads that came from QBO sync
+      const qboLeads = await storage.getLeadsByImportSource('qbo_sync');
+      
+      let updated = 0;
+      let errors = 0;
+      const errorDetails: string[] = [];
+      
+      // Define stage order for comparison
+      const stageOrder = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"];
+      
+      for (const lead of qboLeads) {
+        if (!lead.qboEstimateId) continue;
+        
+        try {
+          // Fetch current estimate status from QBO
+          const estimate = await quickbooksClient.getEstimate(lead.qboEstimateId);
+          
+          if (estimate) {
+            const newStage = mapQboStatusToDealStage(estimate);
+            const hasInvoice = estimate.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice') || false;
+            
+            // Only advance stage, never regress
+            const currentStageIndex = stageOrder.indexOf(lead.dealStage);
+            const newStageIndex = stageOrder.indexOf(newStage);
+            const shouldUpdateStage = newStageIndex > currentStageIndex;
+            
+            await storage.updateLead(lead.id, {
+              qboEstimateStatus: estimate.TxnStatus || null,
+              qboHasLinkedInvoice: hasInvoice,
+              qboSyncedAt: new Date(),
+              ...(shouldUpdateStage ? {
+                dealStage: newStage,
+                probability: getStageProbability(newStage),
+              } : {}),
+            });
+            updated++;
+          }
+        } catch (err: any) {
+          console.error(`Failed to resync lead ${lead.id}:`, err);
+          errorDetails.push(`Lead ${lead.id}: ${err.message}`);
+          errors++;
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        updated, 
+        errors,
+        errorDetails: errorDetails.slice(0, 10), // Only return first 10 errors
+        message: `Updated ${updated} leads from QBO status${errors > 0 ? `, ${errors} errors` : ''}` 
+      });
+      
+    } catch (error: any) {
+      const errorMessage = error.message || "Resync failed";
       if (errorMessage.includes("401") || errorMessage.includes("not connected")) {
         res.status(401).json({ message: "QuickBooks authentication expired. Please reconnect.", needsReauth: true });
       } else {

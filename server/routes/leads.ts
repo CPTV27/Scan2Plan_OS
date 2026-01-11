@@ -441,6 +441,53 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     res.status(204).send();
   }));
 
+  // Bulk update stage for multiple leads
+  app.post("/api/leads/bulk-update-stage", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const { leadIds, dealStage } = req.body;
+    
+    if (!Array.isArray(leadIds) || !dealStage) {
+      return res.status(400).json({ error: "leadIds array and dealStage required" });
+    }
+    
+    const validStages = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"];
+    if (!validStages.includes(dealStage)) {
+      return res.status(400).json({ error: "Invalid deal stage" });
+    }
+    
+    // Map stage to probability
+    const stageProbability: Record<string, number> = {
+      "Leads": 10,
+      "Contacted": 20,
+      "Proposal": 50,
+      "Negotiation": 75,
+      "On Hold": 50,
+      "Closed Won": 100,
+      "Closed Lost": 0,
+    };
+    
+    let updated = 0;
+    const errors: string[] = [];
+    
+    for (const id of leadIds) {
+      try {
+        await storage.updateLead(Number(id), { 
+          dealStage, 
+          probability: stageProbability[dealStage] || 50 
+        });
+        updated++;
+      } catch (err: any) {
+        errors.push(`Lead ${id}: ${err.message}`);
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      updated, 
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Updated ${updated} leads to ${dealStage}${errors.length > 0 ? `, ${errors.length} errors` : ''}`
+    });
+  }));
+
   app.patch("/api/leads/:id/stage", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
