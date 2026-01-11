@@ -19,7 +19,6 @@ import { registerUserRoutes } from "./routes/users";
 import { registerLeadRoutes } from "./routes/leads";
 import { registerCpqRoutes } from "./routes/cpq";
 import { registerHubspotRoutes } from "./routes/hubspot";
-import { registerGHLRoutes } from "./routes/ghl";
 import { registerGoogleRoutes } from "./routes/google";
 import { registerAnalyticsRoutes } from "./routes/analytics";
 import { registerProjectRoutes } from "./routes/projects";
@@ -279,7 +278,6 @@ export async function registerRoutes(
   await registerLeadRoutes(app);
   await registerCpqRoutes(app);
   await registerHubspotRoutes(app);
-  registerGHLRoutes(app);
   await registerGoogleRoutes(app);
   registerAnalyticsRoutes(app);
   registerProjectRoutes(app);
