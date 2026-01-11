@@ -12,6 +12,7 @@ interface PandaDocEmbedProps {
   onDocumentCreated?: (docId: string) => void;
   onDocumentSent?: () => void;
   leadId?: number;
+  quoteId?: number;
 }
 
 interface DocumentStatus {
@@ -26,13 +27,44 @@ export function PandaDocEmbed({
   pandaDocId, 
   documentName,
   onDocumentSent,
+  onDocumentCreated,
+  leadId,
+  quoteId,
 }: PandaDocEmbedProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
   const [editorLoaded, setEditorLoaded] = useState(false);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null);
+  const [currentDocId, setCurrentDocId] = useState<string | null>(pandaDocId);
   const { toast } = useToast();
+
+  const createDocumentMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/pandadoc/documents", {
+        quoteId,
+        leadId,
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.id) {
+        setCurrentDocId(data.id);
+        onDocumentCreated?.(data.id);
+        toast({
+          title: "Document created",
+          description: "Your proposal has been created in PandaDoc. You can now edit it.",
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to create document",
+        description: String(error),
+        variant: "destructive",
+      });
+    },
+  });
 
   const editingSessionMutation = useMutation({
     mutationFn: async (docId: string) => {
@@ -66,7 +98,7 @@ export function PandaDocEmbed({
           
           editorRef.current.open({
             token: data.token,
-            documentId: pandaDocId,
+            documentId: activeDocId,
           });
           
           setEditorLoaded(true);
@@ -105,10 +137,12 @@ export function PandaDocEmbed({
     },
   });
 
+  const activeDocId = currentDocId || pandaDocId;
+
   const refreshStatus = async () => {
-    if (!pandaDocId) return;
+    if (!activeDocId) return;
     try {
-      const response = await apiRequest("GET", `/api/pandadoc/documents/${pandaDocId}/status`);
+      const response = await apiRequest("GET", `/api/pandadoc/documents/${activeDocId}/status`);
       const status = await response.json();
       setDocumentStatus(status);
     } catch (error) {
@@ -117,9 +151,9 @@ export function PandaDocEmbed({
   };
 
   useEffect(() => {
-    if (pandaDocId) {
+    if (activeDocId) {
       refreshStatus();
-      editingSessionMutation.mutate(pandaDocId);
+      editingSessionMutation.mutate(activeDocId);
     }
     
     return () => {
@@ -130,17 +164,39 @@ export function PandaDocEmbed({
         }
       }
     };
-  }, [pandaDocId]);
+  }, [activeDocId]);
 
-  if (!pandaDocId) {
+  if (!activeDocId) {
     return (
       <Card className="h-full flex items-center justify-center">
         <CardContent className="text-center py-12">
           <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
-          <h3 className="text-lg font-medium mb-2">No Document</h3>
-          <p className="text-sm text-muted-foreground">
-            Create a proposal from the Quote Builder to get started
+          <h3 className="text-lg font-medium mb-2">No Proposal Document</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {quoteId 
+              ? "Create a PandaDoc proposal from your saved quote to send to the client."
+              : "Save a quote in the Quote Builder first, then create a proposal here."
+            }
           </p>
+          {quoteId && (
+            <Button 
+              onClick={() => createDocumentMutation.mutate()}
+              disabled={createDocumentMutation.isPending}
+              data-testid="button-create-proposal"
+            >
+              {createDocumentMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Create Proposal
+                </>
+              )}
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
