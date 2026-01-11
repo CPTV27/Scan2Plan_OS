@@ -1231,7 +1231,8 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function DealWorkspace() {
   const params = useParams<{ id: string }>();
-  const leadId = Number(params.id);
+  // Use parseInt to safely extract numeric ID, ignoring any query string that might be attached
+  const leadId = params.id ? parseInt(params.id.split("?")[0], 10) : NaN;
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     const validTabs = ["lead", "quote", "history", "ai", "documents"];
@@ -1254,17 +1255,17 @@ export default function DealWorkspace() {
 
   const { data: lead, isLoading: leadLoading } = useQuery<Lead>({
     queryKey: ["/api/leads", leadId],
-    enabled: !!leadId,
+    enabled: !isNaN(leadId) && leadId > 0,
   });
 
   const { data: quotes, isLoading: quotesLoading } = useQuery<CpqQuote[]>({
     queryKey: ["/api/leads", leadId, "cpq-quotes"],
-    enabled: !!leadId,
+    enabled: !isNaN(leadId) && leadId > 0,
   });
 
   const { data: documents, isLoading: documentsLoading } = useQuery<LeadDocument[]>({
     queryKey: ["/api/leads", leadId, "documents"],
-    enabled: !!leadId,
+    enabled: !isNaN(leadId) && leadId > 0,
   });
 
   const { data: proposalEmails } = useQuery<{
@@ -1282,7 +1283,7 @@ export default function DealWorkspace() {
     clickCount: number;
   }[]>({
     queryKey: ["/api/leads", leadId, "proposal-emails"],
-    enabled: !!leadId,
+    enabled: !isNaN(leadId) && leadId > 0,
   });
 
   const latestQuote = quotes?.find((q) => q.isLatest);
