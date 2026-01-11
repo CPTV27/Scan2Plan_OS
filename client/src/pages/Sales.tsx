@@ -404,7 +404,7 @@ function DealCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs px-2"
+              className="h-7 text-xs px-3 flex-shrink-0"
               onClick={onOpenCPQ}
               data-testid={`button-open-deal-${lead.id}`}
             >
