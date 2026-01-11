@@ -2459,3 +2459,54 @@ export const cpqErrorResponseSchema = z.object({
   }).optional(),
 });
 export type CpqErrorResponse = z.infer<typeof cpqErrorResponseSchema>;
+
+// === EMAIL CORRESPONDENCE ===
+// Email threads synced from Gmail for deal communication tracking
+export const emailThreads = pgTable("email_threads", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id),
+  gmailThreadId: text("gmail_thread_id").unique(),
+  subject: text("subject"),
+  participants: jsonb("participants").$type<string[]>().default([]),
+  snippet: text("snippet"),
+  messageCount: integer("message_count").default(0),
+  hasAttachments: boolean("has_attachments").default(false),
+  isUnread: boolean("is_unread").default(false),
+  lastMessageAt: timestamp("last_message_at"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmailThreadSchema = createInsertSchema(emailThreads).omit({
+  id: true,
+  syncedAt: true,
+  createdAt: true,
+});
+export type InsertEmailThread = z.infer<typeof insertEmailThreadSchema>;
+export type EmailThread = typeof emailThreads.$inferSelect;
+
+// Individual email messages within threads
+export const emailMessages = pgTable("email_messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer("thread_id").references(() => emailThreads.id).notNull(),
+  gmailMessageId: text("gmail_message_id").unique(),
+  fromEmail: text("from_email").notNull(),
+  fromName: text("from_name"),
+  toEmails: jsonb("to_emails").$type<string[]>().default([]),
+  ccEmails: jsonb("cc_emails").$type<string[]>().default([]),
+  subject: text("subject"),
+  bodyPreview: text("body_preview"),
+  bodyHtml: text("body_html"),
+  hasAttachments: boolean("has_attachments").default(false),
+  attachmentNames: jsonb("attachment_names").$type<string[]>().default([]),
+  isInbound: boolean("is_inbound").default(true),
+  sentAt: timestamp("sent_at").notNull(),
+  syncedAt: timestamp("synced_at").defaultNow(),
+});
+
+export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({
+  id: true,
+  syncedAt: true,
+});
+export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
+export type EmailMessage = typeof emailMessages.$inferSelect;
