@@ -436,13 +436,13 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
     }
   }]);
   
-  const [dispatchLocation, setDispatchLocation] = useState<string>("troy");
-  const [distance, setDistance] = useState<string>("");
+  const [dispatchLocation, setDispatchLocation] = useState<string>("brooklyn");
+  const [distance, setDistance] = useState<string>("25");
   const [risks, setRisks] = useState<string[]>([]);
   const [matterport, setMatterport] = useState(false);
   const [actScan, setActScan] = useState(false);
   const [additionalElevations, setAdditionalElevations] = useState<string>("");
-  const [paymentTerms, setPaymentTerms] = useState<string>("partner");
+  const [paymentTerms, setPaymentTerms] = useState<string>("standard");
   
   const [pricingResult, setPricingResult] = useState<CpqCalculateResponse | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -450,16 +450,17 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
 
   useEffect(() => {
     if (lead) {
-      // Pre-fill from lead data: estimatedSqft or default to 10000
-      const sqft = (lead as any).estimatedSqft || (lead as any).sqft || 10000;
+      // Pre-fill from lead data: estimatedSqft or default to 15000
+      const sqft = (lead as any).estimatedSqft || (lead as any).sqft || 15000;
       setAreas([{
         id: "1",
-        name: lead.projectName || "",
-        buildingType: "1",
+        name: lead.projectName || "Main Building",
+        buildingType: (lead as any).buildingType || "2",
         squareFeet: sqft.toString(),
-        disciplines: ["arch"],
+        disciplines: ["arch", "mepf"],
         disciplineLods: {
-          arch: { discipline: "arch", lod: "300", scope: "full" }
+          arch: { discipline: "arch", lod: "300", scope: "full" },
+          mepf: { discipline: "mepf", lod: "300", scope: "full" }
         }
       }]);
     }
