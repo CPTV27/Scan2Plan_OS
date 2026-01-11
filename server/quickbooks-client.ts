@@ -215,22 +215,33 @@ export class QuickBooksClient {
   }
 
   // Helper method to auto-link expense to lead/project via CustomerRef
+  // Uses deterministic selection: prioritizes Closed Won leads, then most recent
   private async autoLinkToLeadAndProject(qboCustomerId: string): Promise<{ leadId: number | null; projectId: number | null }> {
     let leadId: number | null = null;
     let projectId: number | null = null;
 
-    // Find lead with matching qboCustomerId
-    const matchedLead = await db.select()
+    // Find all leads with matching qboCustomerId
+    const matchedLeads = await db.select()
       .from(leads)
-      .where(eq(leads.qboCustomerId, qboCustomerId))
-      .limit(1);
+      .where(eq(leads.qboCustomerId, qboCustomerId));
 
-    if (matchedLead.length > 0) {
-      leadId = matchedLead[0].id;
+    if (matchedLeads.length > 0) {
+      // Deterministic selection: prefer Closed Won, then by most recent ID (highest ID = most recent)
+      const sortedLeads = matchedLeads.sort((a, b) => {
+        // Closed Won gets priority
+        if (a.dealStage === "Closed Won" && b.dealStage !== "Closed Won") return -1;
+        if (b.dealStage === "Closed Won" && a.dealStage !== "Closed Won") return 1;
+        // Then by most recent (highest ID)
+        return b.id - a.id;
+      });
+      
+      const selectedLead = sortedLeads[0];
+      leadId = selectedLead.id;
+      
       // Also link to project if one exists
       const project = await db.select()
         .from(projects)
-        .where(eq(projects.leadId, matchedLead[0].id))
+        .where(eq(projects.leadId, selectedLead.id))
         .limit(1);
       if (project.length > 0) {
         projectId = project[0].id;
@@ -322,25 +333,67 @@ export class QuickBooksClient {
 
     for (const bill of qbBills) {
       try {
-        // Use BILL- prefix to distinguish from Purchase expenses
+        // Use BILL- prefix to distinguish Bills from Purchase expenses
+        // This is intentional as QuickBooks uses separate ID spaces for different entity types
         const qbExpenseId = `BILL-${bill.Id}`;
         const existing = await db.select()
           .from(expenses)
           .where(eq(expenses.qbExpenseId, qbExpenseId))
           .limit(1);
 
-        const firstLine = bill.Line?.find((l) => l.DetailType === "AccountBasedExpenseLineDetail");
+        // Aggregate all lines for accurate categorization and description
+        const allLines = bill.Line || [];
+        const descriptions: string[] = [];
+        const categories: string[] = [];
+        let hasBillable = false;
+        
+        for (const line of allLines) {
+          if (line.Description) {
+            descriptions.push(line.Description);
+          }
+          
+          // Handle AccountBasedExpenseLineDetail
+          if (line.DetailType === "AccountBasedExpenseLineDetail" && line.AccountBasedExpenseLineDetail) {
+            const accountName = line.AccountBasedExpenseLineDetail.AccountRef?.name;
+            if (accountName) {
+              categories.push(this.categorizeExpense(accountName));
+            }
+            if (line.AccountBasedExpenseLineDetail.BillableStatus === "Billable") {
+              hasBillable = true;
+            }
+          }
+          
+          // Handle ItemBasedExpenseLineDetail (vendor invoices with items)
+          if (line.DetailType === "ItemBasedExpenseLineDetail") {
+            const itemLine = line as any;
+            if (itemLine.ItemBasedExpenseLineDetail?.ItemRef?.name) {
+              categories.push(this.categorizeExpense(itemLine.ItemBasedExpenseLineDetail.ItemRef.name));
+            }
+            if (itemLine.ItemBasedExpenseLineDetail?.BillableStatus === "Billable") {
+              hasBillable = true;
+            }
+          }
+        }
+        
+        // Use most common category or first found, defaulting to "Other"
+        const primaryCategory = categories.length > 0 
+          ? this.getMostCommonCategory(categories) 
+          : "Other";
+        
+        const combinedDescription = descriptions.length > 0 
+          ? descriptions.join("; ").substring(0, 500) // Limit description length
+          : bill.PrivateNote || null;
 
         const expenseData: InsertExpense = {
           qbExpenseId,
           vendorName: bill.VendorRef?.name || null,
-          description: firstLine?.Description || bill.PrivateNote || null,
-          amount: String(bill.TotalAmt),
+          description: combinedDescription,
+          amount: String(bill.TotalAmt), // Use TotalAmt which sums all lines
           expenseDate: new Date(bill.TxnDate),
-          category: this.categorizeExpense(firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name),
-          accountName: firstLine?.AccountBasedExpenseLineDetail?.AccountRef?.name || null,
+          category: primaryCategory,
+          accountName: allLines[0]?.AccountBasedExpenseLineDetail?.AccountRef?.name || null,
           source: "quickbooks",
-          isBillable: firstLine?.AccountBasedExpenseLineDetail?.BillableStatus === "Billable",
+          isBillable: hasBillable,
         };
 
         // Auto-link to lead/project via CustomerRef
@@ -364,6 +417,23 @@ export class QuickBooksClient {
     }
 
     return results;
+  }
+
+  // Helper to get most common category from a list
+  private getMostCommonCategory(categories: string[]): string {
+    const counts: Record<string, number> = {};
+    for (const cat of categories) {
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    let maxCount = 0;
+    let mostCommon = "Other";
+    for (const [cat, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommon = cat;
+      }
+    }
+    return mostCommon;
   }
 
   // Combined sync method for purchases + bills
@@ -433,11 +503,13 @@ export class QuickBooksClient {
       projectName: string;
       quotedPrice: number;
       quotedMargin: number;
+      hasQuotedMargin: boolean; // Indicates if margin was explicitly set
       actualRevenue: number;
       actualCosts: number;
       actualProfit: number;
       actualMargin: number;
       marginVariance: number;
+      hasMarginVariance: boolean; // Indicates if variance calculation is valid
       costsByCategory: Record<string, number>;
     }>;
     overhead: {
@@ -477,16 +549,21 @@ export class QuickBooksClient {
       const project = allProjects.find(p => p.leadId === lead.id);
       const leadExpenses = expensesByLead.get(lead.id) || [];
 
-      const actualRevenue = parseFloat(lead.value || "0");
+      // Use project's quotedPrice if available, otherwise fall back to lead value
+      const actualRevenue = project?.quotedPrice 
+        ? parseFloat(String(project.quotedPrice)) 
+        : parseFloat(lead.value || "0");
+      
       const actualCosts = leadExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
       const actualProfit = actualRevenue - actualCosts;
       const actualMargin = actualRevenue > 0 ? (actualProfit / actualRevenue) * 100 : 0;
 
-      // Get quoted margin from project or estimate from CPQ
+      // Get quoted margin from project (only if explicitly set)
       const quotedPrice = project?.quotedPrice ? parseFloat(String(project.quotedPrice)) : actualRevenue;
-      const quotedMargin = project?.quotedMargin ? parseFloat(String(project.quotedMargin)) : 45; // Default 45%
-
-      const marginVariance = actualMargin - quotedMargin;
+      const quotedMargin = project?.quotedMargin ? parseFloat(String(project.quotedMargin)) : null;
+      
+      // Only calculate variance if we have a real quoted margin
+      const marginVariance = quotedMargin !== null ? actualMargin - quotedMargin : null;
 
       // Group costs by category
       const costsByCategory: Record<string, number> = {};
@@ -501,12 +578,14 @@ export class QuickBooksClient {
         clientName: lead.clientName,
         projectName: lead.projectName || lead.projectAddress || "Unknown",
         quotedPrice,
-        quotedMargin,
+        quotedMargin: quotedMargin ?? 0, // Default to 0 for display but flag it
+        hasQuotedMargin: quotedMargin !== null, // Flag to indicate if margin was explicitly set
         actualRevenue,
         actualCosts,
         actualProfit,
         actualMargin,
-        marginVariance,
+        marginVariance: marginVariance ?? 0,
+        hasMarginVariance: marginVariance !== null,
         costsByCategory,
       };
     }).sort((a, b) => b.actualProfit - a.actualProfit);
