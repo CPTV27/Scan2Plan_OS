@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,16 +19,21 @@ import {
 import {
   AlertCircle,
   Brain,
+  Building2,
+  Check,
   Copy,
+  Edit2,
   FileText,
   Loader2,
   Mail,
+  MapPin,
   MessageSquare,
+  Save,
   Sparkles,
   User,
   Zap,
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Lead } from "@shared/schema";
 
@@ -47,6 +52,14 @@ interface BuyerPersona {
   technicalTriggers: string[];
   emotionalTriggers: string[];
   avoidWords: string[];
+}
+
+interface SimplePersona {
+  id: number;
+  code: string;
+  name: string;
+  painPoints: string[];
+  preferredTags: string[];
 }
 
 interface DealAIAssistantProps {
@@ -83,13 +96,84 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
   const [objection, setObjection] = useState("");
   const [projectType, setProjectType] = useState("Commercial / Office");
   const [timeline, setTimeline] = useState("Standard");
+  
+  // Deal Summary state
+  const [dealSummary, setDealSummary] = useState<string>("");
+  const [isEditingSummary, setIsEditingSummary] = useState(false);
+  const [summaryDirty, setSummaryDirty] = useState(false);
 
-  const buyerCode = lead.buyerPersona || "BP-A";
+  // Generate initial deal summary from lead data
+  useEffect(() => {
+    if (lead && !dealSummary) {
+      const summary = generateDealSummary(lead);
+      setDealSummary(summary);
+    }
+  }, [lead]);
+
+  const generateDealSummary = (lead: Lead): string => {
+    const parts: string[] = [];
+    
+    if (lead.clientName) {
+      parts.push(`Client: ${lead.clientName}`);
+    }
+    if (lead.projectName) {
+      parts.push(`Project: ${lead.projectName}`);
+    }
+    if (lead.projectAddress) {
+      parts.push(`Location: ${lead.projectAddress}`);
+    }
+    if (lead.sqft) {
+      parts.push(`Size: ${lead.sqft.toLocaleString()} sqft`);
+    }
+    if (lead.value) {
+      parts.push(`Deal Value: $${Number(lead.value).toLocaleString()}`);
+    }
+    if (lead.dealStage) {
+      parts.push(`Stage: ${lead.dealStage}`);
+    }
+    if (lead.notes) {
+      parts.push(`\nNotes: ${lead.notes}`);
+    }
+    
+    return parts.join("\n");
+  };
+
+  // Fetch all personas for the selector
+  const { data: allPersonas } = useQuery<SimplePersona[]>({
+    queryKey: ["/api/personas"],
+  });
+
+  const buyerCode = lead.buyerPersona || "";
 
   const { data: persona, isLoading: personaLoading, error: personaError } = useQuery<BuyerPersona>({
     queryKey: [`/api/intelligence/personas/${buyerCode}`],
     enabled: !!buyerCode,
   });
+
+  // Mutation to update lead's buyer persona
+  const updatePersonaMutation = useMutation({
+    mutationFn: async (personaCode: string) => {
+      const res = await apiRequest("PATCH", `/api/leads/${lead.id}`, {
+        buyerPersona: personaCode,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", lead.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      toast({ title: "Persona Updated", description: "Buyer persona has been saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Save summary locally (used for AI generation context)
+  const handleSaveSummary = () => {
+    setSummaryDirty(false);
+    setIsEditingSummary(false);
+    toast({ title: "Summary Updated", description: "Context updated for AI generation" });
+  };
 
   const proposalMutation = useMutation({
     mutationFn: async () => {
@@ -100,6 +184,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
         squareFootage: lead.sqft?.toString() || "TBD",
         timeline,
         scopeNotes: scopeNotes || lead.notes || undefined,
+        dealContext: dealSummary, // Include deal summary for AI context
       });
       return res.json();
     },
@@ -132,6 +217,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
           squareFootage: lead.sqft?.toString() || "TBD",
         },
         specificRequest: emailPrompts[emailType] + (emailContext ? `\n\nAdditional context: ${emailContext}` : ""),
+        dealContext: dealSummary,
       });
       return res.json();
     },
@@ -150,6 +236,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
         buyerCode,
         objectionRaised: objection,
         projectContext: `Project: ${lead.projectName || lead.clientName}, Value: $${lead.value?.toLocaleString() || "TBD"}, Stage: ${lead.dealStage}`,
+        dealContext: dealSummary,
       });
       return res.json();
     },
@@ -169,43 +256,127 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
 
   const isGenerating = proposalMutation.isPending || emailMutation.isPending || negotiationMutation.isPending;
 
-  if (!lead.buyerPersona) {
-    return (
-      <Card className="border-amber-500/30 bg-amber-500/5">
-        <CardContent className="py-8">
-          <div className="flex flex-col items-center text-center gap-4">
-            <AlertCircle className="h-12 w-12 text-amber-500" />
-            <div>
-              <h3 className="font-semibold text-lg">Select a Buyer Persona</h3>
-              <p className="text-muted-foreground text-sm mt-1">
-                Choose a buyer persona in the Lead Details tab to enable AI-powered content generation
-                tailored to their communication style and pain points.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {persona && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Target Persona: {persona.roleTitle}
-              </CardTitle>
-              <Badge variant="outline">{persona.code}</Badge>
+      {/* Deal Summary Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Deal Summary
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {isEditingSummary ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setIsEditingSummary(false);
+                      setDealSummary(generateDealSummary(lead));
+                      setSummaryDirty(false);
+                    }}
+                    data-testid="button-cancel-summary"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveSummary}
+                    disabled={!summaryDirty}
+                    data-testid="button-save-summary"
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Apply
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditingSummary(true)}
+                  data-testid="button-edit-summary"
+                >
+                  <Edit2 className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
             </div>
-            <CardDescription className="text-xs">
-              All generated content is tailored to this buyer's psychology and communication preferences
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+          </div>
+          <CardDescription className="text-xs">
+            Context provided to AI for generating targeted content
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isEditingSummary ? (
+            <Textarea
+              value={dealSummary}
+              onChange={(e) => {
+                setDealSummary(e.target.value);
+                setSummaryDirty(true);
+              }}
+              className="min-h-[120px] text-sm"
+              placeholder="Enter deal context for AI generation..."
+              data-testid="textarea-deal-summary"
+            />
+          ) : (
+            <div className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
+              {dealSummary || "No deal summary available. Click Edit to add context."}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Buyer Persona Selector */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Target Buyer Persona
+            </CardTitle>
+            {buyerCode && <Badge variant="outline">{buyerCode}</Badge>}
+          </div>
+          <CardDescription className="text-xs">
+            Select the buyer type to tailor AI content generation
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Select
+            value={buyerCode}
+            onValueChange={(value) => updatePersonaMutation.mutate(value)}
+            disabled={updatePersonaMutation.isPending}
+          >
+            <SelectTrigger data-testid="select-buyer-persona">
+              {updatePersonaMutation.isPending ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </div>
+              ) : (
+                <SelectValue placeholder="Select a buyer persona..." />
+              )}
+            </SelectTrigger>
+            <SelectContent>
+              {allPersonas?.map((p) => (
+                <SelectItem key={p.code} value={p.code}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{p.code}</span>
+                    <span className="text-muted-foreground">- {p.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Show persona details if selected */}
+          {persona && (
+            <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-3 rounded-lg">
+              <div>
+                <span className="text-muted-foreground">Role:</span>
+                <p className="font-medium">{persona.roleTitle}</p>
+              </div>
               <div>
                 <span className="text-muted-foreground">Primary Pain:</span>
                 <p className="font-medium">{persona.primaryPain}</p>
@@ -218,14 +389,17 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
                 <span className="text-muted-foreground">Communication Style:</span>
                 <p className="font-medium">{persona.tonePreference}</p>
               </div>
-              <div>
-                <span className="text-muted-foreground">Attention Span:</span>
-                <p className="font-medium">{persona.attentionSpan}</p>
-              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {!buyerCode && (
+            <div className="flex items-center gap-2 text-amber-500 text-sm">
+              <AlertCircle className="h-4 w-4" />
+              <span>Select a persona to enable AI content generation</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
@@ -317,7 +491,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
 
               <Button
                 onClick={() => proposalMutation.mutate()}
-                disabled={isGenerating}
+                disabled={isGenerating || !buyerCode}
                 className="w-full"
                 data-testid="button-generate-proposal"
               >
@@ -326,7 +500,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
                 ) : (
                   <Brain className="h-4 w-4 mr-2" />
                 )}
-                Generate Proposal Language
+                {!buyerCode ? "Select a Persona First" : "Generate Proposal Language"}
               </Button>
             </CardContent>
           </Card>
@@ -374,7 +548,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
 
               <Button
                 onClick={() => emailMutation.mutate()}
-                disabled={isGenerating}
+                disabled={isGenerating || !buyerCode}
                 className="w-full"
                 data-testid="button-generate-email"
               >
@@ -383,7 +557,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
                 ) : (
                   <Zap className="h-4 w-4 mr-2" />
                 )}
-                Draft Email
+                {!buyerCode ? "Select a Persona First" : "Draft Email"}
               </Button>
             </CardContent>
           </Card>
@@ -415,7 +589,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
 
               <Button
                 onClick={() => negotiationMutation.mutate()}
-                disabled={isGenerating || !objection.trim()}
+                disabled={isGenerating || !objection.trim() || !buyerCode}
                 className="w-full"
                 data-testid="button-generate-response"
               >
@@ -424,7 +598,7 @@ export function DealAIAssistant({ lead }: DealAIAssistantProps) {
                 ) : (
                   <Brain className="h-4 w-4 mr-2" />
                 )}
-                Generate Response Strategy
+                {!buyerCode ? "Select a Persona First" : "Generate Response Strategy"}
               </Button>
             </CardContent>
           </Card>
