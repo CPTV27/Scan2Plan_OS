@@ -50,16 +50,24 @@ function generateScopeSummary(lead: any): string {
     parts.push(disciplineNames.join(', '));
   }
 
-  const lods = areas.map((a: any) => a.lod).filter(Boolean);
-  if (lods.length > 0) {
-    const maxLod = Math.max(...lods.map((l: string) => parseInt(l) || 200));
+  const allLods: number[] = [];
+  for (const area of areas) {
+    if (area.mixedInteriorLod) allLods.push(parseInt(area.mixedInteriorLod) || 200);
+    if (area.mixedExteriorLod) allLods.push(parseInt(area.mixedExteriorLod) || 200);
+    if (area.disciplineLods) {
+      for (const lod of Object.values(area.disciplineLods)) {
+        allLods.push(parseInt(lod as string) || 200);
+      }
+    }
+  }
+  if (allLods.length > 0) {
+    const maxLod = Math.max(...allLods);
     parts.push(`LOD ${maxLod}`);
   }
 
-  const risks = lead.cpqRisks || {};
-  const activeRisks = Object.entries(risks).filter(([_, v]) => v === true).map(([k]) => k);
-  if (activeRisks.length > 0) {
-    const riskNames = activeRisks.map(r => {
+  const risksArray = Array.isArray(lead.cpqRisks) ? lead.cpqRisks : [];
+  if (risksArray.length > 0) {
+    const riskNames = risksArray.map((r: string) => {
       const map: Record<string, string> = {
         remote: 'Remote',
         fastTrack: 'Fast Track',

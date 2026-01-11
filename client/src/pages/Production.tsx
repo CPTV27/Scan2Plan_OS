@@ -506,9 +506,10 @@ function ProjectDialog({
         
         {project && projectAddress ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
-              <TabsTrigger value="scoping" data-testid="tab-project-scoping">Scoping</TabsTrigger>
+              <TabsTrigger value="quoted" data-testid="tab-project-quoted">Quoted Scope</TabsTrigger>
+              <TabsTrigger value="scoping" data-testid="tab-project-scoping">Live Scoping</TabsTrigger>
               <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
               <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
             </TabsList>
@@ -520,6 +521,12 @@ function ProjectDialog({
                     {renderFormFields()}
                   </form>
                 </Form>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="quoted" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <QuotedScopeDetails project={project} />
               </ScrollArea>
             </TabsContent>
 
@@ -594,6 +601,264 @@ const TRAVEL_MODE_LABELS: Record<string, string> = {
 const SERVICE_LABELS: Record<string, string> = {
   matterport: "Matterport Virtual Tour",
 };
+
+// Site Readiness Question Labels
+const SITE_READINESS_LABELS: Record<string, string> = {
+  buildingOccupied: "Building Occupied",
+  occupancyStatus: "Occupancy Status",
+  accessRestrictions: "Access Restrictions",
+  temporaryStructures: "Temporary Structures",
+  hasBasement: "Has Basement",
+  hasAttic: "Has Attic",
+  ceilingType: "Ceiling Type",
+  hazardousMaterials: "Hazardous Materials",
+  parkingAvailability: "Parking Availability",
+  existingDrawings: "Existing Drawings",
+  additionalNotes: "Additional Notes",
+};
+
+// Quoted Scope Details Component - Shows snapshot of what was sold at close
+function QuotedScopeDetails({ project }: { project: Project }) {
+  const areas = (project.quotedAreas as any[]) || [];
+  const risksRaw = project.quotedRisks;
+  const risks: string[] = Array.isArray(risksRaw) ? risksRaw : [];
+  const travel = (project.quotedTravel as CpqTravel | null) || null;
+  const services = (project.quotedServices as Record<string, number> | null) || null;
+  const siteReadiness = (project.siteReadiness as Record<string, any>) || {};
+
+  const hasQuotedData = areas.length > 0 || project.quotedPrice || project.scopeSummary;
+
+  if (!hasQuotedData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <p>No quoted scope data available.</p>
+        <p className="text-sm mt-1">This project was created before quote inheritance was enabled.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pr-4">
+      {project.scopeSummary && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="pt-4">
+            <p className="text-sm text-primary font-medium">{project.scopeSummary}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Quoted Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex justify-between py-2 border-b">
+            <span className="text-muted-foreground">Quoted Price</span>
+            <span className="font-semibold text-lg">${Number(project.quotedPrice || 0).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between py-2 border-b">
+            <span className="text-muted-foreground">Quoted Margin</span>
+            <span className="font-semibold">{Number(project.quotedMargin || 0).toFixed(1)}%</span>
+          </div>
+          {project.dispatchLocation && (
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-muted-foreground">Dispatch Location</span>
+              <span>{project.dispatchLocation}{project.distance ? ` (${project.distance} mi)` : ""}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Client Contact (at close)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Client:</span>
+              <p className="font-medium">{project.clientName || "—"}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Address:</span>
+              <p className="font-medium">{project.projectAddress || "—"}</p>
+            </div>
+          </div>
+          {(project.clientContact || project.clientEmail || project.clientPhone) && (
+            <>
+              <Separator className="my-2" />
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                {project.clientContact && (
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3 text-muted-foreground" />
+                    <span>{project.clientContact}</span>
+                  </div>
+                )}
+                {project.clientEmail && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-3 h-3 text-muted-foreground" />
+                    <span>{project.clientEmail}</span>
+                  </div>
+                )}
+                {project.clientPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-3 h-3 text-muted-foreground" />
+                    <span>{project.clientPhone}</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {areas.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Quoted Areas ({areas.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {areas.map((area, index) => (
+              <div key={index} className="p-3 rounded-lg bg-muted/50 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h5 className="font-medium text-sm">{area.name || `Area ${index + 1}`}</h5>
+                  <Badge variant="secondary">{area.squareFeet?.toLocaleString() || 0} sqft</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <div>Building Type: {BUILDING_TYPE_LABELS[area.buildingType?.toString()] || `Type ${area.buildingType}`}</div>
+                  <div>LOD: {area.mixedInteriorLod || area.mixedExteriorLod || (area.disciplineLods ? Object.values(area.disciplineLods)[0] : null) || "—"} | Scope: {area.scope || "—"}</div>
+                  {area.disciplines && area.disciplines.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {area.disciplines.map((d: string) => (
+                        <Badge key={d} variant="outline" className="text-xs py-0">
+                          {DISCIPLINE_LABELS[d] || d}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {risks.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Risk Factors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {risks.map((risk) => (
+                <Badge key={risk} variant="destructive" className="text-xs">
+                  {RISK_LABELS[risk] || risk}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {travel && travel.travelMode && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Travel Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Mode:</span>
+              <span>{TRAVEL_MODE_LABELS[travel.travelMode] || travel.travelMode}</span>
+            </div>
+            {travel.distance !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Distance:</span>
+                <span>{travel.distance} miles</span>
+              </div>
+            )}
+            {travel.perDiem !== undefined && travel.perDiem > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Per Diem:</span>
+                <span>${travel.perDiem.toLocaleString()}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {services && Object.keys(services).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              Add-on Services
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {Object.entries(services).map(([service, quantity]) => (
+                <div key={service} className="flex justify-between text-sm">
+                  <span>{SERVICE_LABELS[service] || service}</span>
+                  <span className="text-muted-foreground">x{quantity}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {siteReadiness && Object.keys(siteReadiness).length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ClipboardCheck className="w-4 h-4" />
+              Site Readiness
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(siteReadiness).map(([key, value]) => {
+              if (key === "internal" || key === "client") {
+                const segment = value as Record<string, any>;
+                return Object.entries(segment || {}).map(([qKey, qVal]) => (
+                  <div key={`${key}-${qKey}`} className="flex justify-between text-sm py-1 border-b last:border-b-0">
+                    <span className="text-muted-foreground">{SITE_READINESS_LABELS[qKey] || qKey}</span>
+                    <span className="font-medium">
+                      {typeof qVal === "boolean" ? (qVal ? "Yes" : "No") : String(qVal)}
+                    </span>
+                  </div>
+                ));
+              }
+              return (
+                <div key={key} className="flex justify-between text-sm py-1 border-b last:border-b-0">
+                  <span className="text-muted-foreground">{SITE_READINESS_LABELS[key] || key}</span>
+                  <span className="font-medium">
+                    {typeof value === "boolean" ? (value ? "Yes" : "No") : String(value)}
+                  </span>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
 
 // Scoping Details Component - Shows all CPQ data from sales process
 function ScopingDetails({ lead }: { lead: Lead | undefined }) {
