@@ -440,10 +440,13 @@ interface QuoteBuilderTabProps {
   toast: ReturnType<typeof useToast>["toast"];
   onQuoteSaved: () => void;
   existingQuotes?: CpqQuote[];
+  sourceQuote?: CpqQuote | null;
+  onClearSourceQuote?: () => void;
 }
 
-function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, existingQuotes }: QuoteBuilderTabProps) {
+function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, existingQuotes, sourceQuote, onClearSourceQuote }: QuoteBuilderTabProps) {
   const updateLeadMutation = useUpdateLead();
+  const [loadedSourceQuoteId, setLoadedSourceQuoteId] = useState<number | null>(null);
   
   const [areas, setAreas] = useState<QuoteBuilderArea[]>([{
     id: "1",
@@ -470,8 +473,99 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
   const [pricingError, setPricingError] = useState<string | null>(null);
 
+  // Hydrate from sourceQuote when user selects a historical version to edit
   useEffect(() => {
-    if (lead) {
+    if (sourceQuote && sourceQuote.id !== loadedSourceQuoteId) {
+      // Parse areas from the source quote
+      const quoteAreas = sourceQuote.areas as any[];
+      if (quoteAreas && quoteAreas.length > 0) {
+        const hydratedAreas: QuoteBuilderArea[] = quoteAreas.map((area: any, idx: number) => {
+          const disciplines = area.disciplines || [];
+          const disciplineLods: Record<string, { discipline: string; lod: string; scope: string }> = {};
+          
+          if (Array.isArray(disciplines)) {
+            disciplines.forEach((disc: any) => {
+              if (typeof disc === 'string') {
+                disciplineLods[disc] = { discipline: disc, lod: "300", scope: "full" };
+              } else if (disc.discipline) {
+                disciplineLods[disc.discipline] = {
+                  discipline: disc.discipline,
+                  lod: disc.lod || "300",
+                  scope: disc.scope || "full"
+                };
+              }
+            });
+          }
+          
+          return {
+            id: (idx + 1).toString(),
+            name: area.name || `Area ${idx + 1}`,
+            buildingType: area.buildingType?.toString() || area.typeOfBuilding?.toString() || "1",
+            squareFeet: (area.squareFeet || area.sqft || "").toString(),
+            disciplines: Object.keys(disciplineLods),
+            disciplineLods
+          };
+        });
+        setAreas(hydratedAreas);
+      }
+      
+      // Parse travel data
+      if (sourceQuote.travel) {
+        const travelData = typeof sourceQuote.travel === 'string' 
+          ? JSON.parse(sourceQuote.travel) 
+          : sourceQuote.travel;
+        if (travelData.dispatchLocation) {
+          setDispatchLocation(travelData.dispatchLocation.toLowerCase());
+        }
+        const distValue = travelData.distance ?? travelData.miles;
+        if (distValue !== undefined && distValue !== null) {
+          const numericDist = typeof distValue === 'string' ? Number(distValue) : distValue;
+          if (!isNaN(numericDist)) {
+            setDistance(numericDist.toString());
+          }
+        }
+      } else if (sourceQuote.dispatchLocation) {
+        setDispatchLocation(sourceQuote.dispatchLocation.toLowerCase());
+        if (sourceQuote.distance) {
+          setDistance(sourceQuote.distance.toString());
+        }
+      }
+      
+      // Parse risks
+      if (sourceQuote.risks && Array.isArray(sourceQuote.risks)) {
+        setRisks(sourceQuote.risks as string[]);
+        setRisksAffirmed((sourceQuote.risks as string[]).length > 0);
+      }
+      
+      // Parse services
+      if (sourceQuote.services) {
+        const services = typeof sourceQuote.services === 'string' 
+          ? JSON.parse(sourceQuote.services) 
+          : sourceQuote.services;
+        if (services.matterport) setMatterport(true);
+        if (services.actScan) setActScan(true);
+        if (services.additionalElevations) setAdditionalElevations(services.additionalElevations.toString());
+        setServicesAffirmed(true);
+      }
+      
+      // Parse payment terms
+      if (sourceQuote.paymentTerms) {
+        setPaymentTerms(sourceQuote.paymentTerms);
+      }
+      
+      // Parse margin from pricing breakdown if available
+      const breakdown = sourceQuote.pricingBreakdown as any;
+      if (breakdown?.marginTarget) {
+        setMarginTarget(breakdown.marginTarget);
+      }
+      
+      setLoadedSourceQuoteId(sourceQuote.id);
+    }
+  }, [sourceQuote, loadedSourceQuoteId]);
+
+  useEffect(() => {
+    // Only pre-fill from lead if we don't have a sourceQuote
+    if (lead && !sourceQuote) {
       // Pre-fill from lead data: estimatedSqft or default to 15000
       const sqft = (lead as any).estimatedSqft || (lead as any).sqft || 15000;
       setAreas([{
@@ -486,10 +580,11 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         }
       }]);
     }
-  }, [lead]);
+  }, [lead, sourceQuote]);
 
   useEffect(() => {
-    if (existingQuotes && existingQuotes.length > 0) {
+    // Only use existingQuotes for travel data if no sourceQuote provided
+    if (existingQuotes && existingQuotes.length > 0 && !sourceQuote) {
       const latestQuote = existingQuotes.find(q => q.isLatest) || existingQuotes[0];
       if (latestQuote?.travel) {
         const travelData = typeof latestQuote.travel === 'string' 
@@ -507,7 +602,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         }
       }
     }
-  }, [existingQuotes]);
+  }, [existingQuotes, sourceQuote]);
 
   const addArea = () => {
     const newId = (areas.length + 1).toString();
@@ -732,7 +827,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
 
     setIsSaving(true);
     try {
-      const quoteData = {
+      const quoteData: Record<string, any> = {
         leadId,
         totalPrice: pricingResult.totalClientPrice,
         totalCost: pricingResult.totalUpteamCost,
@@ -752,15 +847,28 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         },
       };
 
+      // If editing from a historical version, include parent quote reference
+      if (sourceQuote) {
+        quoteData.parentQuoteId = sourceQuote.id;
+        quoteData.baseVersionNumber = sourceQuote.versionNumber;
+      }
+
       const response = await apiRequest("POST", `/api/leads/${leadId}/cpq-quotes`, quoteData);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to save quote");
       }
 
+      // Clear the source quote state after successful save
+      setLoadedSourceQuoteId(null);
+      
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "cpq-quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
-      toast({ title: "Quote Saved", description: "Quote has been saved successfully" });
+      
+      const versionMsg = sourceQuote 
+        ? `New version created from Version ${sourceQuote.versionNumber}` 
+        : "Quote has been saved successfully";
+      toast({ title: "Quote Saved", description: versionMsg });
       onQuoteSaved();
     } catch (error) {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save quote", variant: "destructive" });
@@ -903,6 +1011,31 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   return (
     <ScrollArea className="h-full">
       <div className="p-4">
+        {/* Editing From Version Banner */}
+        {sourceQuote && (
+          <Alert className="mb-4 border-primary/50 bg-primary/5">
+            <History className="w-4 h-4" />
+            <AlertTitle className="flex items-center justify-between">
+              <span>Editing from Version {sourceQuote.versionNumber}</span>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => {
+                  onClearSourceQuote?.();
+                  setLoadedSourceQuoteId(null);
+                }}
+                data-testid="button-clear-source-quote"
+              >
+                <X className="w-4 h-4 mr-1" />
+                Start Fresh
+              </Button>
+            </AlertTitle>
+            <AlertDescription className="text-sm">
+              Any changes will create a new quote version. Original Quote #{sourceQuote.quoteNumber} will be preserved.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
             <Card>
@@ -1442,6 +1575,7 @@ export default function DealWorkspace() {
   const { toast } = useToast();
   const [showProposalDialog, setShowProposalDialog] = useState(false);
   const [viewingQuote, setViewingQuote] = useState<CpqQuote | null>(null);
+  const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
   
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents"];
@@ -3181,9 +3315,12 @@ export default function DealWorkspace() {
             queryClient={queryClient}
             toast={toast}
             onQuoteSaved={() => {
+              setEditingFromQuote(null);
               handleTabChange("history");
             }}
             existingQuotes={quotes}
+            sourceQuote={editingFromQuote}
+            onClearSourceQuote={() => setEditingFromQuote(null)}
           />
         </TabsContent>
 
@@ -3621,6 +3758,25 @@ export default function DealWorkspace() {
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">{viewingQuote.notes}</p>
                 </div>
               )}
+
+              {/* Edit This Version Button */}
+              <div className="pt-4 border-t">
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setEditingFromQuote(viewingQuote);
+                    setViewingQuote(null);
+                    handleTabChange("quote");
+                  }}
+                  data-testid="button-edit-this-version"
+                >
+                  <Calculator className="w-4 h-4 mr-2" />
+                  Edit This Version
+                </Button>
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Creates a new version based on this quote
+                </p>
+              </div>
             </div>
           )}
         </DialogContent>
