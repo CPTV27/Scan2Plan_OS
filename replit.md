@@ -37,6 +37,7 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 11, 2026)
+- **Code Cleanup:** Removed deprecated `/api/cpq/calculate` and `/api/cpq/pricing-matrix` endpoints (now handled client-side). Deleted orphaned GoHighLevel integration files (`server/routes/ghl.ts`, `server/services/gohighlevel.ts`) - integration was never configured.
 - **QBO Expense Auto-Linking:** Expenses and Bills synced from QuickBooks are automatically linked to leads/projects via CustomerRef. Uses deterministic selection: prioritizes Closed Won leads, then most recent.
 - **Bill Sync Multi-Line Support:** syncBills() aggregates all lines from vendor invoices, supports both AccountBased and ItemBased expense details, with getMostCommonCategory() for accurate categorization.
 - **Job Costing Analytics:** getJobCostingAnalytics() calculates actual vs quoted margins with hasQuotedMargin and hasMarginVariance flags to indicate data quality. Groups costs by category, tracks overhead, provides profitability summaries.
