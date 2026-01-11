@@ -279,8 +279,13 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         setServices(existingQuote.services as Record<string, number>);
       }
       if (existingQuote.travel) {
-        const travelData = existingQuote.travel as TravelConfig & { customCost?: number };
-        setTravel({ dispatchLocation: travelData.dispatchLocation, distance: travelData.distance });
+        const travelData = existingQuote.travel as TravelConfig & { customCost?: number; miles?: number };
+        // Handle both "distance" (new format) and "miles" (legacy database format)
+        const distanceValue = travelData.distance ?? travelData.miles ?? 0;
+        setTravel({ 
+          dispatchLocation: travelData.dispatchLocation?.toLowerCase() || "woodstock", 
+          distance: distanceValue 
+        });
         if (travelData.customCost) {
           setCustomTravelCost(travelData.customCost.toString());
         }

@@ -421,9 +421,10 @@ interface QuoteBuilderTabProps {
   queryClient: ReturnType<typeof useQueryClient>;
   toast: ReturnType<typeof useToast>["toast"];
   onQuoteSaved: () => void;
+  existingQuotes?: CpqQuote[];
 }
 
-function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved }: QuoteBuilderTabProps) {
+function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, existingQuotes }: QuoteBuilderTabProps) {
   const [areas, setAreas] = useState<QuoteBuilderArea[]>([{
     id: "1",
     name: "",
@@ -463,6 +464,27 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved }: Quo
       }]);
     }
   }, [lead]);
+
+  useEffect(() => {
+    if (existingQuotes && existingQuotes.length > 0) {
+      const latestQuote = existingQuotes.find(q => q.isLatest) || existingQuotes[0];
+      if (latestQuote?.travel) {
+        const travelData = typeof latestQuote.travel === 'string' 
+          ? JSON.parse(latestQuote.travel) 
+          : latestQuote.travel;
+        if (travelData.dispatchLocation) {
+          setDispatchLocation(travelData.dispatchLocation.toLowerCase());
+        }
+        const distValue = travelData.distance ?? travelData.miles;
+        if (distValue !== undefined && distValue !== null) {
+          const numericDist = typeof distValue === 'string' ? Number(distValue) : distValue;
+          if (!isNaN(numericDist)) {
+            setDistance(numericDist.toString());
+          }
+        }
+      }
+    }
+  }, [existingQuotes]);
 
   const addArea = () => {
     const newId = (areas.length + 1).toString();
@@ -2152,6 +2174,7 @@ export default function DealWorkspace() {
             onQuoteSaved={() => {
               handleTabChange("history");
             }}
+            existingQuotes={quotes}
           />
         </TabsContent>
 
