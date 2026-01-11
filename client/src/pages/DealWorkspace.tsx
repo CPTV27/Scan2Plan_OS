@@ -1267,6 +1267,24 @@ export default function DealWorkspace() {
     enabled: !!leadId,
   });
 
+  const { data: proposalEmails } = useQuery<{
+    id: number;
+    leadId: number;
+    quoteId: number | null;
+    token: string;
+    recipientEmail: string;
+    recipientName: string | null;
+    subject: string | null;
+    sentAt: string;
+    firstOpenedAt: string | null;
+    lastOpenedAt: string | null;
+    openCount: number;
+    clickCount: number;
+  }[]>({
+    queryKey: ["/api/leads", leadId, "proposal-emails"],
+    enabled: !!leadId,
+  });
+
   const latestQuote = quotes?.find((q) => q.isLatest);
 
 
@@ -1928,6 +1946,21 @@ export default function DealWorkspace() {
                 <Mail className="w-4 h-4 mr-2" />
                 Send Proposal
               </Button>
+              {proposalEmails && proposalEmails.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {proposalEmails[0].openCount > 0 ? (
+                    <Badge variant="default" className="bg-green-600 text-white text-xs" data-testid="badge-proposal-opened">
+                      <Eye className="w-3 h-3 mr-1" />
+                      Viewed {proposalEmails[0].openCount}x
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs" data-testid="badge-proposal-sent">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Sent
+                    </Badge>
+                  )}
+                </div>
+              )}
             </>
           )}
 

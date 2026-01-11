@@ -33,6 +33,7 @@ import ProposalVault from "@/pages/ProposalVault";
 import BrandGenerator from "@/pages/BrandGenerator";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
+import ProposalViewer from "@/pages/ProposalViewer";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -49,6 +50,9 @@ function Router() {
   }
   if (path.startsWith("/site-readiness/")) {
     return <SiteReadinessForm />;
+  }
+  if (path.startsWith("/proposals/")) {
+    return <ProposalViewer />;
   }
 
   if (isLoading) {

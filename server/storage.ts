@@ -4,6 +4,7 @@ import {
   users, accounts, invoices, internalLoans, vendorPayables, quoteVersions, projectAttachments,
   cpqPricingMatrix, cpqUpteamPricingMatrix, cpqCadPricingMatrix, cpqPricingParameters, cpqQuotes,
   caseStudies, notifications, dealAttributions, events, eventRegistrations, qbCustomers, leadDocuments,
+  proposalEmailEvents,
   type InsertLead, type InsertProject, type InsertFieldNote, type InsertLeadResearch,
   type Lead, type Project, type FieldNote, type Setting, type LeadResearch, type User, type UserRole,
   type Account, type InsertAccount, type Invoice, type InsertInvoice,
@@ -18,7 +19,8 @@ import {
   type DealAttribution, type InsertDealAttribution,
   type Event, type InsertEvent, type EventRegistration, type InsertEventRegistration,
   type QbCustomer, type InsertQbCustomer,
-  type LeadDocument, type InsertLeadDocument
+  type LeadDocument, type InsertLeadDocument,
+  type ProposalEmailEvent, type InsertProposalEmailEvent
 } from "@shared/schema";
 import { eq, desc, and, lt, sql, max, ilike, isNull, isNotNull } from "drizzle-orm";
 
@@ -138,6 +140,13 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   getNotificationsForUser(userId: string): Promise<Notification[]>;
   markNotificationRead(id: number): Promise<void>;
+
+  // Proposal Email Tracking
+  createProposalEmailEvent(event: InsertProposalEmailEvent): Promise<ProposalEmailEvent>;
+  getProposalEmailEventByToken(token: string): Promise<ProposalEmailEvent | undefined>;
+  getProposalEmailEventsByLead(leadId: number): Promise<ProposalEmailEvent[]>;
+  recordProposalOpen(token: string): Promise<ProposalEmailEvent | undefined>;
+  recordProposalClick(token: string): Promise<ProposalEmailEvent | undefined>;
 
   // Deal Attributions (Marketing Influence Tracker)
   getDealAttributions(leadId: number): Promise<DealAttribution[]>;
@@ -829,6 +838,48 @@ export class DatabaseStorage implements IStorage {
     await db.update(notifications)
       .set({ read: true })
       .where(eq(notifications.id, id));
+  }
+
+  // Proposal Email Tracking
+  async createProposalEmailEvent(event: InsertProposalEmailEvent): Promise<ProposalEmailEvent> {
+    const [created] = await db.insert(proposalEmailEvents).values(event).returning();
+    return created;
+  }
+
+  async getProposalEmailEventByToken(token: string): Promise<ProposalEmailEvent | undefined> {
+    const [event] = await db.select().from(proposalEmailEvents)
+      .where(eq(proposalEmailEvents.token, token));
+    return event;
+  }
+
+  async getProposalEmailEventsByLead(leadId: number): Promise<ProposalEmailEvent[]> {
+    return await db.select().from(proposalEmailEvents)
+      .where(eq(proposalEmailEvents.leadId, leadId))
+      .orderBy(desc(proposalEmailEvents.sentAt));
+  }
+
+  async recordProposalOpen(token: string): Promise<ProposalEmailEvent | undefined> {
+    const [updated] = await db.update(proposalEmailEvents)
+      .set({ 
+        openCount: sql`${proposalEmailEvents.openCount} + 1`,
+        lastOpenedAt: new Date(),
+        firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
+      })
+      .where(eq(proposalEmailEvents.token, token))
+      .returning();
+    return updated;
+  }
+
+  async recordProposalClick(token: string): Promise<ProposalEmailEvent | undefined> {
+    const [updated] = await db.update(proposalEmailEvents)
+      .set({ 
+        clickCount: sql`${proposalEmailEvents.clickCount} + 1`,
+        lastOpenedAt: new Date(),
+        firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
+      })
+      .where(eq(proposalEmailEvents.token, token))
+      .returning();
+    return updated;
   }
 
   // Deal Attributions (Marketing Influence Tracker)

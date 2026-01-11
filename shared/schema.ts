@@ -1705,6 +1705,33 @@ export const insertTrackingEventSchema = createInsertSchema(trackingEvents).omit
 export type TrackingEvent = typeof trackingEvents.$inferSelect;
 export type InsertTrackingEvent = z.infer<typeof insertTrackingEventSchema>;
 
+// === PROPOSAL EMAIL TRACKING ===
+export const proposalEmailEvents = pgTable("proposal_email_events", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  quoteId: integer("quote_id").references(() => cpqQuotes.id),
+  token: text("token").notNull().unique(),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name"),
+  subject: text("subject"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  firstOpenedAt: timestamp("first_opened_at"),
+  lastOpenedAt: timestamp("last_opened_at"),
+  openCount: integer("open_count").default(0).notNull(),
+  clickCount: integer("click_count").default(0).notNull(),
+});
+
+export const insertProposalEmailEventSchema = createInsertSchema(proposalEmailEvents).omit({
+  id: true,
+  sentAt: true,
+  firstOpenedAt: true,
+  lastOpenedAt: true,
+  openCount: true,
+  clickCount: true,
+});
+export type ProposalEmailEvent = typeof proposalEmailEvents.$inferSelect;
+export type InsertProposalEmailEvent = z.infer<typeof insertProposalEmailEventSchema>;
+
 // === GROWTH ENGINE: NOTIFICATIONS ===
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),

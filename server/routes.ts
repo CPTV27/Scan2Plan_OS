@@ -34,6 +34,7 @@ import pandaDocRoutes from "./routes/pandadoc";
 import brandEngineRoutes from "./routes/brandEngine";
 import intelligenceRoutes from "./routes/intelligence";
 import { registerDocumentRoutes } from "./routes/documents";
+import { registerProposalRoutes } from "./routes/proposals";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -225,6 +226,7 @@ export async function registerRoutes(
   app.use("/api/pandadoc", pandaDocRoutes);
   app.use("/api/brand", brandEngineRoutes);
   app.use("/api/intelligence", intelligenceRoutes);
+  registerProposalRoutes(app);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
     try {
