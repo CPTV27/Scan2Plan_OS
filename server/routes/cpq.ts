@@ -349,7 +349,11 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       // Use normalized travel.dispatchLocation or fall back to lead's dispatch location (also uppercase)
       const dispatchLocation = normalizedData.travel?.dispatchLocation || 
                               normalizedData.dispatchLocation || 
+                              normalizedData.requestData?.dispatchLocation ||
                               (lead.dispatchLocation ? lead.dispatchLocation.toUpperCase() : "WOODSTOCK");
+      
+      // Extract areas from requestData if not at top level (frontend sends it nested)
+      const areas = normalizedData.areas || normalizedData.requestData?.areas || [];
       
       const quote = await storage.createCpqQuote({
         ...normalizedData,
@@ -358,6 +362,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         projectAddress,
         typeOfBuilding,
         dispatchLocation,
+        areas,
         createdBy: user?.claims?.email || user?.username || "unknown",
       });
       log(`[CPQ Quote Create] Success, quoteId: ${quote.id}, dispatchLocation: ${dispatchLocation}`);
