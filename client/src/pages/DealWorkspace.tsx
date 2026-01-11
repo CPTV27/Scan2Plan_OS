@@ -1564,7 +1564,7 @@ export default function DealWorkspace() {
   const leadId = params.id ? parseInt(params.id.split("?")[0], 10) : NaN;
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
-    const validTabs = ["lead", "quote", "history", "ai", "documents"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal"];
     const urlParams = new URLSearchParams(window.location.search);
     const tabFromUrl = urlParams.get("tab");
     if (tabFromUrl && validTabs.includes(tabFromUrl)) {
@@ -1578,7 +1578,7 @@ export default function DealWorkspace() {
   const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
   
   const handleTabChange = (value: string) => {
-    const validTabs = ["lead", "quote", "history", "ai", "documents"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
   };
   const queryClient = useQueryClient();
