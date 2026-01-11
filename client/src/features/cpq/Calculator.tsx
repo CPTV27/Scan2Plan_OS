@@ -2135,27 +2135,6 @@ Thanks!`.trim();
               <h2 className="text-lg font-medium">Internal Notes & Assumptions</h2>
               <Card>
                 <CardContent className="pt-4 space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Margin Target</Label>
-                      <span className="text-sm font-semibold text-primary" data-testid="text-margin-target-value">
-                        {(marginTarget * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                    <Slider
-                      value={[marginTarget * 100]}
-                      onValueChange={(value) => setMarginTarget(value[0] / 100)}
-                      min={35}
-                      max={60}
-                      step={1}
-                      className="w-full"
-                      data-testid="slider-margin-target"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>35%</span>
-                      <span>60%</span>
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <Label>Assumed Gross Margin</Label>
                     <Input
@@ -2335,6 +2314,32 @@ Thanks!`.trim();
             </div>
           )}
           
+          {/* Margin Target Slider - Always Visible */}
+          <div className="p-4 border-b">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Margin Target</Label>
+                <span className="text-sm font-semibold text-primary" data-testid="text-margin-target-value">
+                  {(marginTarget * 100).toFixed(0)}%
+                </span>
+              </div>
+              <Slider
+                value={[marginTarget * 100]}
+                onValueChange={(value) => setMarginTarget(value[0] / 100)}
+                min={35}
+                max={60}
+                step={1}
+                className="w-full"
+                data-testid="slider-margin-target"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>35%</span>
+                <span className="text-amber-600 dark:text-amber-400">45% (recommended)</span>
+                <span>60%</span>
+              </div>
+            </div>
+          </div>
+
           {/* Margin Guardrail Warnings */}
           {pricing.marginWarnings && pricing.marginWarnings.length > 0 && (
             <div className="p-4 border-b space-y-2">
