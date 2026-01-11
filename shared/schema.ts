@@ -2282,6 +2282,7 @@ export const cpqCalculateRequestSchema = z.object({
   services: cpqServicesSchema.optional(),
   paymentTerms: z.enum(CPQ_PAYMENT_TERMS).optional(),
   leadId: z.number().optional(),
+  marginTarget: z.number().min(0.35).max(0.60).optional(),
 });
 export type CpqCalculateRequest = z.infer<typeof cpqCalculateRequestSchema>;
 
@@ -2311,6 +2312,15 @@ export const cpqIntegrityFlagSchema = z.object({
 });
 export type CpqIntegrityFlag = z.infer<typeof cpqIntegrityFlagSchema>;
 
+// Margin warning schema
+export const cpqMarginWarningSchema = z.object({
+  code: z.enum(["BELOW_GUARDRAIL", "BELOW_FLOOR", "MARGIN_ADJUSTED"]),
+  message: z.string(),
+  targetMargin: z.number().optional(),
+  calculatedMargin: z.number().optional(),
+});
+export type CpqMarginWarning = z.infer<typeof cpqMarginWarningSchema>;
+
 // Full calculate response
 export const cpqCalculateResponseSchema = z.object({
   success: z.literal(true),
@@ -2328,6 +2338,8 @@ export const cpqCalculateResponseSchema = z.object({
   }),
   integrityStatus: z.enum(["pass", "warning", "blocked"]),
   integrityFlags: z.array(cpqIntegrityFlagSchema).optional(),
+  marginTarget: z.number().optional(),
+  marginWarnings: z.array(cpqMarginWarningSchema).optional(),
   calculatedAt: z.string(),
   engineVersion: z.string(),
 });

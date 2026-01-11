@@ -126,12 +126,23 @@ export interface PricingLineItem {
   upteamCost?: number;
 }
 
+// Margin warning for target margin calculations
+export interface MarginWarning {
+  code: "BELOW_GUARDRAIL" | "BELOW_FLOOR" | "MARGIN_ADJUSTED";
+  message: string;
+  targetMargin?: number;
+  calculatedMargin?: number;
+}
+
 export interface PricingResult {
   items: PricingLineItem[];
   subtotal: number;
   totalClientPrice: number;
   totalUpteamCost: number;
   profitMargin: number;
+  // Margin target support for slider
+  marginTarget?: number;
+  marginWarnings?: MarginWarning[];
   // Discipline breakdowns for deterministic QBO estimate sync
   disciplineTotals: {
     architecture: number;
@@ -494,12 +505,14 @@ export function calculateTravelCost(
 // Main pricing calculation function
 // NOTE: Risk premiums (Occupied/Hazardous) apply ONLY to Architecture discipline.
 // MEPF, Structure, Site, Travel, and other ancillary costs are explicitly EXCLUDED.
+// marginTarget: Optional target margin (0.35-0.60). When provided, adjusts client price to achieve target margin.
 export function calculatePricing(
   areas: Area[],
   services: Record<string, number>,
   travel: TravelConfig | null,
   risks: string[],
-  paymentTerms: string = "standard"
+  paymentTerms: string = "standard",
+  marginTarget?: number
 ): PricingResult {
   const items: PricingLineItem[] = [];
   
@@ -850,9 +863,62 @@ export function calculatePricing(
     });
   }
 
-  const totalClientPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
+  let totalClientPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
   const totalUpteamCost = Math.round(upteamCost * 100) / 100;
-  const profitMargin = totalClientPrice - totalUpteamCost;
+  let profitMargin = totalClientPrice - totalUpteamCost;
+  
+  // Margin target support: when marginTarget is provided, recalculate client price to achieve target margin
+  // Formula: clientPrice = cost / (1 - marginTarget)
+  const marginWarnings: MarginWarning[] = [];
+  const MARGIN_GUARDRAIL = 0.45; // 45% minimum recommended margin
+  const MARGIN_FLOOR = FY26_GOALS.MARGIN_FLOOR; // 40% hard floor
+  
+  if (marginTarget !== undefined) {
+    // Validate margin target range (0.35 - 0.60)
+    const validMarginTarget = Math.max(0.35, Math.min(0.60, marginTarget));
+    
+    // Calculate new client price to achieve target margin
+    // margin = (clientPrice - cost) / clientPrice = marginTarget
+    // clientPrice = cost / (1 - marginTarget)
+    const adjustedClientPrice = Math.round((totalUpteamCost / (1 - validMarginTarget)) * 100) / 100;
+    
+    // Check if margin target is below guardrail (45%)
+    if (validMarginTarget < MARGIN_GUARDRAIL) {
+      marginWarnings.push({
+        code: "BELOW_GUARDRAIL",
+        message: `Target margin (${(validMarginTarget * 100).toFixed(1)}%) is below the recommended 45% guardrail`,
+        targetMargin: validMarginTarget,
+        calculatedMargin: validMarginTarget,
+      });
+    }
+    
+    // Check if margin target is below hard floor (40%)
+    if (validMarginTarget < MARGIN_FLOOR) {
+      marginWarnings.push({
+        code: "BELOW_FLOOR",
+        message: `Target margin (${(validMarginTarget * 100).toFixed(1)}%) is below the 40% minimum margin floor. Quote may be blocked.`,
+        targetMargin: validMarginTarget,
+        calculatedMargin: validMarginTarget,
+      });
+    }
+    
+    // Update the client price and profit margin
+    totalClientPrice = adjustedClientPrice;
+    profitMargin = totalClientPrice - totalUpteamCost;
+    
+    // Update the total line item with adjusted price
+    // Note: We need to add a margin adjustment line item if price changed
+    const originalPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
+    const priceAdjustment = adjustedClientPrice - originalPrice;
+    
+    if (Math.abs(priceAdjustment) > 0.01) {
+      items.push({
+        label: `Margin Target Adjustment (${(validMarginTarget * 100).toFixed(1)}%)`,
+        value: priceAdjustment,
+        isDiscount: priceAdjustment < 0,
+      });
+    }
+  }
 
   // Add total line
   items.push({
@@ -867,6 +933,8 @@ export function calculatePricing(
     totalClientPrice,
     totalUpteamCost,
     profitMargin: Math.round(profitMargin * 100) / 100,
+    marginTarget,
+    marginWarnings: marginWarnings.length > 0 ? marginWarnings : undefined,
     // Discipline breakdowns for deterministic QBO estimate sync
     disciplineTotals: {
       architecture: Math.round(architectureBaseTotal * 100) / 100,
