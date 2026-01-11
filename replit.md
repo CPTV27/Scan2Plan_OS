@@ -37,7 +37,9 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 11, 2026)
-- **Margin Target Slider:** Added to DealWorkspace.tsx pricing sidebar (35%-60% range, default 45%)
-- **Post-Proxy Margin Normalization:** Backend `/api/cpq/calculate` now recalculates pricing after external CPQ response using formula: `clientPrice = upteamCost / (1 - marginTarget)`
-- **Margin Guardrails:** Integrity checks updated to use recalculated margin values (40% floor = blocked, 45% guardrail = warning)
+- **Client-Side Pricing:** DealWorkspace.tsx now uses client-side `calculatePricing()` from `pricing.ts` instead of external API proxy
+- **Orphaned Module Deleted:** Removed unused `client/src/modules/sales_engine/` directory (163 files)
+- **Backend Deprecation:** `/api/cpq/calculate` endpoint marked deprecated with console warning; migrate to client-side calculation
+- **Margin Governance:** Uses FY26_GOALS.MARGIN_FLOOR (40%) and MARGIN_STRETCH (45%) constants for integrity checks
+- **Line Item Categories:** Infers categories (risk, travel, service, subtotal, discipline, total) from labels
 - **Quote Save Fix:** Backend now extracts `areas` from nested `requestData` to resolve NOT NULL constraint errors

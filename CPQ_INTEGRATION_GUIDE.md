@@ -1,6 +1,6 @@
 # CPQ Integration Guide
 ## Scan2Plan OS - Configure, Price, Quote System
-**Last Updated:** January 11, 2026
+**Last Updated:** January 11, 2026 (v2.0 - Client-Side Pricing)
 
 ---
 
@@ -23,11 +23,11 @@ The CPQ (Configure, Price, Quote) system is a hybrid architecture:
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **External CPQ Service** | `https://scan2plan-cpq.replit.app` | Core pricing calculation engine |
-| **CRM Backend (Proxy)** | `server/routes/cpq.ts` | Proxies requests, applies margin adjustments |
-| **Frontend Calculator** | `client/src/features/cpq/Calculator.tsx` | Full standalone CPQ UI |
-| **Deal Workspace** | `client/src/pages/DealWorkspace.tsx` | Embedded quote builder in lead detail |
-| **Pricing Utilities** | `client/src/features/cpq/pricing.ts` | Static pricing tables, type definitions |
+| **Frontend Calculator** | `client/src/features/cpq/Calculator.tsx` | Full standalone CPQ UI (client-side pricing) |
+| **Deal Workspace** | `client/src/pages/DealWorkspace.tsx` | Embedded quote builder (client-side pricing) |
+| **Pricing Engine** | `client/src/features/cpq/pricing.ts` | Core pricing calculation logic |
+| **CRM Backend** | `server/routes/cpq.ts` | Quote persistence, external webhooks |
+| **External CPQ (DEPRECATED)** | `https://scan2plan-cpq.replit.app` | Legacy proxy endpoint, being phased out |
 
 ### Key Business Rules
 - **40% Margin Floor** (FY26_GOALS.MARGIN_FLOOR): Quotes below this are BLOCKED
