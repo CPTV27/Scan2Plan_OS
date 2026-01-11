@@ -326,6 +326,40 @@ export default function HelpCenter() {
                         </AccordionContent>
                       </AccordionItem>
 
+                      <AccordionItem value="cpq-margin">
+                        <AccordionTrigger>Margin Target Slider</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What it does:</strong> Adjusts your target margin and automatically calculates the client price.</p>
+                          <p><strong className="text-foreground">Range:</strong> 35% to 60%</p>
+                          <p><strong className="text-foreground">How it works:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Set your desired margin using the slider</li>
+                            <li>System calculates: Client Price = Cost ÷ (1 - Margin)</li>
+                            <li>Price updates automatically as you adjust</li>
+                          </ul>
+                          <p><strong className="text-foreground">Guardrails:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><span className="text-yellow-600 font-medium">45%:</span> Warning - below stretch goal</li>
+                            <li><span className="text-red-600 font-medium">40%:</span> Hard floor - proposal generation blocked</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="cpq-payment">
+                        <AccordionTrigger>Payment Terms</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Available options:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Net 15:</strong> Full payment within 15 days</li>
+                            <li><strong>Net 30:</strong> Full payment within 30 days</li>
+                            <li><strong>Net 45:</strong> Full payment within 45 days</li>
+                            <li><strong>50/50:</strong> 50% upfront, 50% on completion</li>
+                            <li><strong>25/75:</strong> 25% upfront, 75% on completion</li>
+                          </ul>
+                          <p className="text-sm mt-2">Payment terms are included in proposals and QuickBooks estimates.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
                       <AccordionItem value="cpq-disciplines">
                         <AccordionTrigger>Disciplines & LOD</AccordionTrigger>
                         <AccordionContent className="text-muted-foreground space-y-3">
@@ -387,26 +421,112 @@ export default function HelpCenter() {
                   </CardContent>
                 </Card>
 
+                <Card className="border-green-500/20 bg-green-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-green-500" />
+                      PandaDoc Integration
+                      <Badge variant="secondary" className="ml-auto">New</Badge>
+                    </CardTitle>
+                    <CardDescription>Create, edit, and send proposals directly from the Deal Workspace.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="pandadoc-1">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-green-500" />
+                            Creating a Proposal
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">How to create:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Open a deal from the Sales pipeline</li>
+                            <li>Create and save a quote in the Quote Builder tab</li>
+                            <li>Go to the <strong className="text-foreground">Proposal</strong> tab</li>
+                            <li>Click <strong className="text-foreground">"Create Proposal"</strong> button</li>
+                            <li>PandaDoc document is created from your quote data</li>
+                          </ol>
+                          <p className="text-sm mt-2 text-green-600 dark:text-green-400">Tip: Your quote must be saved before you can create a proposal.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="pandadoc-2">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-500" />
+                            Editing & Sending
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Embedded Editor:</strong> Edit proposals directly in the app without leaving the Deal Workspace.</p>
+                          <p><strong className="text-foreground">What you can do:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Add and edit pricing tables</li>
+                            <li>Place signature fields</li>
+                            <li>Customize content and formatting</li>
+                            <li>Preview the final document</li>
+                          </ul>
+                          <p><strong className="text-foreground">Sending:</strong> Click "Send for Signature" when ready. The client receives an email with a link to sign.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="pandadoc-3">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            Auto-Close on Signature
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What happens when signed:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Deal automatically moves to "Closed Won"</li>
+                            <li>Project is created in Production module</li>
+                            <li>Quote data transfers to the new project</li>
+                          </ul>
+                          <p className="text-sm mt-2 border-t pt-2">Status updates (viewed, sent, completed) sync automatically via webhook.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Zap className="h-5 w-5" />
-                      Smart Proposal Engine
+                      <Calculator className="h-5 w-5" />
+                      QuickBooks Integration
                     </CardTitle>
-                    <CardDescription>Create personalized proposals that win.</CardDescription>
+                    <CardDescription>Financial sync, expense tracking, and job costing.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Accordion type="single" collapsible>
-                      <AccordionItem value="proposal-1">
-                        <AccordionTrigger>Using Case Study Matching</AccordionTrigger>
-                        <AccordionContent className="text-muted-foreground">
-                          <p>The proposal builder automatically matches case studies based on the buyer persona you selected. Navigate to <strong className="text-foreground">Deals &gt; Proposal</strong> to generate a tailored proposal with relevant success stories.</p>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="qbo-1">
+                        <AccordionTrigger>Expense Auto-Linking</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What it does:</strong> Expenses and bills from QuickBooks are automatically linked to projects.</p>
+                          <p><strong className="text-foreground">How it works:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Syncs purchases and vendor bills from QBO</li>
+                            <li>Matches to leads via customer reference</li>
+                            <li>Prioritizes Closed Won deals, then most recent</li>
+                          </ul>
+                          <p className="text-sm mt-2 text-green-600 dark:text-green-400">Check Financial &gt; Sync Expenses to run manually.</p>
                         </AccordionContent>
                       </AccordionItem>
-                      <AccordionItem value="proposal-2">
-                        <AccordionTrigger>GoHighLevel Sync</AccordionTrigger>
-                        <AccordionContent className="text-muted-foreground">
-                          <p>All leads with personas are automatically synced to GoHighLevel with proper tags. Use <strong className="text-foreground">CRM &gt; Sync to GHL</strong> for batch updates.</p>
+
+                      <AccordionItem value="qbo-2">
+                        <AccordionTrigger>Job Costing Analytics</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What you'll see:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Actual vs Quoted Margin:</strong> Compare real costs to estimates</li>
+                            <li><strong>Cost Categories:</strong> Labor, materials, subcontractors, overhead</li>
+                            <li><strong>Profitability Summary:</strong> Per-project profit analysis</li>
+                          </ul>
+                          <p><strong className="text-foreground">Where to find it:</strong> Analytics &gt; Job Costing</p>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>
@@ -415,6 +535,90 @@ export default function HelpCenter() {
               </TabsContent>
 
               <TabsContent value="ops" className="space-y-4">
+                <Card className="border-blue-500/20 bg-blue-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-blue-500" />
+                      Production Workflow
+                      <Badge variant="secondary" className="ml-auto">7 Stages</Badge>
+                    </CardTitle>
+                    <CardDescription>Track projects from closed deal to final delivery.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="prod-stages">
+                        <AccordionTrigger>The 7 Production Stages</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <ol className="list-decimal pl-5 space-y-2">
+                            <li><strong className="text-foreground">Scheduling:</strong> Project created from Closed Won deal, assign scan dates</li>
+                            <li><strong className="text-foreground">Scanning:</strong> Field team captures point cloud data</li>
+                            <li><strong className="text-foreground">Processing:</strong> Raw data cleaned and registered</li>
+                            <li><strong className="text-foreground">Modeling:</strong> BIM model creation in progress</li>
+                            <li><strong className="text-foreground">QC:</strong> Quality check and variance audit</li>
+                            <li><strong className="text-foreground">Delivered:</strong> Sent to client</li>
+                            <li><strong className="text-foreground">Archived:</strong> Project complete, closed out</li>
+                          </ol>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="prod-create">
+                        <AccordionTrigger>Project Creation (Automatic)</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What happens when a deal closes:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Project automatically created in Production</li>
+                            <li>Quote data transfers (price, margin, areas, services)</li>
+                            <li>Scope summary auto-generated from CPQ inputs</li>
+                            <li>Project appears in Scheduling column</li>
+                          </ul>
+                          <p className="text-sm mt-2 text-green-600 dark:text-green-400">No manual data entry required - everything flows from the deal.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Site Readiness Checklist
+                    </CardTitle>
+                    <CardDescription>Pre-scan requirements to ensure successful field work.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="site-1">
+                        <AccordionTrigger>What is Site Readiness?</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Purpose:</strong> Confirms the site is ready for scanning before the field team arrives.</p>
+                          <p><strong className="text-foreground">Key checks include:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Access confirmed (keys, badges, contacts)</li>
+                            <li>Utilities on (lighting, HVAC)</li>
+                            <li>Areas cleared of obstructions</li>
+                            <li>Safety requirements met</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="site-2">
+                        <AccordionTrigger>Using the Checklist</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Where to find it:</strong> Lead Details tab &gt; Site Readiness section</p>
+                          <p><strong className="text-foreground">How to use:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Review each question with the client</li>
+                            <li>Mark items as confirmed or needing attention</li>
+                            <li>Add notes for special instructions</li>
+                            <li>Checklist transfers to project when deal closes</li>
+                          </ol>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">

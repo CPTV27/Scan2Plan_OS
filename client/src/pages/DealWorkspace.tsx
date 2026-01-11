@@ -3420,6 +3420,10 @@ export default function DealWorkspace() {
             pandaDocId={lead?.pandaDocId || null}
             documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
             leadId={leadId}
+            quoteId={latestQuote?.id}
+            onDocumentCreated={(docId) => {
+              queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
+            }}
             onDocumentSent={() => {
               queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
             }}

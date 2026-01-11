@@ -241,7 +241,7 @@ export function PandaDocEmbed({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => window.open(`https://app.pandadoc.com/documents/${pandaDocId}`, "_blank")}
+            onClick={() => window.open(`https://app.pandadoc.com/documents/${activeDocId}`, "_blank")}
             data-testid="button-open-pandadoc"
           >
             <ExternalLink className="h-4 w-4 mr-1" />
@@ -250,7 +250,7 @@ export function PandaDocEmbed({
           {documentStatus?.status === "document.draft" && (
             <Button
               size="sm"
-              onClick={() => sendDocumentMutation.mutate(pandaDocId)}
+              onClick={() => sendDocumentMutation.mutate(activeDocId!)}
               disabled={sendDocumentMutation.isPending}
               data-testid="button-send-for-signature"
             >
@@ -289,7 +289,7 @@ export function PandaDocEmbed({
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => window.open(`https://app.pandadoc.com/documents/${pandaDocId}`, "_blank")}
+                    onClick={() => window.open(`https://app.pandadoc.com/documents/${activeDocId}`, "_blank")}
                     data-testid="button-fallback-open"
                   >
                     <ExternalLink className="h-4 w-4 mr-1" />
@@ -299,7 +299,7 @@ export function PandaDocEmbed({
                     variant="ghost"
                     onClick={() => {
                       setEditorError(null);
-                      editingSessionMutation.mutate(pandaDocId);
+                      editingSessionMutation.mutate(activeDocId!);
                     }}
                     data-testid="button-retry-editor"
                   >
