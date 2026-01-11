@@ -1273,16 +1273,17 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                   <Slider
                     value={[marginTarget * 100]}
                     onValueChange={(value) => setMarginTarget(value[0] / 100)}
-                    min={35}
-                    max={60}
+                    min={20}
+                    max={65}
                     step={1}
                     className="w-full"
                     data-testid="slider-margin-target"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>35%</span>
+                    <span>20%</span>
+                    <span className="text-red-600 dark:text-red-400">40%</span>
                     <span className="text-amber-600 dark:text-amber-400">45%</span>
-                    <span>60%</span>
+                    <span>65%</span>
                   </div>
                 </div>
 

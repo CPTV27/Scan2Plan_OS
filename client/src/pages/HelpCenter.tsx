@@ -51,19 +51,19 @@ export default function HelpCenter() {
                         <AccordionTrigger className="text-left">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-red-500" />
-                            40% Gross Margin Floor (Hard Gate)
+                            40% Gross Margin Floor (CEO Override Available)
                           </div>
                         </AccordionTrigger>
                         <AccordionContent className="text-muted-foreground space-y-3">
-                          <p><strong className="text-foreground">What it does:</strong> Blocks AI proposal generation if your quote's gross margin falls below 40%.</p>
+                          <p><strong className="text-foreground">What it does:</strong> Shows a warning if your quote's gross margin falls below 40%. CEO can override and proceed with strategic pricing.</p>
                           <p><strong className="text-foreground">Why it matters:</strong> Protects profitability by preventing you from accidentally sending proposals that would lose money.</p>
                           <div className="bg-card p-3 rounded-lg border mt-2">
-                            <p className="font-medium text-sm">How to fix if blocked:</p>
+                            <p className="font-medium text-sm">When below 40%:</p>
                             <ol className="list-decimal pl-5 mt-2 space-y-1 text-sm">
-                              <li>Go to the Quote Builder tab in the deal workspace</li>
-                              <li>Increase prices or reduce scope until margin is 40%+</li>
-                              <li>For Tier A projects, adjust your scanning/modeling cost inputs</li>
-                              <li>Once saved with valid margin, proposal generation unlocks</li>
+                              <li>Warning banner displays in Quote Builder</li>
+                              <li>CEO can acknowledge and proceed with strategic pricing</li>
+                              <li>Or adjust prices/scope to improve margin</li>
+                              <li>Quote still saves - full flexibility for the CEO</li>
                             </ol>
                           </div>
                         </AccordionContent>
@@ -342,7 +342,7 @@ export default function HelpCenter() {
                         <AccordionTrigger>Margin Target Slider</AccordionTrigger>
                         <AccordionContent className="text-muted-foreground space-y-3">
                           <p><strong className="text-foreground">What it does:</strong> Adjusts your target margin and automatically calculates the client price.</p>
-                          <p><strong className="text-foreground">Range:</strong> 35% to 60%</p>
+                          <p><strong className="text-foreground">Range:</strong> 20% to 65%</p>
                           <p><strong className="text-foreground">How it works:</strong></p>
                           <ul className="list-disc pl-5 space-y-1">
                             <li>Set your desired margin using the slider</li>
@@ -352,8 +352,12 @@ export default function HelpCenter() {
                           <p><strong className="text-foreground">Guardrails:</strong></p>
                           <ul className="list-disc pl-5 space-y-1">
                             <li><span className="text-yellow-600 font-medium">45%:</span> Warning - below stretch goal</li>
-                            <li><span className="text-red-600 font-medium">40%:</span> Hard floor - proposal generation blocked</li>
+                            <li><span className="text-red-600 font-medium">40%:</span> Standard floor - requires CEO confirmation</li>
                           </ul>
+                          <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                            <p className="font-medium text-foreground">CEO Override</p>
+                            <p className="text-sm mt-1">Margins below 40% show a warning but can still be saved. The CEO can acknowledge and proceed with strategic pricing when needed.</p>
+                          </div>
                         </AccordionContent>
                       </AccordionItem>
 
