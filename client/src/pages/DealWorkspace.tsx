@@ -2907,26 +2907,57 @@ export default function DealWorkspace() {
 
                     <div className="pt-4 space-y-3">
                       {generatedMagicLink && (
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
-                          <Input
-                            value={generatedMagicLink}
-                            readOnly
-                            className="flex-1 text-sm"
-                            data-testid="input-magic-link"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={copyMagicLink}
-                            data-testid="button-copy-magic-link"
-                          >
-                            {linkCopied ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
+                        <div className="space-y-3 p-3 rounded-lg bg-muted">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={generatedMagicLink}
+                              readOnly
+                              className="flex-1 text-sm"
+                              data-testid="input-magic-link"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={copyMagicLink}
+                              data-testid="button-copy-magic-link"
+                            >
+                              {linkCopied ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(generatedMagicLink, "_blank")}
+                              data-testid="button-preview-questionnaire"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              Preview Questionnaire
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => {
+                                const clientEmail = lead?.contactEmail || lead?.billingContactEmail || "";
+                                const projectName = lead?.projectName || "Your Project";
+                                const subject = encodeURIComponent(`Site Readiness Questionnaire - ${projectName}`);
+                                const body = encodeURIComponent(
+                                  `Hi,\n\nPlease complete the following site readiness questionnaire to help us prepare for your scan.\n\n${generatedMagicLink}\n\nThis link will expire in 7 days. If you have any questions, please don't hesitate to reach out.\n\nBest regards,\nScan2Plan Team`
+                                );
+                                window.open(`mailto:${clientEmail}?subject=${subject}&body=${body}`, "_blank");
+                              }}
+                              data-testid="button-email-questionnaire"
+                            >
+                              <Mail className="w-4 h-4 mr-2" />
+                              Send via Email
+                            </Button>
+                          </div>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2">
@@ -2958,18 +2989,18 @@ export default function DealWorkspace() {
                           {generateMagicLinkMutation.isPending ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Generating...
+                              Generating Link...
                             </>
                           ) : (
                             <>
-                              <Send className="w-4 h-4 mr-2" />
-                              Send {questionsToSend.length} Questions to Client
+                              <Link2 className="w-4 h-4 mr-2" />
+                              Generate Link for {questionsToSend.length} Questions
                             </>
                           )}
                         </Button>
                         {questionsToSend.length === 0 && (
                           <span className="text-xs text-muted-foreground">
-                            Check questions above to include in the magic link
+                            Check questions above to include in the questionnaire
                           </span>
                         )}
                       </div>

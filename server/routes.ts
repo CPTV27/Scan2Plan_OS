@@ -226,6 +226,8 @@ export async function registerRoutes(
     { path: '/proposals/track/', type: 'prefix' },  // Tracking pixel and redirect
     // Site readiness forms (magic link protected)
     { path: '/site-readiness/', type: 'prefix' },
+    // Site readiness API endpoints (public, token-authenticated)
+    { path: '/public/site-readiness/', type: 'prefix' },
     // Webhooks (have their own authentication via API keys/signatures)
     { path: '/webhooks/', type: 'prefix' },
   ];
