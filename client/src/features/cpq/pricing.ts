@@ -883,7 +883,9 @@ export function calculatePricing(
     const adjustedClientPrice = Math.round((totalUpteamCost / (1 - validMarginTarget)) * 100) / 100;
     
     // Check if margin target is below guardrail (45%)
-    if (validMarginTarget < MARGIN_GUARDRAIL) {
+    // Use epsilon tolerance to handle floating point precision (e.g., 0.449999... should equal 0.45)
+    const EPSILON = 0.0001;
+    if (validMarginTarget < MARGIN_GUARDRAIL - EPSILON) {
       marginWarnings.push({
         code: "BELOW_GUARDRAIL",
         message: `Target margin (${(validMarginTarget * 100).toFixed(1)}%) is below the recommended 45% guardrail`,
@@ -893,7 +895,7 @@ export function calculatePricing(
     }
     
     // Check if margin target is below hard floor (40%)
-    if (validMarginTarget < MARGIN_FLOOR) {
+    if (validMarginTarget < MARGIN_FLOOR - EPSILON) {
       marginWarnings.push({
         code: "BELOW_FLOOR",
         message: `Target margin (${(validMarginTarget * 100).toFixed(1)}%) is below the 40% minimum margin floor. Quote may be blocked.`,
