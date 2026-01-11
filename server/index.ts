@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedMarketingData } from "./data/seedMarketing";
+import { seedPersonas } from "./seed/personas";
 import { correlationIdMiddleware } from "./middleware/correlationId";
 import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
@@ -132,6 +133,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   }
 
   await seedMarketingData();
+  await seedPersonas();
 
   // Daily staleness check - runs every 24 hours
   const runDailyStaleness = async () => {
