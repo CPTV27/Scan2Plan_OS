@@ -664,6 +664,14 @@ export const leads = pgTable("leads", {
   projectStatus: jsonb("project_status"), // {proposalPhase: boolean, inHand: boolean, urgent: boolean, other: boolean, otherText: string}
   // Proof Links (URLs to proof documents, photos, floor plans)
   proofLinks: text("proof_links"), // Free-form text for storing multiple URLs
+  // Site Readiness Questionnaire (Magic Link)
+  siteReadiness: jsonb("site_readiness").$type<Record<string, any>>(), // Answers to site readiness questions
+  siteReadinessQuestionsSent: jsonb("site_readiness_questions_sent").$type<string[]>(), // Question IDs sent to client
+  siteReadinessStatus: text("site_readiness_status").default("pending"), // pending | sent | completed
+  siteReadinessSentAt: timestamp("site_readiness_sent_at"), // When magic link was sent
+  siteReadinessCompletedAt: timestamp("site_readiness_completed_at"), // When client submitted answers
+  clientToken: text("client_token"), // Magic link token for public access
+  clientTokenExpiresAt: timestamp("client_token_expires_at"), // Token expiration
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
