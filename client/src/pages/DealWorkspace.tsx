@@ -105,6 +105,13 @@ import { Brain, Paperclip, Download, Eye, Link2, ClipboardList } from "lucide-re
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { Slider } from "@/components/ui/slider";
+import { 
+  calculatePricing, 
+  type Area as PricingArea, 
+  type TravelConfig, 
+  type PricingResult 
+} from "@/features/cpq/pricing";
+import { FY26_GOALS } from "@shared/businessGoals";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -555,42 +562,99 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
     }
   };
 
-  const handleCalculate = async () => {
+  const handleCalculate = () => {
     setIsCalculating(true);
     try {
-      const request: CpqCalculateRequest = {
-        clientName: lead.clientName,
-        projectName: lead.projectName || undefined,
-        projectAddress: lead.projectAddress || undefined,
-        areas: areas.map(a => ({
-          name: a.name || undefined,
-          buildingType: a.buildingType,
-          squareFeet: a.squareFeet,
-          disciplines: a.disciplines as any,
-          disciplineLods: a.disciplineLods as any,
+      // Convert areas to pricing engine format
+      const pricingAreas: PricingArea[] = areas.map(a => ({
+        id: a.id,
+        name: a.name,
+        buildingType: a.buildingType,
+        squareFeet: a.squareFeet,
+        lod: "300", // Default LOD
+        disciplines: a.disciplines,
+        disciplineLods: a.disciplineLods,
+        scope: "full",
+      }));
+
+      // Build travel config
+      const travel: TravelConfig | null = dispatchLocation ? {
+        dispatchLocation,
+        distance: distance ? parseFloat(distance) : 0,
+      } : null;
+
+      // Build services object
+      const servicesConfig: Record<string, number> = {};
+      if (matterport) servicesConfig.matterport = 1;
+      if (actScan) servicesConfig.actScan = 1;
+      if (additionalElevations) servicesConfig.additionalElevations = parseInt(additionalElevations);
+
+      // Calculate pricing using client-side engine
+      const result: PricingResult = calculatePricing(
+        pricingAreas,
+        servicesConfig,
+        travel,
+        risks,
+        paymentTerms,
+        marginTarget
+      );
+
+      // Calculate margin percentage
+      const grossMargin = result.totalClientPrice - result.totalUpteamCost;
+      const grossMarginPercent = result.totalClientPrice > 0 
+        ? (grossMargin / result.totalClientPrice) * 100 
+        : 0;
+
+      // Determine integrity status based on margin
+      let integrityStatus: "pass" | "warning" | "blocked" = "pass";
+      const integrityFlags: { code: string; message: string; severity: "warning" | "error" }[] = [];
+      
+      if (grossMarginPercent < FY26_GOALS.MARGIN_FLOOR * 100) {
+        integrityStatus = "blocked";
+        integrityFlags.push({
+          code: "LOW_MARGIN",
+          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below ${(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% threshold`,
+          severity: "error"
+        });
+      } else if (grossMarginPercent < 45) {
+        integrityStatus = "warning";
+        integrityFlags.push({
+          code: "MARGIN_BELOW_GUARDRAIL",
+          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below recommended 45%`,
+          severity: "warning"
+        });
+      }
+
+      // Convert PricingResult to CpqCalculateResponse format
+      const response: CpqCalculateResponse = {
+        success: true,
+        totalClientPrice: result.totalClientPrice,
+        totalUpteamCost: result.totalUpteamCost,
+        grossMargin,
+        grossMarginPercent,
+        lineItems: result.items.map((item, idx) => ({
+          id: `item-${idx}`,
+          label: item.label,
+          category: (item.isTotal ? "total" : "discipline") as "discipline" | "risk" | "area" | "travel" | "service" | "subtotal" | "total",
+          clientPrice: item.value,
+          upteamCost: item.upteamCost || 0,
         })),
-        risks: risks.length > 0 ? risks as any : undefined,
-        dispatchLocation: dispatchLocation as any,
-        distance: distance ? parseFloat(distance) : undefined,
-        services: {
-          matterport,
-          actScan,
-          additionalElevations: additionalElevations ? parseInt(additionalElevations) : undefined,
+        subtotals: {
+          modeling: result.disciplineTotals.architecture + result.disciplineTotals.mep + result.disciplineTotals.structural + result.disciplineTotals.site,
+          travel: result.disciplineTotals.travel,
+          riskPremiums: result.disciplineTotals.risk,
+          services: result.disciplineTotals.services,
+          paymentPremium: 0, // Calculate from payment terms if needed
         },
-        paymentTerms: paymentTerms as any,
-        leadId,
+        integrityStatus,
+        integrityFlags,
         marginTarget,
+        calculatedAt: new Date().toISOString(),
+        engineVersion: "client-1.0",
       };
 
-      const response = await apiRequest("POST", "/api/cpq/calculate", request);
-      const data = await response.json();
-      
-      if (data.success) {
-        setPricingResult(data);
-        toast({ title: "Pricing Calculated", description: `Total: $${data.totalClientPrice.toLocaleString()}` });
-      } else {
-        toast({ title: "Calculation Error", description: data.error || "Failed to calculate pricing", variant: "destructive" });
-      }
+      setPricingResult(response);
+      toast({ title: "Pricing Calculated", description: `Total: $${response.totalClientPrice.toLocaleString()}` });
     } catch (error) {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to calculate pricing", variant: "destructive" });
     } finally {

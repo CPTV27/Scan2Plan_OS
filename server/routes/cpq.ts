@@ -799,9 +799,12 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     });
   }));
 
-  // POST /api/cpq/calculate - Proxy to external CPQ pricing calculation API
-  // This endpoint is used by the in-app quote builder to get pricing from external CPQ
+  // POST /api/cpq/calculate - DEPRECATED: Use client-side calculatePricing() instead
+  // This endpoint proxies to external CPQ service but is being phased out in favor of client-side calculation
   app.post("/api/cpq/calculate", isAuthenticated, asyncHandler(async (req, res) => {
+    console.warn("[DEPRECATED] /api/cpq/calculate called - Use client-side calculatePricing() from pricing.ts instead");
+    log("[DEPRECATED] /api/cpq/calculate endpoint called - migrate to client-side calculation");
+    
     const CPQ_BASE_URL = process.env.CPQ_BASE_URL || "https://scan2plan-cpq.replit.app";
     
     if (!CPQ_API_KEY) {
