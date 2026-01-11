@@ -101,9 +101,10 @@ import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download, Eye } from "lucide-react";
+import { Brain, Paperclip, Download, Eye, Link2, ClipboardList } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
+import { Slider } from "@/components/ui/slider";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -1081,6 +1082,14 @@ const formSchema = insertLeadSchema.extend({
   billingContactName: z.string().min(1, "Billing contact name is required"),
   billingContactEmail: z.string().email("Valid billing email is required"),
   billingContactPhone: z.string().optional().nullable(),
+  projectStatus: z.object({
+    proposalPhase: z.boolean().optional(),
+    inHand: z.boolean().optional(),
+    urgent: z.boolean().optional(),
+    other: z.boolean().optional(),
+    otherText: z.string().optional(),
+  }).optional(),
+  proofLinks: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -1274,11 +1283,20 @@ export default function DealWorkspace() {
       billingContactName: "",
       billingContactEmail: "",
       billingContactPhone: "",
+      projectStatus: {
+        proposalPhase: false,
+        inHand: false,
+        urgent: false,
+        other: false,
+        otherText: "",
+      },
+      proofLinks: "",
     },
   });
 
   useEffect(() => {
     if (lead) {
+      const projectStatus = (lead as any).projectStatus || {};
       form.reset({
         clientName: lead.clientName,
         projectName: lead.projectName || "",
@@ -1299,6 +1317,14 @@ export default function DealWorkspace() {
         billingContactEmail: (lead as any).billingContactEmail || "",
         billingContactPhone: (lead as any).billingContactPhone || "",
         buyerPersona: lead.buyerPersona || "",
+        projectStatus: {
+          proposalPhase: projectStatus.proposalPhase || false,
+          inHand: projectStatus.inHand || false,
+          urgent: projectStatus.urgent || false,
+          other: projectStatus.other || false,
+          otherText: projectStatus.otherText || "",
+        },
+        proofLinks: (lead as any).proofLinks || "",
       });
     }
   }, [lead, form]);
@@ -1848,10 +1874,25 @@ export default function DealWorkspace() {
                         name="probability"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Probability (%)</FormLabel>
-                            <FormControl>
-                              <Input type="number" min="0" max="100" {...field} data-testid="input-probability" />
-                            </FormControl>
+                            <FormLabel>Probability of Closing</FormLabel>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">0%</span>
+                                <span className="text-lg font-semibold" data-testid="text-probability-value">{field.value || 0}%</span>
+                                <span className="text-sm text-muted-foreground">100%</span>
+                              </div>
+                              <FormControl>
+                                <Slider
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={[field.value || 0]}
+                                  onValueChange={(values) => field.onChange(values[0])}
+                                  data-testid="slider-probability"
+                                  className="w-full"
+                                />
+                              </FormControl>
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1949,6 +1990,122 @@ export default function DealWorkspace() {
                       />
                     </div>
 
+                  </CardContent>
+                </Card>
+
+                {/* Project Status Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ClipboardList className="w-4 h-4" />
+                      Project Status
+                    </CardTitle>
+                    <CardDescription>Track the current phase and urgency of this project</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="projectStatus.proposalPhase"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-proposal-phase"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="cursor-pointer">Proposal Phase</FormLabel>
+                              <FormDescription className="text-xs">Currently preparing proposal</FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="projectStatus.inHand"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-in-hand"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="cursor-pointer">In Hand</FormLabel>
+                              <FormDescription className="text-xs">Project is confirmed</FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="projectStatus.urgent"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-urgent"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="cursor-pointer">Urgent</FormLabel>
+                              <FormDescription className="text-xs">High priority timeline</FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="projectStatus.other"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value || false}
+                                onCheckedChange={field.onChange}
+                                data-testid="checkbox-other"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="cursor-pointer">Other</FormLabel>
+                              <FormDescription className="text-xs">Custom status</FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Show text input if "Other" is checked */}
+                    {form.watch("projectStatus.other") && (
+                      <FormField
+                        control={form.control}
+                        name="projectStatus.otherText"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Other Status Details</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Describe the status..."
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-other-status"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </CardContent>
                 </Card>
 
@@ -2147,6 +2304,118 @@ export default function DealWorkspace() {
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* Documentation Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Link2 className="w-4 h-4" />
+                      Documentation
+                    </CardTitle>
+                    <CardDescription>Store proof links and upload important documents</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="proofLinks"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Proof Links</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Paste URLs to proof documents, photos, floor plans, etc.&#10;One link per line or separated by commas..."
+                              className="min-h-24"
+                              {...field} 
+                              value={field.value || ""} 
+                              data-testid="textarea-proof-links" 
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            Links to external documents, photos, or floor plans for this project
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-sm font-medium">NDA & Other Documents</Label>
+                        <Badge variant="outline" className="text-xs">
+                          {documents?.length || 0} files
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={uploadDocumentMutation.isPending}
+                          onClick={() => {
+                            const input = document.getElementById('nda-upload-input') as HTMLInputElement;
+                            input?.click();
+                          }}
+                          data-testid="button-upload-nda"
+                        >
+                          {uploadDocumentMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload NDA or Other Documents
+                            </>
+                          )}
+                        </Button>
+                        <input
+                          id="nda-upload-input"
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadDocumentMutation.mutate(file);
+                            e.target.value = '';
+                          }}
+                          disabled={uploadDocumentMutation.isPending}
+                          data-testid="input-upload-nda"
+                        />
+                      </div>
+                      {documents && documents.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {documents.slice(0, 3).map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center justify-between p-2 bg-muted/50 rounded-md text-sm"
+                              data-testid={`doc-preview-${doc.id}`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <Paperclip className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                <span className="truncate">{doc.originalName}</span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => window.open(`/api/documents/${doc.id}/download`, '_blank')}
+                                data-testid={`button-download-doc-${doc.id}`}
+                              >
+                                <Download className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          {documents.length > 3 && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              +{documents.length - 3} more documents (see Documents tab)
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 

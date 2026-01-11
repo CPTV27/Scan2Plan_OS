@@ -660,6 +660,10 @@ export const leads = pgTable("leads", {
   // Estimator Card (Required for Tier A deals before proposal)
   estimatorCardId: text("estimator_card_id"), // Google Drive file ID for estimator card PDF
   estimatorCardUrl: text("estimator_card_url"), // Direct URL to estimator card in Drive
+  // Project Status Checkboxes (Proposal Phase, In Hand, Urgent, Other)
+  projectStatus: jsonb("project_status"), // {proposalPhase: boolean, inHand: boolean, urgent: boolean, other: boolean, otherText: string}
+  // Proof Links (URLs to proof documents, photos, floor plans)
+  proofLinks: text("proof_links"), // Free-form text for storing multiple URLs
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
@@ -856,6 +860,16 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   firmSize: z.enum(FIRM_SIZES).optional(),
   discipline: z.enum(COMPANY_DISCIPLINES).optional(),
   focusSector: optionalString,
+  // Project Status Checkboxes
+  projectStatus: z.object({
+    proposalPhase: z.boolean().optional(),
+    inHand: z.boolean().optional(),
+    urgent: z.boolean().optional(),
+    other: z.boolean().optional(),
+    otherText: z.string().optional(),
+  }).optional(),
+  // Proof Links
+  proofLinks: optionalString,
 });
 
 // === QC VALIDATION STATUS ENUM ===
@@ -1726,6 +1740,15 @@ export type InsertMarketingPost = z.infer<typeof insertMarketingPostSchema>;
 // === TYPES ===
 export type Lead = typeof leads.$inferSelect;
 export type InsertLead = z.infer<typeof insertLeadSchema>;
+
+// Project Status Type (for checkboxes)
+export interface ProjectStatus {
+  proposalPhase?: boolean;
+  inHand?: boolean;
+  urgent?: boolean;
+  other?: boolean;
+  otherText?: string;
+}
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
