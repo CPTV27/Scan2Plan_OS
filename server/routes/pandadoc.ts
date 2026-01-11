@@ -1,8 +1,101 @@
 import { Router, Request, Response } from "express";
 import { pandaDocClient } from "../lib/pandadoc-client";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { db } from "../db";
+import { leads, cpqQuotes } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const router = Router();
+
+// Create a PandaDoc document from a quote
+router.post("/documents", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { quoteId, leadId } = req.body;
+    
+    if (!quoteId || !leadId) {
+      return res.status(400).json({ error: "quoteId and leadId are required" });
+    }
+    
+    // Get the quote
+    const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.id, quoteId));
+    if (!quote) {
+      return res.status(404).json({ error: "Quote not found" });
+    }
+    
+    // Get the lead
+    const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+    
+    // Prepare recipient
+    const recipientEmail = lead.contactEmail || lead.billingContactEmail;
+    const recipientName = lead.contactName || lead.billingContactName || lead.clientName;
+    
+    if (!recipientEmail) {
+      return res.status(400).json({ error: "Lead must have a contact email to create a proposal" });
+    }
+    
+    // Parse line items from quote's pricingBreakdown
+    const pricingBreakdown = quote.pricingBreakdown as any;
+    const lineItems = pricingBreakdown?.lineItems || [];
+    const pricingItems = lineItems
+      .filter((item: any) => item.clientPrice && item.clientPrice > 0)
+      .map((item: any) => ({
+        name: item.label || "Service",
+        description: item.description || "",
+        price: Number(item.clientPrice) || 0,
+        qty: 1,
+      }));
+    
+    // Create document from template (using a default template or custom one)
+    const templateId = process.env.PANDADOC_TEMPLATE_ID;
+    
+    if (!templateId) {
+      return res.status(500).json({ error: "PandaDoc template ID not configured. Please set PANDADOC_TEMPLATE_ID environment variable." });
+    }
+    
+    const nameParts = recipientName.split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+    
+    const document = await pandaDocClient.createDocumentFromTemplate({
+      templateId,
+      name: `Proposal - ${lead.projectName || lead.clientName}`,
+      recipients: [{
+        email: recipientEmail,
+        first_name: firstName,
+        last_name: lastName,
+        role: "Client",
+      }],
+      tokens: [
+        { name: "client_name", value: lead.clientName },
+        { name: "project_name", value: lead.projectName || "" },
+        { name: "project_address", value: lead.projectAddress || "" },
+        { name: "total_price", value: `$${Number(quote.totalPrice || 0).toLocaleString()}` },
+        { name: "quote_number", value: quote.quoteNumber || "" },
+      ],
+      pricingTables: pricingItems.length > 0 ? [{
+        name: "Pricing",
+        items: pricingItems,
+      }] : undefined,
+      metadata: {
+        lead_id: String(leadId),
+        quote_id: String(quoteId),
+      },
+    });
+    
+    // Update lead with pandaDocId
+    await db.update(leads)
+      .set({ pandaDocId: document.id })
+      .where(eq(leads.id, leadId));
+    
+    res.status(201).json(document);
+  } catch (error) {
+    console.error("Create PandaDoc document error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
 
 router.get("/status", async (req: Request, res: Response) => {
   try {
