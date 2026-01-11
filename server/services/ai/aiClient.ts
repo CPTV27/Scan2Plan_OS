@@ -1,8 +1,81 @@
 import OpenAI from "openai";
 import { log } from "../../lib/logger";
+import crypto from "crypto";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+
+// LRU Cache for AI responses - reduces redundant API calls
+const CACHE_MAX_SIZE = 500;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+interface CacheEntry<T> {
+  value: T;
+  timestamp: number;
+}
+
+class LRUCache<T> {
+  private cache = new Map<string, CacheEntry<T>>();
+  private maxSize: number;
+  private ttlMs: number;
+  private hits = 0;
+  private misses = 0;
+
+  constructor(maxSize: number, ttlMs: number) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+  }
+
+  get(key: string): T | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) {
+      this.misses++;
+      return undefined;
+    }
+
+    // Check TTL
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      this.misses++;
+      return undefined;
+    }
+
+    // Move to end (most recently used)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    this.hits++;
+    return entry.value;
+  }
+
+  set(key: string, value: T): void {
+    // Delete if exists to update position
+    this.cache.delete(key);
+
+    // Evict oldest if at capacity
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+
+    this.cache.set(key, { value, timestamp: Date.now() });
+  }
+
+  getStats(): { hits: number; misses: number; size: number; hitRate: string } {
+    const total = this.hits + this.misses;
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      size: this.cache.size,
+      hitRate: total > 0 ? `${((this.hits / total) * 100).toFixed(1)}%` : "0%",
+    };
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
+  }
+}
 
 type ChatMessage = {
   role: "system" | "user" | "assistant";
@@ -15,11 +88,22 @@ interface ChatParams {
   temperature?: number;
   responseFormat?: "json_object" | "text";
   maxTokens?: number;
+  skipCache?: boolean; // Force fresh response
 }
 
 interface EmbeddingResult {
   embedding: number[];
   tokensUsed: number;
+}
+
+// Singleton caches
+const chatCache = new LRUCache<string>(CACHE_MAX_SIZE, CACHE_TTL_MS);
+const embeddingCache = new LRUCache<EmbeddingResult>(CACHE_MAX_SIZE, CACHE_TTL_MS);
+
+function generateCacheKey(data: unknown): string {
+  const hash = crypto.createHash("sha256");
+  hash.update(JSON.stringify(data));
+  return hash.digest("hex").slice(0, 16);
 }
 
 export class AIClient {
@@ -45,7 +129,24 @@ export class AIClient {
   }
 
   async chat(params: ChatParams): Promise<string | null> {
-    const { messages, model, temperature, responseFormat, maxTokens } = params;
+    const { messages, model, temperature, responseFormat, maxTokens, skipCache } = params;
+
+    // Generate cache key from deterministic params (temperature affects output)
+    const cacheKey = generateCacheKey({
+      messages,
+      model: model || this.defaultModel,
+      temperature: temperature ?? 0.3,
+      responseFormat,
+    });
+
+    // Check cache first (unless skipCache is set)
+    if (!skipCache) {
+      const cached = chatCache.get(cacheKey);
+      if (cached) {
+        log(`[AIClient] Cache hit for chat request`);
+        return cached;
+      }
+    }
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -59,7 +160,14 @@ export class AIClient {
           }),
         });
 
-        return response.choices[0]?.message?.content || null;
+        const result = response.choices[0]?.message?.content || null;
+        
+        // Cache the result
+        if (result) {
+          chatCache.set(cacheKey, result);
+        }
+        
+        return result;
       } catch (error: any) {
         const isRateLimit = error?.status === 429;
         const isRetryable = isRateLimit || error?.status >= 500;
@@ -99,17 +207,33 @@ export class AIClient {
     }
   }
 
-  async embed(text: string): Promise<EmbeddingResult | null> {
+  async embed(text: string, skipCache = false): Promise<EmbeddingResult | null> {
+    const cacheKey = generateCacheKey({ text, model: this.embeddingsModel });
+    
+    // Check cache first
+    if (!skipCache) {
+      const cached = embeddingCache.get(cacheKey);
+      if (cached) {
+        log(`[AIClient] Cache hit for embedding request`);
+        return cached;
+      }
+    }
+
     try {
       const response = await this.openai.embeddings.create({
         model: this.embeddingsModel,
         input: text,
       });
 
-      return {
+      const result = {
         embedding: response.data[0].embedding,
         tokensUsed: response.usage?.total_tokens || 0,
       };
+      
+      // Cache the result
+      embeddingCache.set(cacheKey, result);
+      
+      return result;
     } catch (error: any) {
       log(`ERROR: [AIClient] Embedding error: ${error?.message || error}`);
       return null;
@@ -147,6 +271,46 @@ export class AIClient {
       temperature: options?.temperature,
     });
   }
+
+  getCacheStats(): { chat: ReturnType<typeof chatCache.getStats>; embedding: ReturnType<typeof embeddingCache.getStats> } {
+    return {
+      chat: chatCache.getStats(),
+      embedding: embeddingCache.getStats(),
+    };
+  }
+
+  clearCache(): void {
+    chatCache.clear();
+    embeddingCache.clear();
+    log("[AIClient] Cache cleared");
+  }
+
+  async chatStream(params: Omit<ChatParams, "responseFormat">): Promise<AsyncIterable<string>> {
+    const { messages, model, temperature, maxTokens } = params;
+
+    const stream = await this.openai.chat.completions.create({
+      model: model || this.defaultModel,
+      messages: messages as any,
+      temperature: temperature ?? 0.3,
+      max_tokens: maxTokens,
+      stream: true,
+    });
+
+    return {
+      async *[Symbol.asyncIterator]() {
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            yield content;
+          }
+        }
+      },
+    };
+  }
 }
 
 export const aiClient = new AIClient();
+
+export function getAICacheStats() {
+  return aiClient.getCacheStats();
+}

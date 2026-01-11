@@ -509,4 +509,176 @@ ${contextSummary}`;
       averageResponseTime: analytics.length > 0 ? Math.round(totalTimeTaken / analytics.length) : 0,
     });
   }));
+
+  // AI Cache Stats (for monitoring cost savings)
+  app.get("/api/ai/cache-stats", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    const stats = aiClient.getCacheStats();
+    res.json(stats);
+  }));
+
+  // Clear AI Cache (admin function)
+  app.post("/api/ai/cache/clear", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    aiClient.clearCache();
+    res.json({ success: true, message: "AI cache cleared" });
+  }));
+
+  // Field Notes Processing Endpoint - transforms raw field notes into professional scope
+  app.post("/api/field-notes/:id/process", isAuthenticated, requireRole("ceo", "sales", "production"), asyncHandler(async (req, res) => {
+    const fieldNoteId = Number(req.params.id);
+    const user = req.user as any;
+
+    const fieldNote = await storage.getFieldNote(fieldNoteId);
+    if (!fieldNote) {
+      return res.status(404).json({ error: "Field note not found" });
+    }
+
+    if (!aiClient.isConfigured()) {
+      return res.status(503).json({ error: "AI service not configured" });
+    }
+
+    // Mark as processing
+    await storage.updateFieldNote(fieldNoteId, { status: "Processing" });
+
+    try {
+      const FIELD_NOTE_PROMPT = `You are a professional BIM project manager translating raw field notes from a laser scanning technician into a clear, professional scope summary.
+
+Transform the technician's shorthand and informal notes into:
+1. A professional project scope summary
+2. Key observations and findings
+3. Any potential issues or concerns identified
+4. Recommended next steps
+
+Be concise but thorough. Maintain technical accuracy while improving clarity.`;
+
+      const result = await aiClient.generateText(
+        FIELD_NOTE_PROMPT,
+        `Raw Field Notes:\n${fieldNote.rawContent}`,
+        { maxTokens: 1000, temperature: 0.3 }
+      );
+
+      if (!result) {
+        await storage.updateFieldNote(fieldNoteId, { status: "Failed" });
+        return res.status(500).json({ error: "AI processing failed" });
+      }
+
+      const updated = await storage.updateFieldNote(fieldNoteId, {
+        processedScope: result,
+        status: "Completed",
+      });
+
+      // Track analytics
+      await db.insert(aiAnalytics).values({
+        feature: "field_notes",
+        userId: user?.id?.toString() || user?.claims?.email,
+        action: "processed",
+        metadata: { fieldNoteId, rawLength: fieldNote.rawContent.length, processedLength: result.length },
+      });
+
+      log(`[AI Field Notes] Processed field note ${fieldNoteId}`);
+      res.json(updated);
+    } catch (error: any) {
+      await storage.updateFieldNote(fieldNoteId, { status: "Failed" });
+      log(`ERROR: [AI Field Notes] Processing failed: ${error?.message}`);
+      res.status(500).json({ error: "Processing failed" });
+    }
+  }));
+
+  // Streaming Proposal Generation - better UX for long generations
+  app.post("/api/proposals/generate-stream", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const { leadId, template, sections, persona } = req.body;
+    const user = req.user as any;
+
+    if (!leadId) {
+      return res.status(400).json({ error: "Lead ID is required" });
+    }
+
+    const lead = await storage.getLead(Number(leadId));
+    if (!lead) {
+      return res.status(404).json({ error: "Lead not found" });
+    }
+
+    if (!aiClient.isConfigured()) {
+      return res.status(503).json({ error: "AI service not configured" });
+    }
+
+    // Set up SSE headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const PERSONA_MESSAGING: Record<string, string> = {
+      BP1: "The Engineer - Focus on technical accuracy, data quality, and precision specifications",
+      BP2: "The GC - Emphasize schedule reliability, coordination benefits, and RFI reduction",
+      BP3: "The Architect - Highlight design integration, BIM compatibility, and creative flexibility",
+      BP4: "The Developer - Lead with ROI, timeline efficiency, and cost certainty",
+    };
+
+    const validTemplates = ["technical", "executive", "standard"];
+    const templateType = validTemplates.includes(template) ? template : "standard";
+    const personaContext = persona && PERSONA_MESSAGING[persona]
+      ? PERSONA_MESSAGING[persona]
+      : "General prospect - balance technical and business value";
+
+    const defaultSections = templateType === "executive"
+      ? ["executive_summary", "value_proposition", "scope_overview", "investment", "next_steps"]
+      : ["executive_summary", "scope_of_work", "deliverables", "timeline", "pricing"];
+
+    const requestedSections = sections || defaultSections;
+
+    const projectContext = {
+      projectName: lead.projectName,
+      clientName: lead.clientName,
+      projectAddress: lead.projectAddress,
+      buildingType: lead.buildingType,
+      sqft: lead.sqft,
+      scope: lead.scope,
+      disciplines: lead.disciplines,
+      value: lead.value,
+    };
+
+    const systemPrompt = `You are an expert proposal writer for Scan2Plan, a professional laser scanning and BIM services company. Create compelling, professional proposals.`;
+
+    const userPrompt = `Generate a ${templateType} proposal for this project:
+
+Project: ${JSON.stringify(projectContext, null, 2)}
+Buyer Persona: ${personaContext}
+Sections: ${requestedSections.join(", ")}
+
+Write professional, compelling content. Each section should be 100-300 words.`;
+
+    try {
+      const startTime = Date.now();
+      const stream = await aiClient.chatStream({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.6,
+        maxTokens: 4000,
+      });
+
+      for await (const chunk of stream) {
+        res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+      }
+
+      // Send completion event
+      res.write(`data: ${JSON.stringify({ done: true, analysisTime: Date.now() - startTime })}\n\n`);
+      res.end();
+
+      // Track analytics
+      await db.insert(aiAnalytics).values({
+        feature: "proposal_stream",
+        userId: user?.id?.toString() || user?.claims?.email,
+        leadId: Number(leadId),
+        action: "generated",
+        timeTakenMs: Date.now() - startTime,
+        metadata: { template: templateType, streaming: true },
+      });
+    } catch (error: any) {
+      log(`ERROR: [AI Proposal Stream] Generation failed: ${error?.message}`);
+      res.write(`data: ${JSON.stringify({ error: error?.message || "Generation failed" })}\n\n`);
+      res.end();
+    }
+  }));
 }
