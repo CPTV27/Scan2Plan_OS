@@ -35,6 +35,7 @@ import intelligenceRoutes from "./routes/intelligence";
 import { registerDocumentRoutes } from "./routes/documents";
 import { registerProposalRoutes } from "./routes/proposals";
 import { emailsRouter } from "./routes/emails";
+import { personasRouter } from "./routes/personas";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -296,6 +297,7 @@ export async function registerRoutes(
   app.use("/api/brand", brandEngineRoutes);
   app.use("/api/intelligence", intelligenceRoutes);
   app.use("/api/emails", emailsRouter);
+  app.use("/api/personas", personasRouter);
   registerProposalRoutes(app);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
