@@ -171,3 +171,35 @@ export function generateClientCode(clientName: string): string {
     .join("")
     .toUpperCase();
 }
+
+// Quote Number Generation - S2P-YYYY-NNNN format
+export const QUOTE_NUMBER_REGEX = /^S2P-(\d{4})-(\d{4})$/;
+
+export function parseQuoteNumber(quoteNumber: string): { year: number; sequence: number } | null {
+  const match = quoteNumber.match(QUOTE_NUMBER_REGEX);
+  if (!match) return null;
+  return {
+    year: parseInt(match[1], 10),
+    sequence: parseInt(match[2], 10),
+  };
+}
+
+export function generateQuoteNumber(year: number, sequence: number): string {
+  const paddedSequence = String(sequence).padStart(4, "0");
+  return `S2P-${year}-${paddedSequence}`;
+}
+
+export function getNextQuoteNumber(existingQuoteNumbers: string[], currentYear?: number): string {
+  const year = currentYear ?? new Date().getFullYear();
+  
+  let maxSequenceThisYear = 0;
+  
+  for (const qn of existingQuoteNumbers) {
+    const parsed = parseQuoteNumber(qn);
+    if (parsed && parsed.year === year) {
+      maxSequenceThisYear = Math.max(maxSequenceThisYear, parsed.sequence);
+    }
+  }
+  
+  return generateQuoteNumber(year, maxSequenceThisYear + 1);
+}

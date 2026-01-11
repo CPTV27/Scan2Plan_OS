@@ -23,6 +23,7 @@ import {
   type ProposalEmailEvent, type InsertProposalEmailEvent
 } from "@shared/schema";
 import { eq, desc, and, lt, sql, max, ilike, isNull, isNotNull } from "drizzle-orm";
+import { getNextQuoteNumber } from "@shared/utils/projectId";
 
 export interface IStorage {
   // Leads
@@ -707,11 +708,36 @@ export class DatabaseStorage implements IStorage {
     return quote;
   }
 
+  async generateNextQuoteNumber(): Promise<string> {
+    const currentYear = new Date().getFullYear();
+    const yearPrefix = `S2P-${currentYear}-`;
+    
+    // Find the highest sequence number for this year
+    const quotesThisYear = await db.select({ qn: cpqQuotes.quoteNumber })
+      .from(cpqQuotes)
+      .where(sql`${cpqQuotes.quoteNumber} LIKE ${yearPrefix + '%'}`);
+    
+    let maxSeq = 0;
+    for (const q of quotesThisYear) {
+      if (q.qn) {
+        const match = q.qn.match(/S2P-\d{4}-(\d{4})$/);
+        if (match) {
+          const seq = parseInt(match[1], 10);
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
+    }
+    
+    const nextSeq = maxSeq + 1;
+    return `S2P-${currentYear}-${String(nextSeq).padStart(4, '0')}`;
+  }
+
   async createCpqQuote(insertQuote: InsertCpqQuote): Promise<CpqQuote> {
-    // Use provided quoteNumber or generate a new one (check undefined explicitly for empty string support)
-    const quoteNumber = insertQuote.quoteNumber !== undefined && insertQuote.quoteNumber !== '' 
-      ? insertQuote.quoteNumber 
-      : `Q${Date.now()}`;
+    // Use provided quoteNumber or generate a sequential one (S2P-YYYY-NNNN format)
+    let quoteNumber = insertQuote.quoteNumber;
+    if (!quoteNumber) {
+      quoteNumber = await this.generateNextQuoteNumber();
+    }
     
     // Check if versionNumber was explicitly provided
     const providedVersionNumber = (insertQuote as any).versionNumber;
@@ -779,8 +805,8 @@ export class DatabaseStorage implements IStorage {
     const maxVersion = Math.max(...existingVersions.map(v => v.versionNumber), 0);
     const newVersionNumber = maxVersion + 1;
 
-    // Generate new quote number
-    const quoteNumber = `Q${Date.now()}`;
+    // Generate new quote number (S2P-YYYY-NNNN format)
+    const quoteNumber = await this.generateNextQuoteNumber();
 
     // Create the new version by copying all data from source
     const { id, quoteNumber: _qn, createdAt, updatedAt, versionNumber, versionName: _vn, parentQuoteId: _pid, ...quoteData } = sourceQuote;
