@@ -454,6 +454,7 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   
   const [isSaving, setIsSaving] = useState(false);
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
+  const [pricingError, setPricingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (lead) {
@@ -571,11 +572,11 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
     return "discipline";
   };
 
-  // Reactive pricing calculation - updates instantly when any input changes
-  const pricingResult = useMemo((): CpqCalculateResponse | null => {
+  // Reactive pricing calculation - returns both result and error without mutating state
+  const pricingMemo = useMemo((): { result: CpqCalculateResponse | null; error: string | null } => {
     // Don't calculate if no areas have valid sqft
     if (!areas.length || areas.every(a => !a.squareFeet || parseInt(a.squareFeet) <= 0)) {
-      return null;
+      return { result: null, error: null };
     }
 
     try {
@@ -652,36 +653,57 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
 
       // Convert PricingResult to CpqCalculateResponse format
       return {
-        success: true,
-        totalClientPrice: result.totalClientPrice,
-        totalUpteamCost: result.totalUpteamCost,
-        grossMargin,
-        grossMarginPercent,
-        lineItems: result.items.map((item, idx) => ({
-          id: `item-${idx}`,
-          label: item.label,
-          category: inferCategory(item.label, item.isTotal, item.isDiscount),
-          clientPrice: item.value,
-          upteamCost: item.upteamCost || 0,
-        })),
-        subtotals: {
-          modeling: result.disciplineTotals.architecture + result.disciplineTotals.mep + result.disciplineTotals.structural + result.disciplineTotals.site + result.disciplineTotals.scanning,
-          travel: result.disciplineTotals.travel,
-          riskPremiums: result.disciplineTotals.risk,
-          services: result.disciplineTotals.services,
-          paymentPremium: paymentPremiumTotal,
+        result: {
+          success: true,
+          totalClientPrice: result.totalClientPrice,
+          totalUpteamCost: result.totalUpteamCost,
+          grossMargin,
+          grossMarginPercent,
+          lineItems: result.items.map((item, idx) => ({
+            id: `item-${idx}`,
+            label: item.label,
+            category: inferCategory(item.label, item.isTotal, item.isDiscount),
+            clientPrice: item.value,
+            upteamCost: item.upteamCost || 0,
+          })),
+          subtotals: {
+            modeling: result.disciplineTotals.architecture + result.disciplineTotals.mep + result.disciplineTotals.structural + result.disciplineTotals.site + result.disciplineTotals.scanning,
+            travel: result.disciplineTotals.travel,
+            riskPremiums: result.disciplineTotals.risk,
+            services: result.disciplineTotals.services,
+            paymentPremium: paymentPremiumTotal,
+          },
+          integrityStatus,
+          integrityFlags,
+          marginTarget,
+          calculatedAt: new Date().toISOString(),
+          engineVersion: "client-1.0",
         },
-        integrityStatus,
-        integrityFlags,
-        marginTarget,
-        calculatedAt: new Date().toISOString(),
-        engineVersion: "client-1.0",
+        error: null,
       };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to calculate pricing";
       console.error("Pricing calculation error:", error);
-      return null;
+      return { result: null, error: errorMessage };
     }
   }, [areas, dispatchLocation, distance, matterport, actScan, additionalElevations, risks, paymentTerms, marginTarget]);
+  
+  // Extract result for use in component
+  const pricingResult = pricingMemo.result;
+  
+  // Sync error state from memo (safe to call setState in effect)
+  useEffect(() => {
+    if (pricingMemo.error !== pricingError) {
+      setPricingError(pricingMemo.error);
+    }
+  }, [pricingMemo.error, pricingError]);
+  
+  // Show toast when error occurs
+  useEffect(() => {
+    if (pricingError) {
+      toast({ title: "Pricing Error", description: pricingError, variant: "destructive" });
+    }
+  }, [pricingError, toast]);
 
   const handleSaveQuote = async () => {
     if (!pricingResult) {
