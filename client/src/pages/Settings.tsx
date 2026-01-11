@@ -15,6 +15,7 @@ import {
   Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign
 } from "lucide-react";
 import type { LeadSourcesConfig, StalenessConfig, BusinessDefaultsConfig } from "@shared/schema";
+import PersonaManager from "@/components/PersonaManager";
 
 interface IntegrationStatus {
   airtable: { configured: boolean; writeEnabled: boolean };
@@ -349,6 +350,9 @@ export default function Settings() {
 
             {/* Staleness Configuration */}
             <StalenessEditor config={staleness} />
+
+            {/* Buyer Personas */}
+            <PersonaManager />
 
             {/* Business Defaults */}
             <BusinessDefaultsEditor config={businessDefaults} />
