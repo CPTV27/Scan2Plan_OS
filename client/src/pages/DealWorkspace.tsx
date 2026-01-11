@@ -105,6 +105,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2 } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
+import { PandaDocEmbed } from "@/components/PandaDocEmbed";
 import { Slider } from "@/components/ui/slider";
 import { 
   calculatePricing, 
@@ -2292,6 +2293,10 @@ export default function DealWorkspace() {
               <Paperclip className="w-4 h-4" />
               Documents
             </TabsTrigger>
+            <TabsTrigger value="proposal" className="gap-2" data-testid="tab-proposal">
+              <Send className="w-4 h-4" />
+              Proposal
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -3408,6 +3413,17 @@ export default function DealWorkspace() {
               </Card>
             </div>
           </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
+          <PandaDocEmbed
+            pandaDocId={lead?.pandaDocId || null}
+            documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
+            leadId={leadId}
+            onDocumentSent={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
+            }}
+          />
         </TabsContent>
       </Tabs>
 

@@ -186,4 +186,65 @@ router.get("/documents/:id/pdf", isAuthenticated, async (req: Request, res: Resp
   }
 });
 
+router.post("/create-from-template", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { templateId, name, recipients, tokens, metadata, pricingTables } = req.body;
+    
+    if (!templateId || !name || !recipients || recipients.length === 0) {
+      return res.status(400).json({ error: "templateId, name, and at least one recipient are required" });
+    }
+    
+    const document = await pandaDocClient.createDocumentFromTemplate({
+      templateId,
+      name,
+      recipients,
+      tokens,
+      metadata,
+      pricingTables,
+    });
+    
+    res.json(document);
+  } catch (error) {
+    console.error("Create document error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+router.post("/documents/:pandaDocId/editing-session", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { pandaDocId } = req.params;
+    
+    const session = await pandaDocClient.createDocumentEditingSession(pandaDocId);
+    res.json(session);
+  } catch (error) {
+    console.error("Create editing session error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+router.post("/documents/:pandaDocId/send", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { pandaDocId } = req.params;
+    const { message, subject } = req.body;
+    
+    const result = await pandaDocClient.sendDocument(pandaDocId, message, subject);
+    res.json(result);
+  } catch (error) {
+    console.error("Send document error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+router.get("/documents/:pandaDocId/status", isAuthenticated, async (req: Request, res: Response) => {
+  try {
+    const { pandaDocId } = req.params;
+    
+    const status = await pandaDocClient.getDocumentStatus(pandaDocId);
+    res.json(status);
+  } catch (error) {
+    console.error("Get document status error:", error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 export default router;

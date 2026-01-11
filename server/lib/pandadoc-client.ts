@@ -234,6 +234,122 @@ export class PandaDocClient {
     return this.downloadPdf(pandaDocId);
   }
 
+  /**
+   * Create a document from a template with pre-filled data
+   */
+  async createDocumentFromTemplate(params: {
+    templateId: string;
+    name: string;
+    recipients: Array<{
+      email: string;
+      first_name?: string;
+      last_name?: string;
+      role?: string;
+    }>;
+    tokens?: Array<{ name: string; value: string }>;
+    metadata?: Record<string, string>;
+    pricingTables?: Array<{
+      name: string;
+      items: Array<{
+        name: string;
+        description?: string;
+        price: number;
+        qty?: number;
+      }>;
+    }>;
+  }): Promise<{ id: string; status: string }> {
+    const body: any = {
+      name: params.name,
+      template_uuid: params.templateId,
+      recipients: params.recipients.map(r => ({
+        email: r.email,
+        first_name: r.first_name || "",
+        last_name: r.last_name || "",
+        role: r.role || "Signer",
+      })),
+    };
+    
+    if (params.tokens) {
+      body.tokens = params.tokens;
+    }
+    if (params.metadata) {
+      body.metadata = params.metadata;
+    }
+    if (params.pricingTables) {
+      body.pricing_tables = params.pricingTables.map(table => ({
+        name: table.name,
+        options: { currency: "USD" },
+        sections: [{
+          title: "Services",
+          default: true,
+          rows: table.items.map(item => ({
+            options: { optional: false, optional_selected: false },
+            data: {
+              name: item.name,
+              description: item.description || "",
+              price: item.price,
+              qty: item.qty || 1,
+            },
+          })),
+        }],
+      }));
+    }
+    
+    const response = await this.fetch("/documents", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    
+    return response.json();
+  }
+
+  /**
+   * Create an editing session for a document (returns E-Token for embedded editing)
+   */
+  async createDocumentEditingSession(documentId: string): Promise<{ token: string; expires_at: string }> {
+    const response = await this.fetch(`/documents/${documentId}/editing-sessions`, {
+      method: "POST",
+    });
+    
+    return response.json();
+  }
+
+  /**
+   * Create a signing session for a document (returns link for embedded signing)
+   */
+  async createDocumentSession(documentId: string, recipientEmail: string): Promise<{ id: string; expires_at: string }> {
+    const response = await this.fetch(`/documents/${documentId}/session`, {
+      method: "POST",
+      body: JSON.stringify({ recipient: recipientEmail }),
+    });
+    
+    return response.json();
+  }
+
+  /**
+   * Send a document for signing
+   */
+  async sendDocument(documentId: string, message?: string, subject?: string): Promise<{ id: string; status: string }> {
+    const body: any = {};
+    if (message) body.message = message;
+    if (subject) body.subject = subject;
+    
+    const response = await this.fetch(`/documents/${documentId}/send`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    
+    return response.json();
+  }
+
+  /**
+   * Get document status
+   */
+  async getDocumentStatus(documentId: string): Promise<{ id: string; name: string; status: string; date_created: string; date_modified: string }> {
+    const response = await this.fetch(`/documents/${documentId}`);
+    return response.json();
+  }
+
   async extractTextFromPdf(pdfBuffer: Buffer): Promise<string> {
     try {
       const parser = await getPdfParse();

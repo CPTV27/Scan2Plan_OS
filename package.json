@@ -81,6 +81,7 @@
     "openid-client": "^6.8.1",
     "p-limit": "^7.2.0",
     "p-retry": "^7.1.1",
+    "pandadoc-editor": "^0.0.0-b.10",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pdf-img-convert": "^2.0.0",
