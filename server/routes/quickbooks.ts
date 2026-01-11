@@ -892,7 +892,7 @@ export function registerQuickbooksRoutes(app: Express): void {
               const mappedStage = mapQboStatusToDealStage(est);
               const hasLinkedInvoice = est.LinkedTxn?.some((txn: any) => txn.TxnType === 'Invoice') || false;
               
-              await storage.createLead({
+              const newLead = await storage.createLead({
                 clientName: customerName,
                 projectName: projectName,
                 projectAddress: address,
@@ -910,6 +910,7 @@ export function registerQuickbooksRoutes(app: Express): void {
                 contactEmail: est.BillEmail?.Address || null,
                 notes: `[Imported from QuickBooks Estimate #${est.DocNumber || est.Id}] Status: ${est.TxnStatus || 'Pending'}`,
               });
+              log(`[QBO Sync] Created new lead ID ${newLead.id} from Estimate #${est.DocNumber || est.Id} for ${customerName}`);
               results.estimates.imported++;
             }
           }
