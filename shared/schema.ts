@@ -963,6 +963,32 @@ export const projects = pgTable("projects", {
   potreePath: text("potree_path"), // Internal GCS path to converted point cloud
   viewerUrl: text("viewer_url"), // Public/Signed URL for Potree viewer
   deliveryStatus: text("delivery_status").default("pending"), // pending | processing | ready | failed
+  
+  // === CPQ Inheritance (from lead at time of Closed Won) ===
+  quotedPrice: decimal("quoted_price", { precision: 12, scale: 2 }),
+  quotedMargin: decimal("quoted_margin", { precision: 5, scale: 2 }),
+  quotedAreas: jsonb("quoted_areas").$type<any[]>(), // Snapshot of cpqAreas
+  quotedRisks: jsonb("quoted_risks").$type<any>(), // Snapshot of cpqRisks
+  quotedTravel: jsonb("quoted_travel").$type<any>(), // Snapshot of cpqTravel
+  quotedServices: jsonb("quoted_services").$type<any>(), // Snapshot of cpqServices
+  
+  // === Site Readiness Inheritance ===
+  siteReadiness: jsonb("site_readiness").$type<Record<string, any>>(),
+  
+  // === Client Contact (snapshot at close) ===
+  clientName: text("client_name"),
+  clientContact: text("client_contact"),
+  clientEmail: text("client_email"),
+  clientPhone: text("client_phone"),
+  projectAddress: text("project_address"),
+  
+  // === Dispatch & Travel ===
+  dispatchLocation: text("dispatch_location"),
+  distance: integer("distance"),
+  
+  // === Scope Summary (auto-generated plain English) ===
+  scopeSummary: text("scope_summary"),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 
