@@ -19,7 +19,7 @@ Key modules include:
 - **Marketing Module:** Includes an 8-persona classification system and an Evidence Vault.
 - **CEO Dashboard:** Provides key metrics, win rate tracking, pipeline visualization, and recent activity feeds.
 - **Profitability Gates System:** Server-side enforcement of business rules, including a hard gate for minimum gross margin (40%), auto-flagging for large "Tier A" deals, and attribution requirements for deal progression.
-- **PandaDoc Proposal Vault:** Syncs completed proposals from PandaDoc, uses AI for data extraction, and supports a review workflow to convert approved documents into CPQ quotes.
+- **PandaDoc Embedded Editor:** Direct PandaDoc proposal editing within Deal Workspace using E-Token authentication. Supports document creation from templates, inline editing with pricing tables, send for signature, and automatic deal closure on completion via webhook.
 - **Cognitive Brand Engine:** An AI writing assistant enforcing brand governance with features like executive brief generation, buyer type adaptation, pain point selection, and AI-driven self-correction against red-line violations.
 - **Buyer Persona Intelligence Engine:** Advanced AI content generation leveraging detailed psychological profiles, communication preferences, and solution mappings for four distinct buyer personas (Design Principal, Project Architect, Owner Rep, GC/CM), supported by four brand voices.
 - **Payment Terms Centralization:** Standardizes payment terms across the application (e.g., Net 15, Net 45, 50/50) with consistent UI and pricing logic.
@@ -37,6 +37,13 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 11, 2026)
+- **PandaDoc Embedded Editor Integration:**
+  - Added PandaDoc embedded editor directly in Deal Workspace "Proposal" tab using pandadoc-editor npm package
+  - E-Token authentication with 1-hour session expiration for secure editing sessions
+  - API endpoints: POST /api/pandadoc/documents (create from quote), POST /api/pandadoc/documents/:id/editing-session (get edit token)
+  - Webhook handles document_state_changed events: updates quote status, auto-closes deals to "Closed Won" on signature
+  - Removed standalone Proposal Vault page - proposal workflow now consolidated in Deal Workspace
+- **Margin Guardrail Floating Point Fix:** Added EPSILON tolerance (0.0001) to margin comparisons preventing false warnings at exact 45% threshold
 - **AI Performance Improvements:**
   - LRU caching for AI responses (500 items, 30 min TTL) reduces API costs with separate chat/embedding caches
   - Cache monitoring endpoints: GET /api/ai/cache-stats, POST /api/ai/cache/clear
