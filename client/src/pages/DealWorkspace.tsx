@@ -605,25 +605,47 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         ? (grossMargin / result.totalClientPrice) * 100 
         : 0;
 
-      // Determine integrity status based on margin
+      // Determine integrity status based on margin using FY26_GOALS constants
       let integrityStatus: "pass" | "warning" | "blocked" = "pass";
       const integrityFlags: { code: string; message: string; severity: "warning" | "error" }[] = [];
+      const marginFloorPercent = FY26_GOALS.MARGIN_FLOOR * 100;
+      const marginGuardrailPercent = FY26_GOALS.MARGIN_STRETCH * 100;
       
-      if (grossMarginPercent < FY26_GOALS.MARGIN_FLOOR * 100) {
+      if (grossMarginPercent < marginFloorPercent) {
         integrityStatus = "blocked";
         integrityFlags.push({
           code: "LOW_MARGIN",
-          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below ${(FY26_GOALS.MARGIN_FLOOR * 100).toFixed(0)}% threshold`,
+          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below ${marginFloorPercent.toFixed(0)}% threshold`,
           severity: "error"
         });
-      } else if (grossMarginPercent < 45) {
+      } else if (grossMarginPercent < marginGuardrailPercent) {
         integrityStatus = "warning";
         integrityFlags.push({
           code: "MARGIN_BELOW_GUARDRAIL",
-          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below recommended 45%`,
+          message: `Gross margin ${grossMarginPercent.toFixed(1)}% is below recommended ${marginGuardrailPercent.toFixed(0)}%`,
           severity: "warning"
         });
       }
+
+      // Helper to infer category from line item label
+      const inferCategory = (label: string, isTotal?: boolean, isDiscount?: boolean): "discipline" | "risk" | "area" | "travel" | "service" | "subtotal" | "total" => {
+        if (isTotal) return "total";
+        const lowerLabel = label.toLowerCase();
+        if (lowerLabel.includes("risk premium")) return "risk";
+        if (lowerLabel.includes("travel") || lowerLabel.includes("mileage") || lowerLabel.includes("hotel")) return "travel";
+        if (lowerLabel.includes("matterport") || lowerLabel.includes("cad") || lowerLabel.includes("elevation") || lowerLabel.includes("facade")) return "service";
+        if (lowerLabel.includes("discount") || lowerLabel.includes("terms") || lowerLabel.includes("adjustment")) return "subtotal";
+        return "discipline";
+      };
+
+      // Calculate payment premium from line items
+      let paymentPremiumTotal = 0;
+      result.items.forEach(item => {
+        const lowerLabel = item.label.toLowerCase();
+        if (lowerLabel.includes("terms") || (lowerLabel.includes("discount") && !lowerLabel.includes("partner"))) {
+          paymentPremiumTotal += item.value;
+        }
+      });
 
       // Convert PricingResult to CpqCalculateResponse format
       const response: CpqCalculateResponse = {
@@ -635,16 +657,16 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
         lineItems: result.items.map((item, idx) => ({
           id: `item-${idx}`,
           label: item.label,
-          category: (item.isTotal ? "total" : "discipline") as "discipline" | "risk" | "area" | "travel" | "service" | "subtotal" | "total",
+          category: inferCategory(item.label, item.isTotal, item.isDiscount),
           clientPrice: item.value,
           upteamCost: item.upteamCost || 0,
         })),
         subtotals: {
-          modeling: result.disciplineTotals.architecture + result.disciplineTotals.mep + result.disciplineTotals.structural + result.disciplineTotals.site,
+          modeling: result.disciplineTotals.architecture + result.disciplineTotals.mep + result.disciplineTotals.structural + result.disciplineTotals.site + result.disciplineTotals.scanning,
           travel: result.disciplineTotals.travel,
           riskPremiums: result.disciplineTotals.risk,
           services: result.disciplineTotals.services,
-          paymentPremium: 0, // Calculate from payment terms if needed
+          paymentPremium: paymentPremiumTotal,
         },
         integrityStatus,
         integrityFlags,
