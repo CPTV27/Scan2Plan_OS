@@ -37,6 +37,8 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 11, 2026)
+- **PandaDoc Proposal Signature:** Added "Send for Signature" integration that uploads proposal PDFs to PandaDoc, sends for client signature, and auto-closes deals to Closed Won when signed via webhook. Requires PANDADOC_API_KEY secret and lead contact info.
+- **Quote → Project Data Inheritance:** Closed Won deals now pass complete CPQ snapshot (price, margin, areas, risks, travel, services, site readiness) to Production module with auto-generated scope summary.
 - **Client-Side Pricing:** DealWorkspace.tsx now uses client-side `calculatePricing()` from `pricing.ts` instead of external API proxy
 - **Orphaned Module Deleted:** Removed unused `client/src/modules/sales_engine/` directory (163 files)
 - **Backend Deprecation:** `/api/cpq/calculate` endpoint marked deprecated with console warning; migrate to client-side calculation
