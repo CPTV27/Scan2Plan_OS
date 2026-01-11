@@ -451,9 +451,11 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
   const [dispatchLocation, setDispatchLocation] = useState<string>("brooklyn");
   const [distance, setDistance] = useState<string>("25");
   const [risks, setRisks] = useState<string[]>([]);
+  const [risksAffirmed, setRisksAffirmed] = useState(false);
   const [matterport, setMatterport] = useState(false);
   const [actScan, setActScan] = useState(false);
   const [additionalElevations, setAdditionalElevations] = useState<string>("");
+  const [servicesAffirmed, setServicesAffirmed] = useState(false);
   const [paymentTerms, setPaymentTerms] = useState<string>("standard");
   
   const [isSaving, setIsSaving] = useState(false);
@@ -814,14 +816,14 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
       score += CONFIDENCE_WEIGHTS.dispatchLocation * 100;
     }
     
-    // Site Status / Risks (10%) - at least one risk factor considered
-    if (risks.length > 0) {
+    // Site Status / Risks (10%) - requires explicit decision (either risks selected OR "no risks" affirmed)
+    if (risks.length > 0 || risksAffirmed) {
       score += CONFIDENCE_WEIGHTS.siteStatus * 100;
     }
     
-    // ActScanning (10%) - actScan is explicitly set (true or false, but we track if it's been considered)
-    // Since actScan defaults to false, we'll give credit if any service option is configured
-    if (actScan || matterport || (additionalElevations && parseInt(additionalElevations) > 0)) {
+    // ActScanning (10%) - requires explicit decision (services configured OR "no services" affirmed)
+    const hasServices = actScan || matterport || (additionalElevations && parseInt(additionalElevations) > 0);
+    if (hasServices || servicesAffirmed) {
       score += CONFIDENCE_WEIGHTS.actScanning * 100;
     }
     
@@ -832,20 +834,22 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
     }
     
     return Math.round(score);
-  }, [areas, dispatchLocation, risks, actScan, matterport, additionalElevations, distance]);
+  }, [areas, dispatchLocation, risks, risksAffirmed, actScan, matterport, additionalElevations, servicesAffirmed, distance]);
 
   // Field completion status for "hungry field" styling
   const fieldCompletionStatus = useMemo(() => {
     const primaryArea = areas[0];
+    const hasServices = actScan || matterport || (additionalElevations && parseInt(additionalElevations) > 0);
     return {
       buildingType: primaryArea?.buildingType && primaryArea.buildingType.length > 0,
       sqft: parseInt(primaryArea?.squareFeet || "0") > 0,
       disciplines: (primaryArea?.disciplines.length || 0) > 0,
       dispatchLocation: dispatchLocation && dispatchLocation.length > 0,
       distance: parseFloat(distance || "0") > 0,
-      risks: risks.length > 0,
+      risks: risks.length > 0 || risksAffirmed,
+      services: hasServices || servicesAffirmed,
     };
-  }, [areas, dispatchLocation, distance, risks]);
+  }, [areas, dispatchLocation, distance, risks, risksAffirmed, actScan, matterport, additionalElevations, servicesAffirmed]);
 
   // Helper to get "hungry field" styling classes
   const getHungryFieldClass = (fieldName: keyof typeof fieldCompletionStatus) => {
@@ -1116,14 +1120,32 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                       <Checkbox
                         id={`risk-${risk}`}
                         checked={risks.includes(risk)}
-                        onCheckedChange={() => toggleRisk(risk)}
+                        disabled={risksAffirmed}
+                        onCheckedChange={() => {
+                          toggleRisk(risk);
+                          if (risksAffirmed) setRisksAffirmed(false);
+                        }}
                         data-testid={`checkbox-risk-${risk}`}
                       />
-                      <label htmlFor={`risk-${risk}`} className="text-sm cursor-pointer">
+                      <label htmlFor={`risk-${risk}`} className={`text-sm cursor-pointer ${risksAffirmed ? "text-muted-foreground" : ""}`}>
                         {risk === "occupied" ? "Occupied" : risk === "hazardous" ? "Hazardous" : "No Power"}
                       </label>
                     </div>
                   ))}
+                </div>
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-dashed">
+                  <Checkbox
+                    id="risks-affirmed"
+                    checked={risksAffirmed}
+                    onCheckedChange={(checked) => {
+                      setRisksAffirmed(!!checked);
+                      if (checked) setRisks([]);
+                    }}
+                    data-testid="checkbox-no-risks"
+                  />
+                  <label htmlFor="risks-affirmed" className="text-xs text-muted-foreground cursor-pointer italic">
+                    No risk factors apply to this project
+                  </label>
                 </div>
               </CardContent>
             </Card>
@@ -1135,24 +1157,66 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
                   Additional Services
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className={`space-y-3 p-3 rounded-md ${getHungryFieldClass("services")}`}>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="matterport">Matterport Virtual Tour</Label>
-                  <Switch id="matterport" checked={matterport} onCheckedChange={setMatterport} data-testid="switch-matterport" />
+                  <Label htmlFor="matterport" className={servicesAffirmed ? "text-muted-foreground" : ""}>Matterport Virtual Tour</Label>
+                  <Switch 
+                    id="matterport" 
+                    checked={matterport} 
+                    disabled={servicesAffirmed}
+                    onCheckedChange={(checked) => {
+                      setMatterport(checked);
+                      if (checked && servicesAffirmed) setServicesAffirmed(false);
+                    }} 
+                    data-testid="switch-matterport" 
+                  />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="actScan">Above Ceiling Tile Scan</Label>
-                  <Switch id="actScan" checked={actScan} onCheckedChange={setActScan} data-testid="switch-act-scan" />
+                  <Label htmlFor="actScan" className={servicesAffirmed ? "text-muted-foreground" : ""}>Above Ceiling Tile Scan</Label>
+                  <Switch 
+                    id="actScan" 
+                    checked={actScan} 
+                    disabled={servicesAffirmed}
+                    onCheckedChange={(checked) => {
+                      setActScan(checked);
+                      if (checked && servicesAffirmed) setServicesAffirmed(false);
+                    }} 
+                    data-testid="switch-act-scan" 
+                  />
                 </div>
                 <div>
-                  <Label className="text-xs">Additional Interior Elevations</Label>
+                  <Label className={`text-xs ${servicesAffirmed ? "text-muted-foreground" : ""}`}>Additional Interior Elevations</Label>
                   <Input
                     type="number"
                     placeholder="0"
                     value={additionalElevations}
-                    onChange={(e) => setAdditionalElevations(e.target.value)}
+                    disabled={servicesAffirmed}
+                    onChange={(e) => {
+                      setAdditionalElevations(e.target.value);
+                      if (e.target.value && parseInt(e.target.value) > 0 && servicesAffirmed) {
+                        setServicesAffirmed(false);
+                      }
+                    }}
                     data-testid="input-additional-elevations"
                   />
+                </div>
+                <div className="flex items-center gap-2 pt-3 border-t border-dashed">
+                  <Checkbox
+                    id="services-affirmed"
+                    checked={servicesAffirmed}
+                    onCheckedChange={(checked) => {
+                      setServicesAffirmed(!!checked);
+                      if (checked) {
+                        setMatterport(false);
+                        setActScan(false);
+                        setAdditionalElevations("");
+                      }
+                    }}
+                    data-testid="checkbox-no-services"
+                  />
+                  <label htmlFor="services-affirmed" className="text-xs text-muted-foreground cursor-pointer italic">
+                    No additional services needed
+                  </label>
                 </div>
               </CardContent>
             </Card>
