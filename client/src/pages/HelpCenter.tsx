@@ -314,15 +314,27 @@ export default function HelpCenter() {
                       </AccordionItem>
 
                       <AccordionItem value="cpq-travel">
-                        <AccordionTrigger>Travel Pricing (Brooklyn-Based)</AccordionTrigger>
+                        <AccordionTrigger>Travel Calculation</AccordionTrigger>
                         <AccordionContent className="text-muted-foreground space-y-3">
-                          <p><strong className="text-foreground">Dispatch from Brooklyn:</strong></p>
+                          <p><strong className="text-foreground">How to calculate travel:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Select <strong>Dispatch Location</strong> (Brooklyn, Woodstock, or Troy)</li>
+                            <li>Enter the <strong>Project Address</strong></li>
+                            <li>Click <strong>"Calculate Distance"</strong> to get mileage</li>
+                          </ol>
+
+                          <p className="mt-3"><strong className="text-foreground">Tier-Based Pricing (Dispatch from Brooklyn):</strong></p>
                           <ul className="list-disc pl-5 space-y-1">
                             <li>Tier A (50K+ sqft): No base fee, $4/mile over 20 miles</li>
                             <li>Tier B (10K-49,999 sqft): $300 base + $4/mile over 20 miles</li>
                             <li>Tier C (&lt;10K sqft): $150 base + $4/mile over 20 miles</li>
                           </ul>
-                          <p><strong className="text-foreground">Dispatch from Woodstock/Troy:</strong> Flat $3/mile (no base fee)</p>
+                          <p><strong className="text-foreground">Woodstock/Troy:</strong> Flat $3/mile (no base fee)</p>
+
+                          <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                            <p className="font-medium text-foreground">Custom Travel Cost (Manual Override)</p>
+                            <p className="text-sm mt-1">Enter a custom dollar amount in the optional field to override the calculated travel cost. Leave empty to use the automatic tier-based pricing.</p>
+                          </div>
                         </AccordionContent>
                       </AccordionItem>
 
