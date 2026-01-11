@@ -102,7 +102,8 @@ import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2 } from "lucide-react";
+import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Copy, CheckCircle2 } from "lucide-react";
+import { SiPandadoc } from "react-icons/si";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
@@ -2294,7 +2295,7 @@ export default function DealWorkspace() {
               Documents
             </TabsTrigger>
             <TabsTrigger value="proposal" className="gap-2" data-testid="tab-proposal">
-              <Send className="w-4 h-4" />
+              <SiPandadoc className="w-4 h-4" />
               Proposal
             </TabsTrigger>
           </TabsList>
