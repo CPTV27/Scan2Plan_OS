@@ -760,4 +760,115 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       res.status(500).json({ message: "Failed to check outstanding balance" });
     }
   }));
+
+  // Site Readiness Magic Link - Generate link for client to fill out
+  app.post("/api/leads/:id/site-readiness-link", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leadId = Number(req.params.id);
+    const { questionIds, siteReadiness } = req.body;
+
+    const lead = await storage.getLead(leadId);
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+    const crypto = await import("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Store CEO answers in internal segment, client answers stay empty until client submits
+    const existingAnswers = (lead.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> }) || {};
+    const structuredAnswers = {
+      internal: { ...(existingAnswers.internal || {}), ...(siteReadiness || {}) }, // CEO-provided answers with safe defaults
+      client: existingAnswers.client || {}, // Client-submitted answers (preserved if already exists)
+    };
+
+    await storage.updateLead(leadId, {
+      clientToken: token,
+      clientTokenExpiresAt: expiresAt,
+      siteReadinessStatus: "sent",
+      siteReadinessSentAt: new Date(),
+      siteReadinessQuestionsSent: questionIds,
+      siteReadiness: structuredAnswers,
+    } as any);
+
+    const appUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+      : "http://localhost:5000";
+    const magicLink = `${appUrl}/site-readiness/${token}`;
+
+    log(`[Site Readiness] Generated magic link for lead ${leadId} with ${questionIds.length} questions`);
+
+    res.json({ 
+      success: true, 
+      magicLink, 
+      expiresAt,
+      questionsCount: questionIds.length,
+    });
+  }));
+
+  // Public endpoint - Get site readiness form by token (no auth required)
+  app.get("/api/public/site-readiness/:token", asyncHandler(async (req, res) => {
+    const { token } = req.params;
+
+    const lead = await storage.getLeadByClientToken(token);
+    if (!lead) return res.status(404).json({ message: "Invalid or expired link" });
+
+    if (lead.clientTokenExpiresAt && new Date(lead.clientTokenExpiresAt) < new Date()) {
+      return res.status(410).json({ message: "This link has expired" });
+    }
+
+    const sentQuestionIds = (lead.siteReadinessQuestionsSent as string[]) || [];
+    const structuredAnswers = (lead.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> }) || {};
+    
+    // ONLY return client-submitted answers - NEVER expose internal/CEO answers
+    const clientAnswers = structuredAnswers.client || {};
+    
+    // Filter to only sent questions
+    const filteredClientAnswers: Record<string, any> = {};
+    for (const qId of sentQuestionIds) {
+      if (clientAnswers[qId] !== undefined) {
+        filteredClientAnswers[qId] = clientAnswers[qId];
+      }
+    }
+
+    res.json({
+      projectName: lead.projectName || lead.clientName,
+      questionIds: sentQuestionIds,
+      existingAnswers: filteredClientAnswers, // ONLY client-submitted answers
+      status: lead.siteReadinessStatus,
+    });
+  }));
+
+  // Public endpoint - Submit site readiness answers (no auth required)
+  app.post("/api/public/site-readiness/:token", asyncHandler(async (req, res) => {
+    const { token } = req.params;
+    const { answers } = req.body;
+
+    const lead = await storage.getLeadByClientToken(token);
+    if (!lead) return res.status(404).json({ message: "Invalid or expired link" });
+
+    if (lead.clientTokenExpiresAt && new Date(lead.clientTokenExpiresAt) < new Date()) {
+      return res.status(410).json({ message: "This link has expired" });
+    }
+
+    // Get existing structured answers
+    const existingAnswers = (lead.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> }) || {};
+    
+    // Update ONLY the client segment, preserving internal/CEO answers
+    const updatedAnswers = {
+      internal: existingAnswers.internal || {},
+      client: { ...(existingAnswers.client || {}), ...answers },
+    };
+
+    await storage.updateLead(lead.id, {
+      siteReadiness: updatedAnswers,
+      siteReadinessStatus: "completed",
+      siteReadinessCompletedAt: new Date(),
+    } as any);
+
+    log(`[Site Readiness] Client submitted answers for lead ${lead.id}`);
+
+    res.json({ 
+      success: true, 
+      message: "Thank you! Your answers have been submitted." 
+    });
+  }));
 }

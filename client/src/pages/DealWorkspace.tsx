@@ -101,7 +101,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
 import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download, Eye, Link2, ClipboardList } from "lucide-react";
+import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2 } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { Slider } from "@/components/ui/slider";
@@ -112,6 +112,7 @@ import {
   type PricingResult 
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
+import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -1327,6 +1328,108 @@ export default function DealWorkspace() {
     },
   });
 
+  // Site Readiness Magic Link state
+  const [siteReadinessAnswers, setSiteReadinessAnswers] = useState<Record<string, any>>({});
+  const [questionsToSend, setQuestionsToSend] = useState<string[]>([]);
+  const [generatedMagicLink, setGeneratedMagicLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Initialize site readiness answers from lead data
+  // CEO sees their internal answers only - client answers are shown separately if completed
+  // Reset state when lead changes to prevent cross-lead data contamination
+  useEffect(() => {
+    if (lead?.siteReadiness) {
+      const structured = lead.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> };
+      // Only load internal (CEO) answers for editing - don't merge with client to avoid overwriting
+      setSiteReadinessAnswers(structured.internal || {});
+    } else {
+      // Reset to empty when lead has no site readiness data
+      setSiteReadinessAnswers({});
+    }
+    if (lead?.siteReadinessQuestionsSent) {
+      setQuestionsToSend(lead.siteReadinessQuestionsSent as string[]);
+    } else {
+      // Reset to empty when no questions were sent
+      setQuestionsToSend([]);
+    }
+    // Reset magic link state when lead changes
+    setGeneratedMagicLink(null);
+    setLinkCopied(false);
+  }, [leadId, lead?.siteReadiness, lead?.siteReadinessQuestionsSent]);
+
+  // Get client-submitted answers for display (read-only)
+  const clientSubmittedAnswers = useMemo(() => {
+    if (!lead?.siteReadiness) return {};
+    const structured = lead.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> };
+    return structured.client || {};
+  }, [lead?.siteReadiness]);
+
+  // Save site readiness answers to persist CEO-entered data (stores in internal segment)
+  const saveSiteReadinessMutation = useMutation({
+    mutationFn: async () => {
+      // Get existing structured data and update internal segment
+      const existing = (lead?.siteReadiness as { internal?: Record<string, any>; client?: Record<string, any> }) || {};
+      const structuredAnswers = {
+        internal: { ...(existing.internal || {}), ...siteReadinessAnswers },
+        client: existing.client || {},
+      };
+      return updateMutation.mutateAsync({
+        id: leadId,
+        siteReadiness: structuredAnswers,
+      } as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      toast({ title: "Answers Saved", description: "Site readiness answers have been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const generateMagicLinkMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/leads/${leadId}/site-readiness-link`, {
+        questionIds: questionsToSend,
+        siteReadiness: siteReadinessAnswers,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate link");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGeneratedMagicLink(data.magicLink);
+      queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
+      toast({ 
+        title: "Magic Link Generated", 
+        description: `Link valid for 7 days. ${data.questionsCount} questions sent to client.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleQuestionToSend = (questionId: string, checked: boolean) => {
+    setQuestionsToSend(prev => 
+      checked ? [...prev, questionId] : prev.filter(id => id !== questionId)
+    );
+  };
+
+  const updateSiteReadinessAnswer = (questionId: string, value: any) => {
+    setSiteReadinessAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const copyMagicLink = async () => {
+    if (generatedMagicLink) {
+      await navigator.clipboard.writeText(generatedMagicLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
   const pushToQboMutation = useMutation({
     mutationFn: async (forceResync: boolean = false) => {
       if (!latestQuote?.id) throw new Error("No quote to push");
@@ -2407,6 +2510,184 @@ export default function DealWorkspace() {
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* Site Readiness Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4" />
+                        Site Readiness Questionnaire
+                      </CardTitle>
+                      {lead?.siteReadinessStatus === "completed" && (
+                        <Badge variant="default" className="bg-green-600" data-testid="badge-site-readiness-completed">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Completed
+                        </Badge>
+                      )}
+                      {lead?.siteReadinessStatus === "sent" && (
+                        <Badge variant="secondary" data-testid="badge-site-readiness-sent">
+                          <Send className="w-3 h-3 mr-1" />
+                          Sent to Client
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription>
+                      Fill in what you know. Check questions to send to the client via magic link.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {SITE_READINESS_QUESTIONS.map((q) => {
+                      const isSelectedToSend = questionsToSend.includes(q.id);
+                      const clientAnswer = clientSubmittedAnswers[q.id];
+                      const hasClientAnswer = clientAnswer !== undefined && clientAnswer !== "";
+                      
+                      return (
+                        <div key={q.id} className="flex items-start gap-3 py-3 border-b last:border-b-0">
+                          <Checkbox
+                            id={`send-${q.id}`}
+                            checked={isSelectedToSend}
+                            onCheckedChange={(checked) => toggleQuestionToSend(q.id, checked === true)}
+                            data-testid={`checkbox-send-${q.id}`}
+                          />
+                          <div className="flex-1 space-y-2">
+                            <Label htmlFor={`send-${q.id}`} className="text-sm font-medium cursor-pointer">
+                              {q.question}
+                            </Label>
+                            {q.pricingImpact && (
+                              <p className="text-xs text-muted-foreground">{q.pricingImpact}</p>
+                            )}
+                            {hasClientAnswer && (
+                              <div className="p-2 rounded bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                                <p className="text-xs text-green-700 dark:text-green-400 font-medium">Client answered:</p>
+                                <p className="text-sm text-green-800 dark:text-green-300">
+                                  {typeof clientAnswer === "boolean" ? (clientAnswer ? "Yes" : "No") : String(clientAnswer)}
+                                </p>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">Your answer (internal):</p>
+                            {q.type === "boolean" && (
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`answer-${q.id}`}
+                                  checked={siteReadinessAnswers[q.id] === true}
+                                  onCheckedChange={(checked) => updateSiteReadinessAnswer(q.id, checked === true)}
+                                  data-testid={`checkbox-answer-${q.id}`}
+                                />
+                                <Label htmlFor={`answer-${q.id}`} className="text-sm cursor-pointer">Yes</Label>
+                              </div>
+                            )}
+                            {q.type === "select" && (
+                              <Select
+                                value={siteReadinessAnswers[q.id] || ""}
+                                onValueChange={(value) => updateSiteReadinessAnswer(q.id, value)}
+                              >
+                                <SelectTrigger className="w-full" data-testid={`select-answer-${q.id}`}>
+                                  <SelectValue placeholder="Select an option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {q.options?.map((opt) => (
+                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {q.type === "number" && (
+                              <Input
+                                type="number"
+                                min="0"
+                                value={siteReadinessAnswers[q.id] || ""}
+                                onChange={(e) => updateSiteReadinessAnswer(q.id, parseInt(e.target.value) || 0)}
+                                placeholder="Enter a number"
+                                className="w-32"
+                                data-testid={`input-answer-${q.id}`}
+                              />
+                            )}
+                            {q.type === "text" && (
+                              <Textarea
+                                value={siteReadinessAnswers[q.id] || ""}
+                                onChange={(e) => updateSiteReadinessAnswer(q.id, e.target.value)}
+                                placeholder="Type your answer..."
+                                className="resize-none min-h-16"
+                                data-testid={`textarea-answer-${q.id}`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="pt-4 space-y-3">
+                      {generatedMagicLink && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted">
+                          <Input
+                            value={generatedMagicLink}
+                            readOnly
+                            className="flex-1 text-sm"
+                            data-testid="input-magic-link"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={copyMagicLink}
+                            data-testid="button-copy-magic-link"
+                          >
+                            {linkCopied ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => saveSiteReadinessMutation.mutate()}
+                          disabled={saveSiteReadinessMutation.isPending || Object.keys(siteReadinessAnswers).length === 0}
+                          data-testid="button-save-site-readiness"
+                        >
+                          {saveSiteReadinessMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-2" />
+                              Save Answers
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => generateMagicLinkMutation.mutate()}
+                          disabled={questionsToSend.length === 0 || generateMagicLinkMutation.isPending}
+                          data-testid="button-generate-magic-link"
+                        >
+                          {generateMagicLinkMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4 mr-2" />
+                              Send {questionsToSend.length} Questions to Client
+                            </>
+                          )}
+                        </Button>
+                        {questionsToSend.length === 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Check questions above to include in the magic link
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 

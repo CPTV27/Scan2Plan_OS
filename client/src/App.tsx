@@ -32,6 +32,7 @@ import TestPayloadSender from "@/pages/TestPayloadSender";
 import ProposalVault from "@/pages/ProposalVault";
 import BrandGenerator from "@/pages/BrandGenerator";
 import Trash from "@/pages/Trash";
+import SiteReadinessForm from "@/pages/SiteReadinessForm";
 
 function Router() {
   const { user, isLoading } = useAuth();
@@ -45,6 +46,9 @@ function Router() {
   }
   if (path.startsWith("/client-input/")) {
     return <ClientInput />;
+  }
+  if (path.startsWith("/site-readiness/")) {
+    return <SiteReadinessForm />;
   }
 
   if (isLoading) {
