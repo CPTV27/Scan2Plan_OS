@@ -7,3 +7,4 @@ export { CommunicateTab } from "./CommunicateTab";
 export { QuoteVersionDialog } from "./QuoteVersionDialog";
 export { ProposalTab } from "./ProposalTab";
 export { PandaDocTab } from "./PandaDocTab";
+export { LeadDetailsTab } from "./LeadDetailsTab";
