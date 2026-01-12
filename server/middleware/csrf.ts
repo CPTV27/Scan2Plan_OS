@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
+import { logCsrfFailure } from "./securityLogger";
 
 const CSRF_TOKEN_HEADER = "x-csrf-token";
 const CSRF_TOKEN_COOKIE = "csrf-token";
@@ -19,6 +20,18 @@ function generateToken(): string {
 
 function isExemptPath(path: string): boolean {
   return EXEMPT_PATHS.some((exempt) => path.startsWith(exempt));
+}
+
+function safeCompare(a: string, b: string): boolean {
+  // First check length to avoid timingSafeEqual throwing on mismatched lengths
+  if (a.length !== b.length) {
+    return false;
+  }
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return false;
+  }
 }
 
 export function csrfProtection() {
@@ -43,22 +56,23 @@ export function csrfProtection() {
       return next();
     }
 
+    const ip = req.ip || req.socket.remoteAddress || "unknown";
+    
     // For state-changing methods, validate CSRF token
     const cookieToken = req.cookies?.[CSRF_TOKEN_COOKIE];
     const headerToken = req.headers[CSRF_TOKEN_HEADER] as string;
 
     if (!cookieToken || !headerToken) {
+      logCsrfFailure(ip, req.path, req.method);
       return res.status(403).json({
         error: "CSRF token missing",
         code: "CSRF_MISSING",
       });
     }
 
-    // Constant-time comparison to prevent timing attacks
-    if (!crypto.timingSafeEqual(
-      Buffer.from(cookieToken),
-      Buffer.from(headerToken)
-    )) {
+    // Safe constant-time comparison to prevent timing attacks
+    if (!safeCompare(cookieToken, headerToken)) {
+      logCsrfFailure(ip, req.path, req.method);
       return res.status(403).json({
         error: "CSRF token invalid",
         code: "CSRF_INVALID",
