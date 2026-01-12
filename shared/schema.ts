@@ -1013,6 +1013,12 @@ export const projects = pgTable("projects", {
   // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
   fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
   
+  // === Field Equipment Configuration ===
+  scannerType: text("scanner_type").default("trimble_x7"), // trimble_x7 | navvis_slam
+  matterportRequired: boolean("matterport_required").default(false),
+  droneRequired: boolean("drone_required").default(false),
+  extensionTripodNeeded: boolean("extension_tripod_needed").default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1091,6 +1097,11 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   potreePath: z.string().optional(),
   viewerUrl: z.string().optional(),
   deliveryStatus: z.enum(["pending", "processing", "ready", "failed"]).optional(),
+  // Field Equipment Configuration
+  scannerType: z.enum(["trimble_x7", "navvis_slam"]).optional(),
+  matterportRequired: z.boolean().optional(),
+  droneRequired: z.boolean().optional(),
+  extensionTripodNeeded: z.boolean().optional(),
 });
 
 // === FIELD NOTES (AI Technical Translation) ===
