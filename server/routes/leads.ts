@@ -71,9 +71,8 @@ async function precomputeEmbedding(lead: any) {
   }
 }
 
-const ALLOWED_UPLOAD_TYPES = [
+const ALLOWED_IMPORT_TYPES = [
   "text/csv",
-  "application/pdf",
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
@@ -85,10 +84,10 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
+    if (ALLOWED_IMPORT_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`File type ${file.mimetype} is not allowed. Allowed: CSV, PDF, Excel`));
+      cb(new Error(`File type ${file.mimetype} is not allowed. Allowed: CSV, Excel`));
     }
   },
 });

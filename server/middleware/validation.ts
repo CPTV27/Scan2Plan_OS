@@ -17,8 +17,11 @@ export function validateBody<T extends ZodSchema>(
   const { maxBodySize = MAX_JSON_BODY_SIZE, stripUnknown = true } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const contentLength = parseInt(req.headers["content-length"] || "0", 10);
-    if (contentLength > maxBodySize) {
+    // Check actual body size, not just Content-Length header
+    const bodyStr = JSON.stringify(req.body || {});
+    const actualSize = Buffer.byteLength(bodyStr, "utf8");
+    
+    if (actualSize > maxBodySize) {
       return next(
         new BadRequestError(
           `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024)}KB`,
@@ -28,8 +31,14 @@ export function validateBody<T extends ZodSchema>(
     }
 
     try {
-      const parseOptions = stripUnknown ? { strict: false } : {};
-      const validated = schema.parse(req.body);
+      // Use .strict() to reject unknown fields if stripUnknown is false
+      // Otherwise, allow extra fields but don't include them in output (default Zod behavior)
+      let effectiveSchema = schema;
+      if (!stripUnknown && schema instanceof z.ZodObject) {
+        effectiveSchema = schema.strict() as unknown as T;
+      }
+      
+      const validated = effectiveSchema.parse(req.body);
       req.body = validated;
       next();
     } catch (error) {
