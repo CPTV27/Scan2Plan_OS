@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, FileText, Send, RefreshCw, ExternalLink, AlertCircle, Eye, Mail, Clock } from "lucide-react";
+import { Loader2, FileText, Send, RefreshCw, ExternalLink, Eye, Mail, Clock, CheckCircle2, XCircle, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 interface PandaDocEmbedProps {
   pandaDocId: string | null;
@@ -39,12 +40,9 @@ export function PandaDocEmbed({
   quoteId,
   proposalEmails,
 }: PandaDocEmbedProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<any>(null);
-  const [editorLoaded, setEditorLoaded] = useState(false);
-  const [editorError, setEditorError] = useState<string | null>(null);
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null);
   const [currentDocId, setCurrentDocId] = useState<string | null>(pandaDocId);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
   const createDocumentMutation = useMutation({
@@ -61,8 +59,9 @@ export function PandaDocEmbed({
         onDocumentCreated?.(data.id);
         toast({
           title: "Document created",
-          description: "Your proposal has been created in PandaDoc. You can now edit it.",
+          description: "Your proposal has been created in PandaDoc. Click 'Edit in PandaDoc' to customize it.",
         });
+        refreshStatus(data.id);
       }
     },
     onError: (error) => {
@@ -71,55 +70,6 @@ export function PandaDocEmbed({
         description: String(error),
         variant: "destructive",
       });
-    },
-  });
-
-  const editingSessionMutation = useMutation({
-    mutationFn: async (docId: string) => {
-      const response = await apiRequest("POST", `/api/pandadoc/documents/${docId}/editing-session`);
-      return response.json();
-    },
-    onSuccess: async (data) => {
-      if (data.token && containerRef.current) {
-        try {
-          const { Editor } = await import("pandadoc-editor");
-          
-          if (editorRef.current) {
-            editorRef.current.close();
-          }
-          
-          editorRef.current = new Editor(containerRef.current.id, {
-            width: "100%",
-            height: "100%",
-            fieldPlacementOnly: false,
-            fields: {
-              signature: { visible: true },
-              text: { visible: true },
-              date: { visible: true },
-              checkbox: { visible: true },
-            },
-            blocks: {
-              pricingTable: { visible: true },
-              quote: { visible: true },
-            },
-          });
-          
-          editorRef.current.open({
-            token: data.token,
-            documentId: activeDocId,
-          });
-          
-          setEditorLoaded(true);
-          setEditorError(null);
-        } catch (err) {
-          console.error("Editor initialization error:", err);
-          setEditorError("Failed to initialize the document editor");
-        }
-      }
-    },
-    onError: (error) => {
-      console.error("Editing session error:", error);
-      setEditorError("Failed to create editing session. The embedded editor feature may not be enabled for your PandaDoc account.");
     },
   });
 
@@ -147,31 +97,25 @@ export function PandaDocEmbed({
 
   const activeDocId = currentDocId || pandaDocId;
 
-  const refreshStatus = async () => {
-    if (!activeDocId) return;
+  const refreshStatus = async (docId?: string) => {
+    const id = docId || activeDocId;
+    if (!id) return;
+    setIsRefreshing(true);
     try {
-      const response = await apiRequest("GET", `/api/pandadoc/documents/${activeDocId}/status`);
+      const response = await apiRequest("GET", `/api/pandadoc/documents/${id}/status`);
       const status = await response.json();
       setDocumentStatus(status);
     } catch (error) {
       console.error("Failed to refresh status:", error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
     if (activeDocId) {
       refreshStatus();
-      editingSessionMutation.mutate(activeDocId);
     }
-    
-    return () => {
-      if (editorRef.current) {
-        try {
-          editorRef.current.close();
-        } catch (e) {
-        }
-      }
-    };
   }, [activeDocId]);
 
   if (!activeDocId) {
@@ -210,161 +154,184 @@ export function PandaDocEmbed({
     );
   }
 
-  const getStatusBadge = () => {
-    if (!documentStatus) return null;
-    const statusColors: Record<string, string> = {
-      "document.draft": "bg-yellow-500/10 text-yellow-500",
-      "document.sent": "bg-blue-500/10 text-blue-500",
-      "document.viewed": "bg-purple-500/10 text-purple-500",
-      "document.completed": "bg-green-500/10 text-green-500",
-      "document.declined": "bg-red-500/10 text-red-500",
-    };
-    const colorClass = statusColors[documentStatus.status] || "bg-muted text-muted-foreground";
-    const statusLabel = documentStatus.status.replace("document.", "").toUpperCase();
+  const getStatusInfo = () => {
+    if (!documentStatus) return { label: "Loading...", color: "bg-muted", icon: Loader2, description: "" };
     
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${colorClass}`}>
-        {statusLabel}
-      </span>
-    );
+    const statusMap: Record<string, { label: string; color: string; icon: typeof CheckCircle2; description: string }> = {
+      "document.draft": { 
+        label: "Draft", 
+        color: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20", 
+        icon: Edit3,
+        description: "Document created and ready to edit in PandaDoc"
+      },
+      "document.sent": { 
+        label: "Sent", 
+        color: "bg-blue-500/10 text-blue-600 border-blue-500/20", 
+        icon: Send,
+        description: "Document sent and awaiting client signature"
+      },
+      "document.viewed": { 
+        label: "Viewed", 
+        color: "bg-purple-500/10 text-purple-600 border-purple-500/20", 
+        icon: Eye,
+        description: "Client has opened and viewed the document"
+      },
+      "document.completed": { 
+        label: "Completed", 
+        color: "bg-green-500/10 text-green-600 border-green-500/20", 
+        icon: CheckCircle2,
+        description: "Document has been signed by all parties"
+      },
+      "document.declined": { 
+        label: "Declined", 
+        color: "bg-red-500/10 text-red-600 border-red-500/20", 
+        icon: XCircle,
+        description: "Document was declined by the recipient"
+      },
+    };
+    
+    return statusMap[documentStatus.status] || { 
+      label: documentStatus.status.replace("document.", ""), 
+      color: "bg-muted", 
+      icon: FileText,
+      description: ""
+    };
   };
 
+  const statusInfo = getStatusInfo();
+  const StatusIcon = statusInfo.icon;
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between p-3 border-b bg-muted/30">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5" />
-          <span className="font-medium">{documentName || documentStatus?.name || "Proposal"}</span>
-          {getStatusBadge()}
-          {/* Email Status Badge */}
-          {proposalEmails && proposalEmails.length > 0 && (
-            proposalEmails[0].openCount > 0 ? (
-              <Badge variant="default" className="bg-green-600 text-white text-xs" data-testid="badge-proposal-opened">
-                <Eye className="w-3 h-3 mr-1" />
-                Viewed {proposalEmails[0].openCount}x
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="text-xs" data-testid="badge-proposal-sent">
-                <Clock className="w-3 h-3 mr-1" />
-                Sent
-              </Badge>
-            )
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Preview Proposal PDF */}
-          {leadId && (
+    <div className="h-full flex flex-col p-6 overflow-auto">
+      <Card className="max-w-2xl mx-auto w-full">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">{documentName || documentStatus?.name || "Proposal"}</CardTitle>
+                <CardDescription>
+                  {documentStatus?.date_created && (
+                    <>Created {format(new Date(documentStatus.date_created), "MMM d, yyyy 'at' h:mm a")}</>
+                  )}
+                </CardDescription>
+              </div>
+            </div>
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(`/api/google/gmail/preview-proposal/${leadId}`, '_blank')}
-              data-testid="button-preview-proposal"
+              variant="ghost"
+              size="icon"
+              onClick={() => refreshStatus()}
+              disabled={isRefreshing}
+              data-testid="button-refresh-status"
             >
-              <Eye className="h-4 w-4 mr-1" />
-              Preview PDF
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
-          )}
-          {/* Send Proposal Email */}
-          {onOpenSendDialog && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenSendDialog}
-              data-testid="button-send-proposal"
-            >
-              <Mail className="h-4 w-4 mr-1" />
-              Send Email
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshStatus}
-            data-testid="button-refresh-status"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.open(`https://app.pandadoc.com/documents/${activeDocId}`, "_blank")}
-            data-testid="button-open-pandadoc"
-          >
-            <ExternalLink className="h-4 w-4 mr-1" />
-            Open in PandaDoc
-          </Button>
-          {documentStatus?.status === "document.draft" && (
-            <Button
-              size="sm"
-              onClick={() => sendDocumentMutation.mutate(activeDocId!)}
-              disabled={sendDocumentMutation.isPending}
-              data-testid="button-send-for-signature"
-            >
-              {sendDocumentMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-1" />
-              )}
-              Send for Signature
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex-1 relative">
-        {editingSessionMutation.isPending && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Loading editor...</p>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
+          <div className={`p-4 rounded-lg border ${statusInfo.color}`}>
+            <div className="flex items-center gap-3">
+              <StatusIcon className="h-5 w-5" />
+              <div>
+                <p className="font-medium">{statusInfo.label}</p>
+                <p className="text-sm opacity-80">{statusInfo.description}</p>
+              </div>
             </div>
           </div>
-        )}
-        
-        {editorError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
-            <Card className="max-w-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="h-5 w-5" />
-                  Editor Unavailable
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{editorError}</p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open(`https://app.pandadoc.com/documents/${activeDocId}`, "_blank")}
-                    data-testid="button-fallback-open"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Edit in PandaDoc
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setEditorError(null);
-                      editingSessionMutation.mutate(activeDocId!);
-                    }}
-                    data-testid="button-retry-editor"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                    Retry
-                  </Button>
+
+          {proposalEmails && proposalEmails.length > 0 && (
+            <div className="p-4 rounded-lg bg-muted/50 border">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="font-medium text-sm">Email Activity</p>
+                  <p className="text-sm text-muted-foreground">
+                    {proposalEmails[0].openCount > 0 ? (
+                      <>Opened {proposalEmails[0].openCount} time{proposalEmails[0].openCount > 1 ? "s" : ""}</>
+                    ) : (
+                      <>Sent {format(new Date(proposalEmails[0].sentAt), "MMM d, yyyy")}</>
+                    )}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                {proposalEmails[0].openCount > 0 ? (
+                  <Badge variant="default" className="bg-green-600">
+                    <Eye className="w-3 h-3 mr-1" />
+                    Viewed
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Pending
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => window.open(`https://app.pandadoc.com/documents/${activeDocId}`, "_blank")}
+              data-testid="button-open-pandadoc"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              {documentStatus?.status === "document.draft" ? "Edit in PandaDoc" : "View in PandaDoc"}
+            </Button>
+
+            {leadId && (
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => window.open(`/api/google/gmail/preview-proposal/${leadId}`, '_blank')}
+                data-testid="button-preview-proposal"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Preview PDF
+              </Button>
+            )}
+
+            {documentStatus?.status === "document.draft" && (
+              <>
+                {onOpenSendDialog && (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={onOpenSendDialog}
+                    data-testid="button-send-email"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send via Email
+                  </Button>
+                )}
+                
+                <Button
+                  className="w-full"
+                  onClick={() => sendDocumentMutation.mutate(activeDocId!)}
+                  disabled={sendDocumentMutation.isPending}
+                  data-testid="button-send-for-signature"
+                >
+                  {sendDocumentMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Send for Signature via PandaDoc
+                </Button>
+              </>
+            )}
           </div>
-        )}
-        
-        <div 
-          id="pandadoc-editor-container" 
-          ref={containerRef} 
-          className="h-full w-full"
-          style={{ minHeight: "600px" }}
-        />
-      </div>
+
+          {documentStatus?.date_modified && (
+            <p className="text-xs text-center text-muted-foreground">
+              Last updated: {format(new Date(documentStatus.date_modified), "MMM d, yyyy 'at' h:mm a")}
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

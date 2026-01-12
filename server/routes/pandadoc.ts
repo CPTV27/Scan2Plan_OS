@@ -48,7 +48,7 @@ router.post("/documents", isAuthenticated, async (req: Request, res: Response) =
         qty: 1,
       }));
     
-    // Create document from template (using a default template or custom one)
+    // Create document from template
     const templateId = process.env.PANDADOC_TEMPLATE_ID;
     
     if (!templateId) {
@@ -59,6 +59,68 @@ router.post("/documents", isAuthenticated, async (req: Request, res: Response) =
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
     
+    // Parse areas and disciplines from quote
+    const areas = (quote.areas as any[]) || [];
+    const disciplinesList = areas.flatMap((area: any) => area.disciplines || []);
+    const uniqueDisciplines = Array.from(new Set(disciplinesList));
+    const disciplineLabels: Record<string, string> = {
+      arch: "Architectural",
+      mepf: "MEP/F",
+      struct: "Structural",
+      civil: "Civil",
+      facade: "Facade",
+    };
+    const formattedDisciplines = uniqueDisciplines
+      .map((d: string) => disciplineLabels[d] || d)
+      .join(", ");
+    
+    // Calculate total square footage
+    const totalSqft = areas.reduce((sum: number, area: any) => 
+      sum + (parseInt(area.squareFeet) || 0), 0);
+    
+    // Parse scope summary
+    const scopingData = quote.scopingData as any;
+    const scopeSummary = scopingData?.summary || "";
+    
+    // Parse risks
+    const risks = (quote.risks as any[]) || [];
+    const riskLabels = risks.map((r: any) => r.label || r.name).filter(Boolean).join(", ");
+    
+    // Travel info
+    const travel = quote.travel as any;
+    const travelDistance = travel?.distance || quote.distance || 0;
+    const dispatchLocation = quote.dispatchLocation || "";
+    
+    // Get margin from pricing breakdown
+    const marginPercent = pricingBreakdown?.marginPercentage 
+      ? `${(Number(pricingBreakdown.marginPercentage) * 100).toFixed(1)}%` 
+      : "";
+    
+    // Build comprehensive tokens
+    const tokens = [
+      { name: "client_name", value: lead.clientName || "" },
+      { name: "client_company", value: lead.clientName || "" },
+      { name: "contact_name", value: recipientName || "" },
+      { name: "contact_email", value: recipientEmail || "" },
+      { name: "project_name", value: lead.projectName || quote.projectName || "" },
+      { name: "project_address", value: lead.projectAddress || quote.projectAddress || "" },
+      { name: "quote_number", value: quote.quoteNumber || "" },
+      { name: "total_price", value: `$${Number(quote.totalPrice || 0).toLocaleString()}` },
+      { name: "total_cost", value: `$${Number(pricingBreakdown?.totalCost || 0).toLocaleString()}` },
+      { name: "margin_percent", value: marginPercent },
+      { name: "disciplines", value: formattedDisciplines },
+      { name: "total_sqft", value: totalSqft.toLocaleString() },
+      { name: "building_type", value: quote.typeOfBuilding || "" },
+      { name: "scope_summary", value: scopeSummary },
+      { name: "risks", value: riskLabels },
+      { name: "travel_distance", value: `${travelDistance} miles` },
+      { name: "dispatch_location", value: dispatchLocation },
+      { name: "has_basement", value: quote.hasBasement ? "Yes" : "No" },
+      { name: "has_attic", value: quote.hasAttic ? "Yes" : "No" },
+      { name: "notes", value: quote.notes || "" },
+      { name: "date", value: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
+    ];
+    
     const document = await pandaDocClient.createDocumentFromTemplate({
       templateId,
       name: `Proposal - ${lead.projectName || lead.clientName}`,
@@ -68,13 +130,7 @@ router.post("/documents", isAuthenticated, async (req: Request, res: Response) =
         last_name: lastName,
         role: "Client",
       }],
-      tokens: [
-        { name: "client_name", value: lead.clientName },
-        { name: "project_name", value: lead.projectName || "" },
-        { name: "project_address", value: lead.projectAddress || "" },
-        { name: "total_price", value: `$${Number(quote.totalPrice || 0).toLocaleString()}` },
-        { name: "quote_number", value: quote.quoteNumber || "" },
-      ],
+      tokens,
       pricingTables: pricingItems.length > 0 ? [{
         name: "Pricing",
         items: pricingItems,
@@ -133,10 +189,9 @@ router.post("/batches", isAuthenticated, async (req: Request, res: Response) => 
 router.post("/batches/:batchId/start", isAuthenticated, async (req: Request, res: Response) => {
   try {
     const batchId = parseInt(req.params.batchId);
-    const { status, dateFrom, dateTo } = req.body;
+    const { dateFrom, dateTo } = req.body;
     
     const result = await pandaDocClient.startImport(batchId, {
-      status,
       dateFrom,
       dateTo,
     });
@@ -218,7 +273,7 @@ router.post("/documents/:id/reject", isAuthenticated, async (req: Request, res: 
 
 router.post("/sync", isAuthenticated, async (req: Request, res: Response) => {
   try {
-    const { status, dateFrom, dateTo } = req.body;
+    const { dateFrom, dateTo } = req.body;
     const userId = (req.user as any)?.id;
     
     const batch = await pandaDocClient.createImportBatch(
@@ -227,7 +282,6 @@ router.post("/sync", isAuthenticated, async (req: Request, res: Response) => {
     );
     
     const result = await pandaDocClient.startImport(batch.id, {
-      status,
       dateFrom,
       dateTo,
     });
