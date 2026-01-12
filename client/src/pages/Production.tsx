@@ -28,7 +28,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProjectFinancials } from "@/components/ProjectFinancials";
-import { HungryField, HUNGRY_FIELD_QUESTIONS } from "@/components/HungryField";
 
 const COLUMNS = [
   { id: "Scheduling", title: "Scheduling", icon: CalendarClock },
@@ -185,7 +184,6 @@ function ProjectDialog({
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const [activeTab, setActiveTab] = useState("details");
-  const [unknownFields, setUnknownFields] = useState<Set<string>>(new Set());
 
   // Fetch linked lead for address/location data
   const { data: linkedLead } = useQuery<Lead>({
@@ -202,7 +200,6 @@ function ProjectDialog({
   useEffect(() => {
     if (open) {
       setActiveTab("details");
-      setUnknownFields(new Set());
     }
   }, [open]);
 
@@ -236,20 +233,6 @@ function ProjectDialog({
       });
     }
   }, [project?.id, open]);
-
-  const toggleUnknownField = (fieldKey: string, isUnknown: boolean) => {
-    setUnknownFields(prev => {
-      const next = new Set(prev);
-      if (isUnknown) {
-        next.add(fieldKey);
-      } else {
-        next.delete(fieldKey);
-      }
-      return next;
-    });
-  };
-
-  const isFieldUnknown = (fieldKey: string) => unknownFields.has(fieldKey);
 
   async function onSubmit(data: FormData) {
     try {
@@ -357,36 +340,29 @@ function ProjectDialog({
         control={form.control}
         name="assignedTechId"
         render={({ field }) => (
-          <HungryField
-            fieldKey="assignedTechId"
-            question={HUNGRY_FIELD_QUESTIONS.assignedTechId}
-            onUnknownChange={(isUnknown) => toggleUnknownField("assignedTechId", isUnknown)}
-            isUnknown={isFieldUnknown("assignedTechId")}
-          >
-            <FormItem>
-              <FormLabel>Assigned ScanTech</FormLabel>
-              <Select 
-                onValueChange={(val) => field.onChange(val === "unassigned" ? null : parseInt(val))} 
-                value={field.value?.toString() || "unassigned"}
-              >
-                <FormControl>
-                  <SelectTrigger data-testid="select-assigned-tech">
-                    <User className="w-4 h-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Select technician" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {scantechs?.filter(t => t.isActive).map(tech => (
-                    <SelectItem key={tech.id} value={tech.id.toString()}>
-                      {tech.name} ({tech.baseLocation}){tech.canDoTravel && " - Travel OK"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          </HungryField>
+          <FormItem>
+            <FormLabel>Assigned ScanTech</FormLabel>
+            <Select 
+              onValueChange={(val) => field.onChange(val === "unassigned" ? null : parseInt(val))} 
+              value={field.value?.toString() || "unassigned"}
+            >
+              <FormControl>
+                <SelectTrigger data-testid="select-assigned-tech">
+                  <User className="w-4 h-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="Select technician" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {scantechs?.filter(t => t.isActive).map(tech => (
+                  <SelectItem key={tech.id} value={tech.id.toString()}>
+                    {tech.name} ({tech.baseLocation}){tech.canDoTravel && " - Travel OK"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
         )}
       />
 
@@ -394,20 +370,13 @@ function ProjectDialog({
         control={form.control}
         name="progress"
         render={({ field }) => (
-          <HungryField
-            fieldKey="progress"
-            question={HUNGRY_FIELD_QUESTIONS.progress}
-            onUnknownChange={(isUnknown) => toggleUnknownField("progress", isUnknown)}
-            isUnknown={isFieldUnknown("progress")}
-          >
-            <FormItem>
-              <FormLabel>Progress (%)</FormLabel>
-              <FormControl>
-                <Input type="number" min="0" max="100" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </HungryField>
+          <FormItem>
+            <FormLabel>Progress (%)</FormLabel>
+            <FormControl>
+              <Input type="number" min="0" max="100" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
         )}
       />
 
@@ -466,21 +435,14 @@ function ProjectDialog({
             control={form.control}
             name="registrationRms"
             render={({ field }) => (
-              <HungryField
-                fieldKey="registrationRms"
-                question={HUNGRY_FIELD_QUESTIONS.registrationRms}
-                onUnknownChange={(isUnknown) => toggleUnknownField("registrationRms", isUnknown)}
-                isUnknown={isFieldUnknown("registrationRms")}
-              >
-                <FormItem className="mt-3">
-                  <FormLabel>Registration RMS (inches)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.001" min="0" placeholder="0.125" {...field} />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground mt-1">LoA 40 requires RMS ≤ 0.125" (0-1/8")</p>
-                  <FormMessage />
-                </FormItem>
-              </HungryField>
+              <FormItem className="mt-3">
+                <FormLabel>Registration RMS (inches)</FormLabel>
+                <FormControl>
+                  <Input type="number" step="0.001" min="0" placeholder="0.125" {...field} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground mt-1">LoA 40 requires RMS ≤ 0.125" (0-1/8")</p>
+                <FormMessage />
+              </FormItem>
             )}
           />
         </div>
