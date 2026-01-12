@@ -6,6 +6,7 @@ import { z } from "zod";
 import { generateUPID } from "@shared/utils/projectId";
 import { nanoid } from "nanoid";
 import { log } from "../lib/logger";
+import { validateQuote, normalizeQuoteForValidation } from "../validators/cpqValidator";
 
 export async function registerCpqRoutes(app: Express): Promise<void> {
   const CPQ_API_KEY = process.env.CPQ_API_KEY;
@@ -280,11 +281,32 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     try {
       const user = req.user as any;
       const normalizedData = normalizeQuoteData(req.body);
+      
+      const validationInput = normalizeQuoteForValidation(normalizedData);
+      const validation = validateQuote(validationInput);
+      
+      if (!validation.valid) {
+        log(`[CPQ Quote Create] Validation failed: ${JSON.stringify(validation.errors)}`);
+        return res.status(400).json({
+          success: false,
+          integrityStatus: validation.integrityStatus,
+          errors: validation.errors,
+          warnings: validation.warnings,
+        });
+      }
+      
       const quote = await storage.createCpqQuote({
         ...normalizedData,
+        integrityStatus: validation.integrityStatus,
+        integrityFlags: validation.warnings,
+        tierClassification: validation.tierClassification,
         createdBy: user?.claims?.email || user?.username || "unknown",
       });
-      res.status(201).json(quote);
+      
+      res.status(201).json({
+        ...quote,
+        warnings: validation.warnings,
+      });
     } catch (error) {
       log("ERROR: Error creating CPQ quote - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to create quote" });
@@ -329,22 +351,19 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
 
       const user = req.user as any;
       
-      // Normalize quote data (uppercase dispatch locations, backfill area kinds)
       const normalizedData = normalizeQuoteData(req.body);
       
       const projectName = normalizedData.projectName || lead.projectName || lead.clientName || `Project-${leadId}`;
       const projectAddress = normalizedData.projectAddress || lead.projectAddress || "Address not specified";
       const typeOfBuilding = normalizedData.typeOfBuilding || lead.buildingType || "1";
-      // Use normalized travel.dispatchLocation or fall back to lead's dispatch location (also uppercase)
       const dispatchLocation = normalizedData.travel?.dispatchLocation || 
                               normalizedData.dispatchLocation || 
                               normalizedData.requestData?.dispatchLocation ||
                               (lead.dispatchLocation ? lead.dispatchLocation.toUpperCase() : "WOODSTOCK");
       
-      // Extract areas from requestData if not at top level (frontend sends it nested)
       const areas = normalizedData.areas || normalizedData.requestData?.areas || [];
       
-      const quote = await storage.createCpqQuote({
+      const quoteData = {
         ...normalizedData,
         leadId,
         projectName,
@@ -352,10 +371,34 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
         typeOfBuilding,
         dispatchLocation,
         areas,
+      };
+      
+      const validationInput = normalizeQuoteForValidation(quoteData);
+      const validation = validateQuote(validationInput);
+      
+      if (!validation.valid) {
+        log(`[CPQ Quote Create] Validation failed for lead ${leadId}: ${JSON.stringify(validation.errors)}`);
+        return res.status(400).json({
+          success: false,
+          integrityStatus: validation.integrityStatus,
+          errors: validation.errors,
+          warnings: validation.warnings,
+        });
+      }
+      
+      const quote = await storage.createCpqQuote({
+        ...quoteData,
+        integrityStatus: validation.integrityStatus,
+        integrityFlags: validation.warnings,
+        tierClassification: validation.tierClassification,
         createdBy: user?.claims?.email || user?.username || "unknown",
       });
-      log(`[CPQ Quote Create] Success, quoteId: ${quote.id}, dispatchLocation: ${dispatchLocation}`);
-      res.status(201).json(quote);
+      
+      log(`[CPQ Quote Create] Success, quoteId: ${quote.id}, dispatchLocation: ${dispatchLocation}, integrityStatus: ${validation.integrityStatus}`);
+      res.status(201).json({
+        ...quote,
+        warnings: validation.warnings,
+      });
     } catch (error: any) {
       log("ERROR: [CPQ Quote Create] - " + (error?.message || error));
       res.status(500).json({ message: error?.message || "Failed to create quote" });
@@ -389,6 +432,36 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     try {
       const quoteId = Number(req.params.id);
       const normalizedData = normalizeQuoteData(req.body);
+      
+      const hasPricingUpdate = normalizedData.totalClientPrice !== undefined || 
+                               normalizedData.totalUpteamCost !== undefined ||
+                               normalizedData.pricingBreakdown !== undefined;
+      
+      if (hasPricingUpdate) {
+        const existingQuote = await storage.getCpqQuote(quoteId);
+        if (!existingQuote) {
+          return res.status(404).json({ message: "Quote not found" });
+        }
+        
+        const mergedData = { ...existingQuote, ...normalizedData };
+        const validationInput = normalizeQuoteForValidation(mergedData);
+        const validation = validateQuote(validationInput);
+        
+        if (!validation.valid) {
+          log(`[CPQ Quote Update] Validation failed for quote ${quoteId}: ${JSON.stringify(validation.errors)}`);
+          return res.status(400).json({
+            success: false,
+            integrityStatus: validation.integrityStatus,
+            errors: validation.errors,
+            warnings: validation.warnings,
+          });
+        }
+        
+        normalizedData.integrityStatus = validation.integrityStatus;
+        normalizedData.integrityFlags = validation.warnings;
+        normalizedData.tierClassification = validation.tierClassification;
+      }
+      
       const quote = await storage.updateCpqQuote(quoteId, normalizedData);
       if (!quote) return res.status(404).json({ message: "Quote not found" });
       res.json(quote);
