@@ -1,191 +1,111 @@
 # CPQ Integrity Auditor Integration Guide
 
-This document describes how the Scan2Plan CPQ validates quotes before finalization and how the CRM (Scan2Plan-OS) can interact with the validation system.
+This document describes how Scan2Plan OS validates quotes against business rules to protect profitability.
 
 ## Overview
 
-The Integrity Auditor automatically validates quotes against business rules before allowing exports (PDF, PandaDoc, QuickBooks CSV). Quotes that fail critical checks are blocked until a CEO override is approved.
+The Integrity Auditor runs **client-side** during `calculatePricing()` in `client/src/features/cpq/pricing.ts`. It validates quotes against FY26 margin goals before allowing them to be saved.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                  pricing.ts (Client-Side)                │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  calculatePricing() {                                    │
+│    // Calculate costs and prices                         │
+│    // ...                                                │
+│                                                          │
+│    // Run integrity checks                               │
+│    const integrityResult = checkIntegrity(margin);       │
+│                                                          │
+│    return {                                              │
+│      ...pricing,                                         │
+│      integrityStatus: integrityResult.status,           │
+│      integrityFlags: integrityResult.flags              │
+│    };                                                    │
+│  }                                                       │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
 
 ## Validation Checks
 
-The auditor runs 6 validation checks:
-
 | Check | Warning Threshold | Block Threshold | Description |
 |-------|------------------|-----------------|-------------|
-| Margin Floor | < 50% gross margin | < 45% gross margin | Ensures profitability on every quote |
-| Travel Rules | - | Fly-out project with $0 travel | Fly-out projects must include travel costs |
-| LoD 350 Premium | - | LoD 350 without 25% premium | High-detail work requires proper pricing |
-| Scan Duration | Time estimate varies > 25% | Time estimate varies > 50% | Validates sqft vs estimated scan time |
-| Historical Pricing | > 15% variance from past | > 30% variance from past | Compares to client's previous quotes |
-| SqFt Verification | > 15% vs actuals | > 30% vs actuals | Compares to actual measured sqft from past scans |
+| Margin Floor | 40-45% gross margin | < 40% gross margin | FY26 profitability floor |
+| Margin Guardrail | - | - | 45% is the target margin |
 
 ## Audit Status Values
 
-| Status | Meaning | Export Allowed? |
+| Status | Meaning | Can Save Quote? |
 |--------|---------|-----------------|
-| `pass` | All checks passed | Yes |
-| `warning` | Minor issues detected | Yes |
-| `blocked` | Critical policy violations | No (requires override) |
+| `passed` | Margin >= 45% | Yes |
+| `warning` | Margin 40-45% | Yes (with warning) |
+| `blocked` | Margin < 40% | No |
 
-## API Endpoints
+## Quote Fields from Integrity Check
 
-### Run Integrity Audit
-```
-POST /api/quotes/:quoteId/audit
-```
-
-**Response:**
-```json
-{
-  "status": "blocked",
-  "flags": [
-    {
-      "code": "MARGIN_BELOW_FLOOR",
-      "severity": "error",
-      "message": "Gross margin (42%) is below minimum threshold (45%)",
-      "details": {
-        "currentMargin": 42,
-        "minimumMargin": 45
-      }
-    }
-  ],
-  "auditedAt": "2026-01-07T22:30:00.000Z",
-  "requiresOverride": true,
-  "overrideApproved": false
-}
-```
-
-### Request Override Exception
-```
-POST /api/quotes/:quoteId/integrity/override
-Content-Type: application/json
-
-{
-  "justification": "Client is strategic account, CEO approved reduced margin for first project",
-  "requestedBy": "John Smith"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "exception-uuid",
-  "quoteId": "quote-uuid",
-  "status": "pending",
-  "flagCodes": ["MARGIN_BELOW_FLOOR"],
-  "justification": "Client is strategic account...",
-  "requestedBy": "John Smith",
-  "createdAt": "2026-01-07T22:35:00.000Z"
-}
-```
-
-### Approve/Reject Override (Admin Only)
-```
-PATCH /api/integrity/overrides/:exceptionId
-Content-Type: application/json
-
-{
-  "status": "approved",
-  "reviewedBy": "CEO Name",
-  "reviewNotes": "Approved for strategic partnership"
-}
-```
-
-### Get Pending Overrides (Admin Dashboard)
-```
-GET /api/integrity/overrides/pending
-```
-
-**Response:**
-```json
-[
-  {
-    "quote": {
-      "id": "quote-uuid",
-      "quoteNumber": "Q-20260107-001",
-      "projectName": "Office Tower Scan",
-      "clientName": "ACME Corp",
-      "totalPrice": "45000"
-    },
-    "exception": {
-      "id": "exception-uuid",
-      "status": "pending",
-      "justification": "Strategic account...",
-      "requestedBy": "John Smith",
-      "createdAt": "2026-01-07T22:35:00.000Z"
-    }
-  }
-]
-```
-
-## Quote Fields Updated by Audit
-
-When an audit runs, these fields are updated on the quote:
+When `calculatePricing()` runs, these fields are included in the result:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `integrityStatus` | string | `pass`, `warning`, or `blocked` |
-| `integrityFlags` | JSON array | List of flag objects with code, severity, message |
-| `requiresOverride` | boolean | True if quote is blocked |
-| `overrideApproved` | boolean | True if CEO approved override |
-| `overrideApprovedBy` | string | Name of approver |
-| `overrideApprovedAt` | timestamp | When override was approved |
+| `integrityStatus` | string | `passed`, `warning`, or `blocked` |
+| `integrityFlags` | array | List of flag objects with code, severity, message |
 
 ## Flag Codes Reference
 
 | Code | Severity | Trigger |
 |------|----------|---------|
-| `MARGIN_WARNING` | warning | Margin 45-50% |
-| `MARGIN_BELOW_FLOOR` | error | Margin < 45% |
-| `TRAVEL_MISSING_FOR_FLYOUT` | error | Fly-out with no travel cost |
-| `LOD_350_MISSING_PREMIUM` | error | LoD 350 without 25% premium |
-| `SCAN_DURATION_WARNING` | warning | Time variance 25-50% |
-| `SCAN_DURATION_MISMATCH` | error | Time variance > 50% |
-| `HISTORICAL_PRICING_WARNING` | warning | Price variance 15-30% |
-| `HISTORICAL_PRICING_DEVIATION` | error | Price variance > 30% |
-| `SQFT_VARIANCE_WARNING` | warning | SqFt variance 15-30% |
-| `SQFT_VARIANCE_EXCESSIVE` | error | SqFt variance > 30% |
+| `BELOW_GUARDRAIL` | warning | Margin 40-45% |
+| `BELOW_FLOOR` | error | Margin < 40% |
 
-## CRM Integration Workflow
+## UI Integration
 
-1. **Quote Created/Updated in CPQ**: CRM sends scoping data, CPQ calculates pricing
-2. **User Clicks "Run Audit"**: CPQ validates against all business rules
-3. **If Blocked**: User sees which rules failed and can request override with justification
-4. **Override Request Created**: Appears in admin pending queue
-5. **CEO Reviews**: Approves or rejects with notes
-6. **If Approved**: Quote exports are unblocked
-7. **Quote Synced to CRM**: CRM receives quote with integrity status
+The integrity status is displayed in the Quote Builder sidebar:
 
-## Displaying Audit Status in CRM
-
-When receiving quote data, check these fields to display appropriate UI:
-
-```javascript
-// Example: Check if quote can be finalized
-function canFinalizeQuote(quote) {
-  if (quote.integrityStatus === 'blocked') {
-    if (quote.overrideApproved) {
-      return { allowed: true, note: 'CEO override approved' };
-    }
-    return { allowed: false, reason: 'Quote blocked - requires CEO override' };
-  }
-  return { allowed: true };
+```typescript
+// Example: Check if quote can be saved
+function canSaveQuote(pricingResult) {
+  return pricingResult.integrityStatus !== 'blocked';
 }
 
 // Example: Display audit badge
-function getAuditBadge(quote) {
-  switch (quote.integrityStatus) {
-    case 'pass': return { color: 'green', text: 'Audit Passed' };
-    case 'warning': return { color: 'yellow', text: 'Audit Warnings' };
-    case 'blocked': 
-      return quote.overrideApproved 
-        ? { color: 'blue', text: 'Override Approved' }
-        : { color: 'red', text: 'Blocked - Needs Override' };
+function getAuditBadge(pricingResult) {
+  switch (pricingResult.integrityStatus) {
+    case 'passed': return { color: 'green', text: 'Audit Passed' };
+    case 'warning': return { color: 'yellow', text: 'Below Target' };
+    case 'blocked': return { color: 'red', text: 'Blocked - Below Floor' };
     default: return { color: 'gray', text: 'Not Audited' };
   }
 }
 ```
 
+## FY26 Margin Goals
+
+Defined in `shared/config/constants.ts`:
+
+```typescript
+export const FY26_GOALS = {
+  MARGIN_FLOOR: 0.40,    // 40% - HARD BLOCK
+  MARGIN_STRETCH: 0.45,  // 45% - Target/Guardrail
+};
+```
+
+## Save Quote Flow
+
+1. User configures quote in UI
+2. `calculatePricing()` runs on every change
+3. Integrity checks included in pricing result
+4. "Save Quote" button disabled if `integrityStatus === 'blocked'`
+5. Warning badge shown if `integrityStatus === 'warning'`
+6. Quote saved to database via `POST /api/cpq-quotes`
+
 ## Configuration
 
-Guardrail thresholds are defined in `shared/config/PRICING_GUARDRAILS.json` and can be adjusted by administrators.
+Guardrail thresholds are defined in `shared/config/constants.ts` and `client/src/features/cpq/pricing.ts`.
+
+## Note on CEO Overrides
+
+The legacy override system (request/approve workflow) has been simplified. If a quote falls below the 40% floor, the margin target slider must be adjusted to bring it above the floor before saving. This enforces margin discipline at the point of quote creation.

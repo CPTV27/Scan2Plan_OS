@@ -520,84 +520,51 @@ const generateUpidMutation = useMutation({
 
 ## 5. DEPRECATED CODE & CLEANUP LIST
 
-### Files NOT Imported by Main App
+### Cleanup Completed (January 2026)
 
-**ENTIRE `client/src/modules/sales_engine/` FOLDER IS ORPHANED**
+The following items have been cleaned up:
 
-```
-ORPHANED FILES (77 files):
-├── client/src/modules/sales_engine/attached_assets/  (44 files)
-├── client/src/modules/sales_engine/client/           (52 files including duplicates)
-├── client/src/modules/sales_engine/scripts/          (2 files)
-├── client/src/modules/sales_engine/server/           (7 files)
-├── client/src/modules/sales_engine/shared/           (1 file)
-└── Root config files                                 (10 files)
-```
+| Item | Status | Notes |
+|------|--------|-------|
+| `client/src/modules/sales_engine/` | **DELETED** | Orphaned module removed |
+| External CPQ API proxy | **REMOVED** | Pricing now 100% client-side in `pricing.ts` |
+| Deprecated pricing routes | **REMOVED** | `/api/cpq/calculate` and `/api/cpq/pricing-matrix` removed |
 
-### Zombie Code (Commented Out / Old Logic)
+### Remaining Cleanup Candidates
 
 | Location | Description |
 |----------|-------------|
-| `server/routes.ts` lines 1314-1360 | DEPRECATED pricing matrix routes with console.warn |
-| `client/src/modules/sales_engine/server/` | Entire standalone server - dead code |
+| `cpq_pricing_matrix` tables | Legacy pricing tables - may be unused now |
+| `server/routes.ts` deprecated routes | May contain console.warn for old routes |
 
 ### Potentially Unused Dependencies in package.json
 
 | Package | Reason to Verify |
 |---------|------------------|
-| `@playwright/test` | Testing framework - check if e2e tests exist |
+| `@playwright/test` | Testing framework - e2e tests exist in `tests/` |
 | `passport-local` | Only using Replit Auth (OpenID Connect) |
 | `jszip` | Check if ZIP functionality is used |
 | `input-otp` | OTP input component - check if used |
 | `next-themes` | Next.js theming - but using custom ThemeProvider |
-| `@hubspot/api-client` | HubSpot integration - verify if actively used |
+| `@hubspot/api-client` | HubSpot integration - actively used |
 
 ---
 
 ## REFACTORING ACTION PLAN
 
-> **CAUTION:** Before deleting any files or database tables, perform the verification steps listed below. This plan requires manual confirmation of each step.
+> **CAUTION:** Before deleting any database tables, perform the verification steps listed below.
 
-### Priority 1: Verify & Delete Orphaned Sales Engine Module
+### Completed Cleanup (January 2026)
 
-**Verification Steps (REQUIRED BEFORE DELETE):**
+| Item | Status | Date |
+|------|--------|------|
+| Orphaned sales_engine module | **DELETED** | Jan 11, 2026 |
+| External CPQ API integration | **REMOVED** | Jan 11, 2026 |
+| Deprecated `/api/cpq/calculate` route | **REMOVED** | Jan 11, 2026 |
 
-```bash
-# 1. Confirm no imports exist in the main app
-grep -r "modules/sales_engine" client/src --exclude-dir=modules
-grep -r "modules/sales_engine" server/
+### Remaining Tasks
 
-# 2. Check for any scheduled jobs or background processes
-grep -r "sales_engine" .github/ scripts/ cron/
-
-# 3. Verify no environment variables reference it
-grep -r "SALES_ENGINE" .env* replit.nix
-```
-
-**If all checks return empty, safe to delete:**
-
-```bash
-rm -rf client/src/modules/sales_engine/
-```
-
-**Files to delete:** ~120+ files totaling ~50MB (including attached_assets)
-
-### Priority 2: Deprecate Backend Pricing Routes
-
-**Option A (Recommended):** Return 410 Gone with migration guidance
-
-```typescript
-// In server/routes.ts, update deprecated routes to:
-app.get("/api/cpq/pricing-matrix", (req, res) => {
-  res.status(410).json({ 
-    message: "DEPRECATED: Pricing is now calculated client-side. See client/src/features/cpq/pricing.ts" 
-  });
-});
-```
-
-**Option B:** Remove routes entirely (only after confirming no external callers)
-
-### Priority 3: Database Table Cleanup (REQUIRES DATA AUDIT)
+#### Priority 1: Database Table Cleanup (REQUIRES DATA AUDIT)
 
 **BEFORE dropping any tables, run these checks:**
 
@@ -610,9 +577,6 @@ UNION ALL
 SELECT 'cpq_cad_pricing_matrix', COUNT(*) FROM cpq_cad_pricing_matrix
 UNION ALL
 SELECT 'cpq_pricing_parameters', COUNT(*) FROM cpq_pricing_parameters;
-
--- Check for recent reads (if query logging enabled)
--- Review server logs for calls to deprecated routes
 ```
 
 **If tables are empty or data is archived elsewhere:**
@@ -624,7 +588,7 @@ CREATE TABLE cpq_pricing_matrix_backup AS SELECT * FROM cpq_pricing_matrix;
 DROP TABLE cpq_pricing_matrix;
 ```
 
-### Priority 4: Audit Dependencies
+#### Priority 2: Audit Dependencies
 
 ```bash
 # Run dependency check
@@ -634,35 +598,25 @@ npx depcheck
 # DO NOT remove without verification
 ```
 
-### Priority 5: Code Quality Tasks
+#### Priority 3: Code Quality Tasks
 
 1. **Type Safety:** Replace `as any` casts with proper types
 2. **Logging:** Replace `console.log` with structured logging
 3. **Dead Code:** Remove commented-out blocks (use git history)
 
-### Pre-Cleanup Checklist
-
-| Item | Verified | Notes |
-|------|----------|-------|
-| No imports to sales_engine module | [ ] | Run grep commands above |
-| No scheduled jobs reference module | [ ] | Check cron/scripts folders |
-| Pricing tables have no critical data | [ ] | Run SQL count queries |
-| Deprecated routes have no external callers | [ ] | Check CPQ tool configuration |
-| Backup created before deletions | [ ] | Use git commit + DB backup |
-
 ---
 
 ## SUMMARY
 
-| Category | Items Found | Action Required |
-|----------|-------------|-----------------|
-| Orphaned Module | `client/src/modules/sales_engine/` (120+ files) | **DELETE** - Not imported |
-| Deprecated Routes | 4 pricing matrix endpoints | **REMOVE** or return 410 |
-| Duplicate Tables | 4 pricing tables | **DROP** after data verification |
-| Unused Dependencies | 6 packages flagged | **VERIFY** with depcheck |
-| Type Safety Issues | `as any` casts | **FIX** - Add proper types |
+| Category | Status | Notes |
+|----------|--------|-------|
+| Orphaned Module | **COMPLETED** | sales_engine deleted |
+| External CPQ Proxy | **COMPLETED** | Pricing is 100% client-side |
+| Legacy Pricing Tables | **PENDING** | Verify before dropping |
+| Unused Dependencies | **PENDING** | Run depcheck to verify |
+| Type Safety Issues | **ONGOING** | Gradually improving |
 
-**Estimated Cleanup Savings:**
-- ~120 orphaned files removed
-- ~50MB of attached_assets removed
-- Cleaner codebase with single source of truth
+**Current Architecture:**
+- All pricing calculations happen client-side in `client/src/features/cpq/pricing.ts`
+- Backend only handles quote persistence via `/api/cpq-quotes` endpoints
+- No external CPQ service dependencies

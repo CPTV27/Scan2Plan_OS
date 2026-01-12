@@ -1,6 +1,6 @@
 # CPQ Integration Guide
 ## Scan2Plan OS - Configure, Price, Quote System
-**Last Updated:** January 11, 2026 (v2.0 - Client-Side Pricing)
+**Last Updated:** January 12, 2026 (v3.0 - Client-Side Pricing Only)
 
 ---
 
@@ -12,22 +12,21 @@
 5. [API Endpoints](#5-api-endpoints)
 6. [Pricing Logic](#6-pricing-logic)
 7. [Margin Target System](#7-margin-target-system)
-8. [Known Issues & Challenges](#8-known-issues--challenges)
+8. [Integrity Checks](#8-integrity-checks)
 9. [Future Improvements](#9-future-improvements)
 
 ---
 
 ## 1. System Overview
 
-The CPQ (Configure, Price, Quote) system is a hybrid architecture:
+The CPQ (Configure, Price, Quote) system uses **100% client-side pricing**. All calculations happen in the browser using `pricing.ts`.
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **Frontend Calculator** | `client/src/features/cpq/Calculator.tsx` | Full standalone CPQ UI (client-side pricing) |
-| **Deal Workspace** | `client/src/pages/DealWorkspace.tsx` | Embedded quote builder (client-side pricing) |
 | **Pricing Engine** | `client/src/features/cpq/pricing.ts` | Core pricing calculation logic |
-| **CRM Backend** | `server/routes/cpq.ts` | Quote persistence, external webhooks |
-| **External CPQ (DEPRECATED)** | `https://scan2plan-cpq.replit.app` | Legacy proxy endpoint, being phased out |
+| **Frontend Calculator** | `client/src/features/cpq/Calculator.tsx` | Standalone CPQ UI |
+| **Deal Workspace** | `client/src/pages/DealWorkspace.tsx` | Embedded quote builder in deals |
+| **Quote Storage** | `server/routes/cpq.ts` | Quote persistence (POST /api/cpq-quotes) |
 
 ### Key Business Rules
 - **40% Margin Floor** (FY26_GOALS.MARGIN_FLOOR): Quotes below this are BLOCKED
@@ -56,17 +55,26 @@ The CPQ (Configure, Price, Quote) system is a hybrid architecture:
 │                           ▼                                              │
 │  ┌────────────────────────────────────────────────────────────────┐    │
 │  │                    pricing.ts (Client-side)                     │    │
-│  │  - BUILDING_TYPES (16 types)                                    │    │
-│  │  - BASE_RATES per sqft                                          │    │
-│  │  - LOD_MULTIPLIERS                                              │    │
-│  │  - TRAVEL_RATES by dispatch location                            │    │
+│  │                                                                  │    │
+│  │  calculatePricing(): Main entry point                           │    │
+│  │  ├─ BUILDING_TYPES (16 types)                                   │    │
+│  │  ├─ BASE_RATES per sqft                                         │    │
+│  │  ├─ LOD_MULTIPLIERS (200, 300, 350)                            │    │
+│  │  ├─ TRAVEL_RATES by dispatch location                           │    │
+│  │  ├─ Risk premiums (Arch only)                                   │    │
+│  │  └─ Margin formula: clientPrice = cost / (1 - marginTarget)    │    │
+│  │                                                                  │    │
+│  │  FY26 Guardrails:                                               │    │
+│  │  ├─ 40% floor (BLOCKED if below)                                │    │
+│  │  └─ 45% target (WARNING if 40-45%)                              │    │
+│  │                                                                  │    │
 │  └────────────────────────────────────────────────────────────────┘    │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ POST /api/cpq/calculate
-                                    │ { areas, marginTarget, risks, ... }
-                                    ▼
+                              │
+                              │ POST /api/cpq-quotes
+                              │ (Save quote to database)
+                              ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                        BACKEND (Express.js)                              │
 ├──────────────────────────────────────────────────────────────────────────┤
@@ -74,34 +82,21 @@ The CPQ (Configure, Price, Quote) system is a hybrid architecture:
 │  ┌────────────────────────────────────────────────────────────────┐     │
 │  │              server/routes/cpq.ts                               │     │
 │  │                                                                  │     │
-│  │  POST /api/cpq/calculate                                        │     │
-│  │  ├─ Proxy to External CPQ (CPQ_BASE_URL)                        │     │
-│  │  ├─ Apply marginTarget adjustment (post-proxy)                  │     │
-│  │  │   └─ clientPrice = upteamCost / (1 - marginTarget)          │     │
-│  │  ├─ Recalculate totals and grossMarginPercent                   │     │
-│  │  └─ Apply integrity checks (40% floor, 45% guardrail)          │     │
-│  │                                                                  │     │
 │  │  POST /api/leads/:id/cpq-quotes                                 │     │
-│  │  ├─ Extract areas from requestData (if nested)                  │     │
-│  │  ├─ Normalize dispatch locations (uppercase)                    │     │
-│  │  └─ Save quote to database                                      │     │
+│  │  ├─ Receives complete pricing from frontend                     │     │
+│  │  ├─ Validates required fields                                   │     │
+│  │  ├─ Saves quote to database                                     │     │
+│  │  └─ Supports versioning                                         │     │
+│  │                                                                  │     │
+│  │  GET /api/leads/:id/cpq-quotes                                  │     │
+│  │  └─ Returns all quotes for a lead                               │     │
+│  │                                                                  │     │
+│  │  PATCH /api/cpq-quotes/:id                                      │     │
+│  │  └─ Updates existing quote                                      │     │
+│  │                                                                  │     │
+│  │  NO external CPQ calls - pricing is 100% client-side            │     │
 │  │                                                                  │     │
 │  └────────────────────────────────────────────────────────────────┘     │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ POST ${CPQ_BASE_URL}/api/pricing/calculate
-                                    │ Authorization: Bearer ${CPQ_API_KEY}
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                    EXTERNAL CPQ SERVICE                                  │
-│                    (scan2plan-cpq.replit.app)                           │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  - Calculates base pricing from areas, building types, LOD              │
-│  - Returns lineItems with upteamCost and clientPrice                    │
-│  - Returns subtotals, totals, integrityStatus                           │
-│  - Does NOT apply marginTarget (CRM does this post-response)            │
 │                                                                          │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -119,48 +114,21 @@ The CPQ (Configure, Price, Quote) system is a hybrid architecture:
    ├─ Dispatch location and distance
    └─ Margin target slider (35%-60%)
 
-2. Frontend sends POST /api/cpq/calculate
-   {
-     areas: [...],
-     dispatchLocation: "WOODSTOCK",
-     distance: 150,
-     risks: { act: true, complexGeometry: false, ... },
-     marginTarget: 0.45,  // <-- Slider value
-     services: { matterport: false, actScan: false }
-   }
+2. Frontend calls calculatePricing() from pricing.ts
+   ├─ Input: areas, dispatchLocation, distance, risks, marginTarget
+   └─ Calculation happens entirely in browser
 
-3. Backend proxies to External CPQ
-   → POST https://scan2plan-cpq.replit.app/api/pricing/calculate
-
-4. External CPQ returns base pricing
+3. pricing.ts returns PricingResult
    {
-     success: true,
-     lineItems: [
-       { id: "area-0-arch", upteamCost: 5000, clientPrice: 7500, ... },
-       ...
-     ],
-     totalClientPrice: 75000,
+     lineItems: [...],
+     totalClientPrice: 90909,
      totalUpteamCost: 50000,
-     grossMarginPercent: 33.3,  // Based on external calculation
-     integrityStatus: "blocked"
-   }
-
-5. Backend applies marginTarget adjustment
-   ├─ For each lineItem: clientPrice = upteamCost / (1 - 0.45)
-   ├─ Recalculates totalClientPrice, grossMargin, grossMarginPercent
-   ├─ New margin: 45% (based on slider)
-   └─ Updates integrityStatus: "passed" (>= 40%)
-
-6. Response sent to frontend
-   {
-     success: true,
-     lineItems: [...], // With adjusted clientPrice
-     totalClientPrice: 90909,  // Adjusted
-     totalUpteamCost: 50000,   // Unchanged
-     grossMarginPercent: 45.0, // Matches slider
+     grossMarginPercent: 45.0,
      integrityStatus: "passed",
      integrityFlags: []
    }
+
+4. UI displays pricing immediately (no network call needed)
 ```
 
 ### Save Quote Flow
@@ -179,19 +147,17 @@ The CPQ (Configure, Price, Quote) system is a hybrid architecture:
      subtotals: { modeling: 80000, travel: 5909, ... },
      integrityStatus: "passed",
      integrityFlags: [],
-     requestData: {
-       areas: [...],        // <-- Areas nested here!
-       dispatchLocation: "WOODSTOCK",
-       distance: 150,
-       risks: {...},
-       paymentTerms: "standard"
-     }
+     areas: [...],
+     dispatchLocation: "WOODSTOCK",
+     distance: 150,
+     risks: {...},
+     paymentTerms: "standard"
    }
 
-3. Backend extracts areas from requestData
-   const areas = normalizedData.areas || normalizedData.requestData?.areas || [];
-
-4. Quote saved to cpq_quotes table
+3. Backend validates and saves to cpq_quotes table
+   ├─ Generates quote number
+   ├─ Creates version history
+   └─ Returns saved quote
 ```
 
 ---
@@ -230,7 +196,7 @@ CREATE TABLE cpq_quotes (
   services JSONB DEFAULT '{}',
   scoping_data JSONB,
   
-  -- Pricing
+  -- Pricing (calculated client-side, stored here)
   total_price DECIMAL(12,2),
   pricing_breakdown JSONB,
   
@@ -256,10 +222,6 @@ CREATE TABLE cpq_quotes (
   client_token_expires_at TIMESTAMP,
   client_status TEXT DEFAULT 'pending',
   
-  -- External Integration
-  external_cpq_id TEXT,
-  external_cpq_url TEXT,
-  
   -- Audit
   created_by TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
@@ -276,10 +238,10 @@ interface Area {
   buildingType: string;        // "1" through "16"
   squareFeet: string;          // For standard; acres for landscape (14-15)
   lod: string;                 // Default: "200", "300", "350", etc.
-  disciplines: string[];       // ["architecture", "mepf", "structure", "site"]
+  disciplines: string[];       // ["arch", "mepf", "struct", "civil"]
   scope?: string;              // "full", "interior", "exterior"
   
-  // Per-discipline LoD (CPQ-aligned)
+  // Per-discipline LoD
   disciplineLods?: {
     [discipline: string]: {
       discipline: string;
@@ -292,13 +254,10 @@ interface Area {
   includeCadDeliverable?: boolean;
   additionalElevations?: number;
   numberOfRoofs?: number;
-  facades?: Facade[];
   gradeAroundBuilding?: boolean;
   gradeLod?: string;
   
   // Landscape areas
-  boundary?: { lat: number; lng: number }[];
-  boundaryImageUrl?: string;
   kind?: "standard" | "landscape";  // Inferred from buildingType
 }
 ```
@@ -311,7 +270,6 @@ interface Area {
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/api/cpq/calculate` | User | Proxy to external CPQ + margin adjustment |
 | POST | `/api/leads/:id/cpq-quotes` | User (CEO/Sales) | Create new quote for lead |
 | GET | `/api/leads/:id/cpq-quotes` | User (CEO/Sales) | List quotes for lead |
 | GET | `/api/cpq-quotes/:id` | User (CEO/Sales) | Get single quote |
@@ -321,217 +279,90 @@ interface Area {
 | POST | `/api/cpq-quotes/:id/generate-link` | User (CEO/Sales) | Generate magic link |
 | POST | `/api/cpq/calculate-distance` | User (CEO/Sales) | Google Maps distance calc |
 
-### External CPQ Webhooks (CRM ← CPQ)
+### External Webhooks (for integrations calling INTO CRM)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/cpq/leads/:leadId` | CRM_API_KEY | External CPQ fetches lead details |
-| POST | `/api/cpq/quotes/webhook` | CRM_API_KEY | External CPQ posts completed quote |
-| GET | `/api/cpq/config` | CRM_API_KEY | Returns CRM capabilities |
+| POST | `/api/cpq/sync-quote` | API Key (CPQ_API_KEY) | Sync quote from external system |
+| POST | `/api/cpq/update-status` | API Key (CRM_API_KEY) | Update quote status |
 
 ---
 
 ## 6. Pricing Logic
 
-### Building Types (16 total)
+### Building Types
 
-| ID | Type | Base Rate Multiplier |
+| ID | Type | Base Rate (per sqft) |
 |----|------|---------------------|
-| 1 | Commercial - Simple | 1.0x |
-| 2 | Residential - Standard | 0.8x |
-| 3 | Residential - Luxury | 0.9x |
-| 4 | Commercial / Office | 0.7x |
-| 5 | Retail / Restaurants | 0.95x |
-| 6 | Kitchen / Catering | 1.4x |
-| 7 | Education | 1.0x |
-| 8 | Hotel / Theatre / Museum | 1.1x |
-| 9 | Hospitals / Mixed Use | 1.3x |
-| 10 | Mechanical / Utility Rooms | 0.6x |
-| 11 | Warehouse / Storage | 0.5x |
-| 12 | Religious Buildings | 1.0x |
-| 13 | Infrastructure / Roads | 0.8x |
-| 14 | Built Landscape | Special (per acre) |
-| 15 | Natural Landscape | Special (per acre) |
-| 16 | ACT (Above Ceiling Tiles) | 1.5x |
+| 1 | Office/Commercial | $0.12 |
+| 2 | Industrial | $0.08 |
+| 3 | Healthcare | $0.18 |
+| 4 | Educational | $0.14 |
+| 5 | Retail | $0.10 |
+| ... | ... | ... |
 
 ### LOD Multipliers
 
-| LOD | Multiplier | Description |
-|-----|------------|-------------|
-| 100 | 0.5x | Conceptual |
-| 200 | 1.0x | Design Development (baseline) |
-| 250 | 1.25x | Enhanced Design |
-| 300 | 1.5x | Construction Documents |
-| 350 | 2.0x | Fabrication Ready |
-| 400 | 2.5x | As-Built |
+| LOD | Multiplier |
+|-----|------------|
+| 200 | 1.0 |
+| 300 | 1.5 |
+| 350 | 2.0 |
 
-### Pricing Formula
+### Discipline Rates
 
-```
-Base Price = sqft × buildingTypeRate × disciplineRate
-LOD Adjusted = Base Price × lodMultiplier
-Risk Adjusted = LOD Adjusted × (1 + riskFactors)
-Travel Added = Risk Adjusted + travelCost
-
-Client Price = upteamCost / (1 - marginTarget)
-```
+| Discipline | Rate Modifier |
+|------------|---------------|
+| Architecture | 1.0 |
+| MEP/F | 1.2 |
+| Structural | 0.8 |
+| Civil | 0.6 |
 
 ---
 
 ## 7. Margin Target System
 
-### Slider Configuration
-- **Range:** 35% to 60%
-- **Default:** 45%
-- **Step:** 1%
-- **Location:** DealWorkspace.tsx pricing sidebar
+The margin slider allows adjusting the target gross margin (35%-60%).
 
-### Margin Formula
-
-```typescript
+### Formula
+```
 clientPrice = upteamCost / (1 - marginTarget)
 
-// Example: upteamCost = $50,000, marginTarget = 0.45 (45%)
-clientPrice = 50000 / (1 - 0.45) = 50000 / 0.55 = $90,909
-grossMargin = 90909 - 50000 = $40,909
-grossMarginPercent = 40909 / 90909 × 100 = 45%
+Example:
+- Cost: $50,000
+- Margin Target: 45%
+- Client Price: $50,000 / (1 - 0.45) = $90,909
+- Gross Margin: $40,909 (45%)
 ```
 
-### Integrity Thresholds
+### Guardrails
 
-| Margin | Status | Action |
-|--------|--------|--------|
-| < 40% | `blocked` | Save button disabled, error message |
-| 40-45% | `warning` | Save enabled, warning displayed |
-| ≥ 45% | `passed` | Save enabled, no warnings |
-
-### Post-Proxy Normalization (Backend)
-
-```typescript
-// server/routes/cpq.ts - POST /api/cpq/calculate
-
-// After receiving response from external CPQ:
-if (marginTarget >= 0.35 && marginTarget <= 0.60) {
-  // Recalculate each line item
-  data.lineItems = data.lineItems.map(item => {
-    if (item.category !== "total" && item.upteamCost) {
-      return {
-        ...item,
-        clientPrice: item.upteamCost / (1 - marginTarget)
-      };
-    }
-    return item;
-  });
-  
-  // Recalculate totals
-  data.totalClientPrice = sum(lineItems.clientPrice);
-  data.grossMargin = data.totalClientPrice - data.totalUpteamCost;
-  data.grossMarginPercent = (data.grossMargin / data.totalClientPrice) * 100;
-  
-  // Update integrity status
-  if (data.grossMarginPercent < 40) {
-    data.integrityStatus = "blocked";
-  } else if (data.grossMarginPercent < 45) {
-    data.integrityStatus = "warning";
-  } else {
-    data.integrityStatus = "passed";
-  }
-}
-```
+| Level | Threshold | Status | Action |
+|-------|-----------|--------|--------|
+| Floor | < 40% | BLOCKED | Cannot save quote |
+| Guardrail | 40-45% | WARNING | Can save with warning badge |
+| Target | ≥ 45% | PASSED | Normal operation |
 
 ---
 
-## 8. Known Issues & Challenges
+## 8. Integrity Checks
 
-### Issue 1: Areas Extraction from requestData
-**Status:** FIXED (January 11, 2026)
+Integrity checks run client-side during `calculatePricing()`:
 
-**Problem:** Frontend sends `areas` nested inside `requestData`, but database requires `areas` at top level.
+| Check | Condition | Status |
+|-------|-----------|--------|
+| Margin Floor | margin < 40% | BLOCKED |
+| Margin Warning | 40% ≤ margin < 45% | WARNING |
+| Travel Missing | Fly-out with $0 travel | WARNING |
+| LoD 350 Premium | LoD 350 without markup | WARNING |
 
-**Solution:**
-```typescript
-// Extract areas from requestData if not at top level
-const areas = normalizedData.areas || normalizedData.requestData?.areas || [];
-```
-
-### Issue 2: External CPQ Not Using marginTarget
-**Status:** RESOLVED via Post-Proxy Normalization
-
-**Problem:** External CPQ service ignores marginTarget, returns fixed margin.
-
-**Solution:** Backend applies margin adjustment after receiving external CPQ response.
-
-### Issue 3: Dispatch Location Case Sensitivity
-**Status:** Handled
-
-**Problem:** Legacy systems use uppercase (WOODSTOCK), CPQ uses lowercase (woodstock).
-
-**Solution:** 
-- UI displays lowercase
-- Backend normalizes to uppercase for persistence
-- `normalizeDispatchLocation()` and `toUppercaseDispatchLocation()` helpers
-
-### Issue 4: Dual Pricing Engines
-**Challenge:** Both client-side (pricing.ts) and server-side (external CPQ) pricing exist.
-
-**Current State:** 
-- External CPQ is authoritative for pricing
-- Client-side pricing.ts contains static tables for reference/validation
-- Post-proxy adjustment reconciles margin differences
+The integrity status is included in the pricing result and displayed in the UI.
 
 ---
 
 ## 9. Future Improvements
 
-### Priority 1: Consolidate Pricing Engine
-- Remove dependency on external CPQ service
-- Move all pricing calculation to client-side (pricing.ts)
-- Backend only handles quote persistence
-
-### Priority 2: Real-time Margin Preview
-- Calculate margin in frontend before API call
-- Show instant feedback as slider moves
-- Only call API on explicit "Calculate" button
-
-### Priority 3: Tier A Auto-Detection
-- Automatically flag quotes over $100K
-- Require approval workflow for large deals
-- Track approval chain in database
-
-### Priority 4: Version Comparison
-- Side-by-side quote version comparison
-- Highlight pricing differences
-- Track change history
-
-### Priority 5: QuickBooks Sync
-- Auto-create QBO estimate on quote save
-- Sync line items to QBO
-- Track estimate status back to CRM
-
----
-
-## Environment Variables
-
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `CPQ_API_KEY` | Auth token for external CPQ | Yes |
-| `CPQ_BASE_URL` | External CPQ URL (default: scan2plan-cpq.replit.app) | No |
-| `CRM_API_KEY` | Auth for external CPQ → CRM calls | Yes |
-| `GOOGLE_MAPS_API_KEY` | Distance calculation | Yes |
-
----
-
-## File Reference
-
-| File | Purpose |
-|------|---------|
-| `server/routes/cpq.ts` | All CPQ API endpoints |
-| `client/src/features/cpq/Calculator.tsx` | Standalone CPQ UI |
-| `client/src/features/cpq/pricing.ts` | Pricing tables, types, utilities |
-| `client/src/pages/DealWorkspace.tsx` | Embedded quote builder |
-| `shared/schema.ts` | Database schema (cpq_quotes table) |
-| `shared/businessGoals.ts` | FY26 margin thresholds |
-
----
-
-*This document is intended for debugging and architectural review. Last updated January 11, 2026.*
+1. **Server-side validation**: Add backend validation as a safety net
+2. **Pricing audit trail**: Log all pricing calculations for compliance
+3. **A/B testing**: Support multiple pricing strategies
+4. **API rate caching**: Cache Google Maps distance calculations
