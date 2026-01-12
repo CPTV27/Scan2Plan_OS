@@ -100,20 +100,10 @@ import { Label } from "@/components/ui/label";
 import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
 import { LocationPreview } from "@/components/LocationPreview";
-import { DealAIAssistant } from "@/components/DealAIAssistant";
 import { formatDistanceToNow } from "date-fns";
 import { Brain, Paperclip, Download, Eye, Link2, ClipboardList, Send, Copy, CheckCircle2, FileSignature, ChevronRight } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
-import { PandaDocEmbed } from "@/components/PandaDocEmbed";
-import { CorrespondenceTimeline } from "@/components/CorrespondenceTimeline";
 import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { Slider } from "@/components/ui/slider";
 import { 

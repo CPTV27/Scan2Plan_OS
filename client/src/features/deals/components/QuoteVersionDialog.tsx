@@ -18,12 +18,12 @@ import {
   FileText,
 } from "lucide-react";
 import { CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
-import type { Quote } from "@shared/schema";
+import type { CpqQuote } from "@shared/schema";
 
 interface QuoteVersionDialogProps {
-  quote: Quote | null;
+  quote: CpqQuote | null;
   onClose: () => void;
-  onEditVersion: (quote: Quote) => void;
+  onEditVersion: (quote: CpqQuote) => void;
 }
 
 export function QuoteVersionDialog({
