@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -6,6 +7,7 @@ import { seedMarketingData } from "./data/seedMarketing";
 import { seedPersonas } from "./seed/personas";
 import { correlationIdMiddleware } from "./middleware/correlationId";
 import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
+import { csrfProtection } from "./middleware/csrf";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { SERVER_CONSTANTS } from "./constants";
 import { pool } from "./db";
@@ -38,6 +40,10 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+
+// CSRF protection for API routes (excludes webhooks and public endpoints)
+app.use("/api/", csrfProtection());
 
 app.use("/api/", apiLimiter);
 app.use("/api/auth/", authLimiter);
