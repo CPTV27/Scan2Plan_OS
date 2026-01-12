@@ -939,7 +939,7 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
     }
   }));
 
-  // Static map endpoint - Returns a static map image URL for thumbnails
+  // Static map endpoint - Proxies actual image for thumbnails
   app.get("/api/location/static-map", asyncHandler(async (req, res) => {
     try {
       const address = req.query.address as string;
@@ -952,7 +952,6 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
         return res.status(503).json({ 
-          available: false,
           error: "Google Maps API key not configured" 
         });
       }
@@ -968,14 +967,22 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
 
       const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${size}&maptype=${maptype}&key=${apiKey}`;
 
-      res.json({
-        available: true,
-        url: staticMapUrl,
-        thumbnailUrl: staticMapUrl
-      });
+      // Fetch the actual image from Google and proxy it
+      const response = await fetch(staticMapUrl);
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch static map from Google" });
+      }
+      
+      const contentType = response.headers.get("content-type");
+      res.setHeader("Content-Type", contentType || "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+      
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
     } catch (error) {
-      log("ERROR: Static map URL error - " + (error as any)?.message);
-      res.status(500).json({ error: "Failed to generate static map URL" });
+      log("ERROR: Static map error - " + (error as any)?.message);
+      res.status(500).json({ error: "Failed to generate static map" });
     }
   }));
 
