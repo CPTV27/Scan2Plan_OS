@@ -929,7 +929,9 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
           lat,
           lng,
           formattedAddress: address
-        }
+        },
+        // Also include coordinates for frontend compatibility
+        coordinates: lat && lng ? { lat, lng } : undefined
       });
     } catch (error) {
       log("ERROR: Location preview error - " + (error as any)?.message);
