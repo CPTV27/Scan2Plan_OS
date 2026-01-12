@@ -5,23 +5,19 @@
  * while organizing them by domain for cleaner imports in new code.
  * 
  * Usage:
- *   // Legacy (still works):
+ *   // Legacy (still works - preferred for existing code):
  *   import { storage } from "../storage";
  * 
- *   // New domain-specific (preferred for new code):
- *   import { storage } from "../storage/index";
- *   // Then use: storage.leads.getLead(id)
+ *   // Domain-specific (optional for new code):
+ *   import { leadStorage, cpqQuoteStorage } from "../storage/index";
  * 
  * Domains:
- *   - leads: Lead management (CRUD, search, soft delete)
- *   - projects: Production projects
- *   - quotes: CPQ quotes and versions
- *   - financial: Accounts, invoices, loans, payables
- *   - marketing: Case studies, events, attributions
- *   - users: User management
- *   - quickbooks: QBO customer sync
- *   - documents: Lead documents and attachments
- *   - settings: System settings
+ *   - leadStorage: Lead management (CRUD, search, soft delete)
+ *   - cpqQuoteStorage: CPQ quotes
+ *   - quoteVersionStorage: Quote version history
+ *   - accountStorage, invoiceStorage, internalLoanStorage, vendorPayableStorage: Financial
+ *   - caseStudyStorage, eventStorage, eventRegistrationStorage: Marketing
+ *   - dealAttributionStorage, notificationStorage, proposalEmailStorage: Marketing
  */
 
 export { storage, IStorage, DatabaseStorage } from "../storage";

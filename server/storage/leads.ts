@@ -6,39 +6,36 @@
  */
 
 import { storage } from "../storage";
-import type { Lead, InsertLead } from "@shared/schema";
+import type { Lead, InsertLead, InsertLeadResearch, InsertLeadDocument, LeadDocument } from "@shared/schema";
 
 export const leadStorage = {
-  getAll: () => storage.getLeads(),
-  getDeleted: () => storage.getDeletedLeads(),
-  getById: (id: number) => storage.getLead(id),
-  getByQboInvoiceId: (qboInvoiceId: string) => storage.getLeadByQboInvoiceId(qboInvoiceId),
-  getByQboEstimateId: (qboEstimateId: string) => storage.getLeadByQboEstimateId(qboEstimateId),
-  getByClientName: (clientName: string) => storage.getLeadByClientName(clientName),
-  getAllByClientName: (clientName: string) => storage.getLeadsByClientName(clientName),
-  getAllByQboCustomerId: (qboCustomerId: string) => storage.getLeadsByQboCustomerId(qboCustomerId),
-  getAllByImportSource: (importSource: string) => storage.getLeadsByImportSource(importSource),
-  getByClientToken: (token: string) => storage.getLeadByClientToken(token),
-  create: (lead: InsertLead) => storage.createLead(lead),
-  update: (id: number, updates: Partial<InsertLead>) => storage.updateLead(id, updates),
-  softDelete: (id: number, deletedBy?: string) => storage.softDeleteLead(id, deletedBy),
-  restore: (id: number) => storage.restoreLead(id),
-  hardDelete: (id: number) => storage.deleteLead(id),
+  getAll: (): Promise<Lead[]> => storage.getLeads(),
+  getDeleted: (): Promise<Lead[]> => storage.getDeletedLeads(),
+  getById: (id: number): Promise<Lead | undefined> => storage.getLead(id),
+  getByQboInvoiceId: (qboInvoiceId: string): Promise<Lead | undefined> => storage.getLeadByQboInvoiceId(qboInvoiceId),
+  getByQboEstimateId: (qboEstimateId: string): Promise<Lead | undefined> => storage.getLeadByQboEstimateId(qboEstimateId),
+  getByClientName: (clientName: string): Promise<Lead | undefined> => storage.getLeadByClientName(clientName),
+  getAllByClientName: (clientName: string): Promise<Lead[]> => storage.getLeadsByClientName(clientName),
+  getAllByQboCustomerId: (qboCustomerId: string): Promise<Lead[]> => storage.getLeadsByQboCustomerId(qboCustomerId),
+  getAllByImportSource: (importSource: string): Promise<Lead[]> => storage.getLeadsByImportSource(importSource),
+  getByClientToken: (token: string): Promise<Lead | undefined> => storage.getLeadByClientToken(token),
+  create: (lead: InsertLead): Promise<Lead> => storage.createLead(lead),
+  update: (id: number, updates: Partial<InsertLead>): Promise<Lead> => storage.updateLead(id, updates),
+  softDelete: (id: number, deletedBy?: string): Promise<Lead> => storage.softDeleteLead(id, deletedBy),
+  restore: (id: number): Promise<Lead> => storage.restoreLead(id),
+  hardDelete: (id: number): Promise<void> => storage.deleteLead(id),
 };
 
 export const leadResearchStorage = {
   getByLeadId: (leadId: number) => storage.getLeadResearch(leadId),
-  create: (research: Parameters<typeof storage.createLeadResearch>[0]) => 
-    storage.createLeadResearch(research),
+  create: (research: InsertLeadResearch) => storage.createLeadResearch(research),
 };
 
 export const leadDocumentStorage = {
-  getByLeadId: (leadId: number) => storage.getLeadDocuments(leadId),
-  getById: (id: number) => storage.getLeadDocument(id),
-  create: (doc: Parameters<typeof storage.createLeadDocument>[0]) => 
-    storage.createLeadDocument(doc),
-  update: (id: number, updates: Parameters<typeof storage.updateLeadDocument>[1]) => 
-    storage.updateLeadDocument(id, updates),
-  delete: (id: number) => storage.deleteLeadDocument(id),
-  getUnmigrated: (leadId: number) => storage.getUnmigratedDocuments(leadId),
+  getByLeadId: (leadId: number): Promise<LeadDocument[]> => storage.getLeadDocuments(leadId),
+  getById: (id: number): Promise<LeadDocument | undefined> => storage.getLeadDocument(id),
+  create: (doc: InsertLeadDocument): Promise<LeadDocument> => storage.createLeadDocument(doc),
+  update: (id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> => storage.updateLeadDocument(id, updates),
+  delete: (id: number): Promise<void> => storage.deleteLeadDocument(id),
+  getUnmigrated: (leadId: number): Promise<LeadDocument[]> => storage.getUnmigratedDocuments(leadId),
 };

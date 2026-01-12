@@ -10,41 +10,38 @@
 
 import { storage } from "../storage";
 import type { 
-  InsertAccount, 
-  InsertInvoice, 
-  InsertInternalLoan, 
-  InsertVendorPayable 
+  Account, InsertAccount, 
+  Invoice, InsertInvoice,
+  InternalLoan, InsertInternalLoan, 
+  VendorPayable, InsertVendorPayable 
 } from "@shared/schema";
 
 export const accountStorage = {
-  getAll: () => storage.getAccounts(),
-  getById: (id: number) => storage.getAccount(id),
-  create: (account: InsertAccount) => storage.createAccount(account),
-  update: (id: number, updates: Partial<InsertAccount>) => storage.updateAccount(id, updates),
+  getAll: (): Promise<Account[]> => storage.getAccounts(),
+  getById: (id: number): Promise<Account | undefined> => storage.getAccount(id),
+  create: (account: InsertAccount): Promise<Account> => storage.createAccount(account),
+  update: (id: number, updates: Partial<InsertAccount>): Promise<Account> => storage.updateAccount(id, updates),
 };
 
 export const invoiceStorage = {
-  getAll: () => storage.getInvoices(),
-  getById: (id: number) => storage.getInvoice(id),
-  getByLeadId: (leadId: number) => storage.getInvoicesByLead(leadId),
-  getOverdue: () => storage.getOverdueInvoices(),
-  create: (invoice: InsertInvoice) => storage.createInvoice(invoice),
-  update: (id: number, updates: Parameters<typeof storage.updateInvoice>[1]) => 
-    storage.updateInvoice(id, updates),
+  getAll: (): Promise<Invoice[]> => storage.getInvoices(),
+  getById: (id: number): Promise<Invoice | undefined> => storage.getInvoice(id),
+  getByLeadId: (leadId: number): Promise<Invoice[]> => storage.getInvoicesByLead(leadId),
+  getOverdue: (): Promise<Invoice[]> => storage.getOverdueInvoices(),
+  create: (invoice: InsertInvoice): Promise<Invoice> => storage.createInvoice(invoice),
+  update: (id: number, updates: Partial<Invoice>): Promise<Invoice> => storage.updateInvoice(id, updates),
 };
 
 export const internalLoanStorage = {
-  getAll: () => storage.getInternalLoans(),
-  getActive: () => storage.getActiveLoan(),
-  create: (loan: InsertInternalLoan) => storage.createInternalLoan(loan),
-  update: (id: number, updates: Parameters<typeof storage.updateInternalLoan>[1]) => 
-    storage.updateInternalLoan(id, updates),
+  getAll: (): Promise<InternalLoan[]> => storage.getInternalLoans(),
+  getActive: (): Promise<InternalLoan | undefined> => storage.getActiveLoan(),
+  create: (loan: InsertInternalLoan): Promise<InternalLoan> => storage.createInternalLoan(loan),
+  update: (id: number, updates: Partial<InternalLoan>): Promise<InternalLoan> => storage.updateInternalLoan(id, updates),
 };
 
 export const vendorPayableStorage = {
-  getAll: () => storage.getVendorPayables(),
-  getUnpaid: () => storage.getUnpaidPayables(),
-  create: (payable: InsertVendorPayable) => storage.createVendorPayable(payable),
-  update: (id: number, updates: Parameters<typeof storage.updateVendorPayable>[1]) => 
-    storage.updateVendorPayable(id, updates),
+  getAll: (): Promise<VendorPayable[]> => storage.getVendorPayables(),
+  getUnpaid: (): Promise<VendorPayable[]> => storage.getUnpaidPayables(),
+  create: (payable: InsertVendorPayable): Promise<VendorPayable> => storage.createVendorPayable(payable),
+  update: (id: number, updates: Partial<VendorPayable>): Promise<VendorPayable> => storage.updateVendorPayable(id, updates),
 };
