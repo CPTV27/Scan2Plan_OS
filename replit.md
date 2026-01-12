@@ -36,7 +36,15 @@ Key modules include:
 - **PandaDoc:** Key required for document signing and proposal import.
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
-## Recent Changes (January 11, 2026)
+## Recent Changes (January 12, 2026)
+- **CPQ Documentation Cleanup:**
+  - Deleted 4 outdated docs: CPQ_PRICING_API.md, CPQ_COMPARISON_REPORT.md, CPQ_PRICING_REPAIR_REPORT.md, CPQ_CRM_ALIGNMENT_REPORT.md
+  - Rewrote CPQ_INTEGRATION_GUIDE.md to reflect 100% client-side pricing architecture (no external CPQ service)
+  - Updated SYSTEM_ARCHITECTURE_EXPORT.md to mark sales_engine module and external CPQ proxy as completed cleanup
+  - Updated docs/CPQ_INTEGRITY_AUDITOR_INTEGRATION.md to describe client-side integrity checking
+  - Clarified .env.example: CPQ_API_KEY is for inbound API calls only (external integrations calling INTO the CRM)
+
+### Previous Changes (January 11, 2026)
 - **PandaDoc Embedded Editor Integration:**
   - Added PandaDoc embedded editor directly in Deal Workspace "Proposal" tab using pandadoc-editor npm package
   - E-Token authentication with 1-hour session expiration for secure editing sessions
