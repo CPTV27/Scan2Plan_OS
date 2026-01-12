@@ -5,6 +5,7 @@ import { promisify } from "util";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { log } from "./logger";
 
 const execAsync = promisify(exec);
 
@@ -177,7 +178,7 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 1
       base64Images.push(`data:image/png;base64,${base64}`);
     }
     
-    console.log(`[Vision] Converted ${base64Images.length} pages to images at 200 DPI`);
+    log(`Converted ${base64Images.length} pages to images at 200 DPI`, "vision");
     return base64Images;
   } finally {
     try {
@@ -205,7 +206,7 @@ async function findEstimatePage(images: string[]): Promise<{ pageIndex: number; 
     },
   }));
 
-  console.log(`[Vision] Phase 1: Scanning ALL ${images.length} pages to find estimate...`);
+  log(`Phase 1: Scanning ALL ${images.length} pages to find estimate...`, "vision");
 
   try {
     const response = await openai.chat.completions.create({
@@ -239,18 +240,18 @@ async function findEstimatePage(images: string[]): Promise<{ pageIndex: number; 
       .sort((a, b) => b.confidence - a.confidence)[0];
 
     if (estimatePage) {
-      console.log(`[Vision] Found estimate on page ${estimatePage.page_number} (${estimatePage.confidence}% confidence): ${estimatePage.reason}`);
+      log(`Found estimate on page ${estimatePage.page_number} (${estimatePage.confidence}% confidence): ${estimatePage.reason}`, "vision");
       return { pageIndex: estimatePage.page_number - 1, confidence: estimatePage.confidence };
     }
 
     // Fallback: scan pages looking for any with numbers/tables (pages 2-3 are common)
-    console.log("[Vision] No estimate page identified with high confidence, using heuristic fallback");
+    log("No estimate page identified with high confidence, using heuristic fallback", "vision");
     
     // Try the middle of the document as fallback (common for estimates)
     const fallbackIndex = Math.min(Math.floor(images.length / 2), images.length - 1);
     return { pageIndex: fallbackIndex, confidence: 40 };
   } catch (error) {
-    console.error("[Vision] Page finder error:", error);
+    log(`Page finder error: ${error instanceof Error ? error.message : String(error)}`, "vision");
     // On error, try to extract from all pages at once
     return { pageIndex: -1, confidence: 20 }; // -1 signals "use all pages"
   }
@@ -270,7 +271,7 @@ async function extractFromEstimatePage(
     // Use all pages when page detection failed
     relevantImages = images;
     contextInfo = `You are looking at all ${images.length} pages of the proposal. Find the pricing/estimate table and extract all data.`;
-    console.log(`[Vision] Phase 2: Extracting from ALL ${images.length} pages (page detection failed)...`);
+    log(`Phase 2: Extracting from ALL ${images.length} pages (page detection failed)...`, "vision");
   } else {
     // Dynamic window: include 1 page before and ALL pages after the estimate
     // This ensures we capture totals/signatures that may follow
@@ -278,7 +279,7 @@ async function extractFromEstimatePage(
     const endIdx = images.length; // Always include to end of document
     relevantImages = images.slice(startIdx, endIdx);
     contextInfo = `You are looking at pages ${startIdx + 1} through ${endIdx} of the proposal. The pricing table should be on page ${estimatePageIndex + 1}. Include any totals or additional pricing from subsequent pages.`;
-    console.log(`[Vision] Phase 2: Extracting from pages ${startIdx + 1}-${endIdx} (estimate on page ${estimatePageIndex + 1})...`);
+    log(`Phase 2: Extracting from pages ${startIdx + 1}-${endIdx} (estimate on page ${estimatePageIndex + 1})...`, "vision");
   }
   
   const imageContents = relevantImages.map((base64Image, idx) => ({
@@ -325,7 +326,7 @@ Pay special attention to:
     throw new Error("No response from GPT-4o");
   }
 
-  console.log("[Vision] Response received, parsing...");
+  log("Response received, parsing...", "vision");
 
   // Clean up JSON response
   let jsonStr = content.trim();
@@ -338,8 +339,8 @@ Pay special attention to:
   try {
     parsed = JSON.parse(jsonStr);
   } catch (parseError) {
-    console.error("[Vision] JSON parse error:", parseError);
-    console.error("[Vision] Raw content:", content.substring(0, 500));
+    log(`JSON parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`, "vision");
+    log(`Raw content (truncated): ${content.substring(0, 500)}`, "vision");
     throw new Error(`Failed to parse response as JSON: ${parseError}`);
   }
 
@@ -347,7 +348,7 @@ Pay special attention to:
   const validated = ProposalSchema.safeParse(parsed);
   
   if (!validated.success) {
-    console.error("[Vision] Schema validation failed:", validated.error.errors);
+    log(`Schema validation failed: ${JSON.stringify(validated.error.errors)}`, "vision");
     
     // Build fallback from partial data
     const data = parsed as any;
@@ -468,7 +469,7 @@ function calculateAverageConfidence(data: ProposalData): number {
 
 // Main extraction function - now uses two-pass approach
 export async function extractProposalData(pdfBuffer: Buffer): Promise<ProposalData> {
-  console.log("[Vision] Starting enhanced two-pass proposal extraction...");
+  log("Starting enhanced two-pass proposal extraction...", "vision");
   
   const images = await convertPdfToImages(pdfBuffer, 10);
   
@@ -505,10 +506,7 @@ export function convertVisionToExtractedData(visionData: ProposalData) {
   const hasDiscrepancy = discrepancyPercent > 15;
   
   if (hasDiscrepancy) {
-    console.log("[Vision] Price discrepancy detected:");
-    console.log(`  Line item sum: $${lineItemSum.toLocaleString()}`);
-    console.log(`  Grand total: $${grandTotal.toLocaleString()}`);
-    console.log(`  Discrepancy: ${discrepancyPercent.toFixed(1)}%`);
+    log(`Price discrepancy detected: Line item sum $${lineItemSum.toLocaleString()} vs grand total $${grandTotal.toLocaleString()} (${discrepancyPercent.toFixed(1)}% diff)`, "vision");
   }
 
   // Map line items with quality metrics

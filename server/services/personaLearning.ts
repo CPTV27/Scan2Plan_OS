@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { db } from '../db';
 import { buyerPersonas, personaInsights, leads } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { log } from '../lib/logger';
 
 let openaiClient: OpenAI | null = null;
 
@@ -51,7 +52,7 @@ export async function analyzeOutcome(context: DealContext): Promise<PersonaInsig
       .where(eq(buyerPersonas.code, context.personaCode));
 
     if (!persona) {
-      console.error(`Persona not found: ${context.personaCode}`);
+      log(`Persona not found: ${context.personaCode}`, "persona-learning");
       return null;
     }
 
@@ -70,7 +71,7 @@ export async function analyzeOutcome(context: DealContext): Promise<PersonaInsig
     if (!isAIConfigured()) {
       await db.insert(personaInsights).values(basicInsight);
       await recalculatePersonaStats(persona.id);
-      console.log(`[Persona Learning] Recorded basic insight for lead ${context.leadId} (AI not configured)`);
+      log(`Recorded basic insight for lead ${context.leadId} (AI not configured)`, "persona-learning");
       return {
         tacticalLessons: [],
         languageWins: [],
@@ -110,7 +111,7 @@ Always respond with valid JSON matching the requested schema.`
       // Record basic insight without AI analysis
       await db.insert(personaInsights).values(basicInsight);
       await recalculatePersonaStats(persona.id);
-      console.log(`[Persona Learning] Recorded basic insight for lead ${context.leadId} (AI returned empty)`);
+      log(`Recorded basic insight for lead ${context.leadId} (AI returned empty)`, "persona-learning");
       return null;
     }
 
@@ -124,7 +125,7 @@ Always respond with valid JSON matching the requested schema.`
       if (!Array.isArray(result.refinementSuggestions)) result.refinementSuggestions = [];
       if (typeof result.confidenceScore !== 'number') result.confidenceScore = 0.5;
     } catch (parseError) {
-      console.error('[Persona Learning] Failed to parse AI response:', parseError);
+      log(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`, "persona-learning");
       // Still record basic insight
       await db.insert(personaInsights).values(basicInsight);
       await recalculatePersonaStats(persona.id);

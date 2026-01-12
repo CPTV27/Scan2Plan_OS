@@ -14,6 +14,7 @@ import {
 import { eq, desc, and, sql } from "drizzle-orm";
 import OpenAI from "openai";
 import { extractProposalData, convertVisionToExtractedData } from "./proposal-vision";
+import { log } from "./logger";
 
 // pdf-parse is a CJS-only package
 // In ESM (dev), use dynamic import. In CJS (prod), esbuild bundles it directly.
@@ -823,7 +824,7 @@ Return ONLY valid JSON.`;
         
         if (isRateLimited || isServerError) {
           const delay = baseDelayMs * Math.pow(2, attempt);
-          console.log(`PandaDoc API retry ${attempt + 1}/${maxRetries} after ${delay}ms:`, error.message);
+          log(`PandaDoc API retry ${attempt + 1}/${maxRetries} after ${delay}ms: ${error.message}`, "pandadoc");
           await new Promise(resolve => setTimeout(resolve, delay));
         } else {
           throw error;
@@ -857,7 +858,7 @@ Return ONLY valid JSON.`;
       let extracted: ExtractedQuoteData;
       
       try {
-        console.log(`Starting GPT-4o Vision extraction for document ${documentId}...`);
+        log(`Starting GPT-4o Vision extraction for document ${documentId}...`, "pandadoc");
         const pdfBuffer = await this.fetchWithRetry(
           () => this.downloadPdf(doc.pandaDocId),
           2,
@@ -875,16 +876,16 @@ Return ONLY valid JSON.`;
           }));
         }
         
-        console.log(`Vision extraction successful: ${extracted.services?.length || 0} services found`);
+        log(`Vision extraction successful: ${extracted.services?.length || 0} services found`, "pandadoc");
       } catch (visionError) {
-        console.error("Vision extraction failed, falling back to text extraction:", visionError);
+        log(`Vision extraction failed, falling back to text extraction: ${visionError instanceof Error ? visionError.message : String(visionError)}`, "pandadoc");
         
         let pdfText = "";
         try {
           const pdfBuffer = await this.downloadPdf(doc.pandaDocId);
           pdfText = await this.extractTextFromPdf(pdfBuffer);
         } catch (textError) {
-          console.error("Text extraction also failed:", textError);
+          log(`Text extraction also failed: ${textError instanceof Error ? textError.message : String(textError)}`, "pandadoc");
         }
         
         extracted = await this.extractQuoteData(details, pdfText);
@@ -917,7 +918,7 @@ Return ONLY valid JSON.`;
         timestamp: new Date().toISOString(),
       };
       
-      console.error(`PandaDoc extraction failed for doc ${documentId}:`, errorDetails);
+      log(`PandaDoc extraction failed for doc ${documentId}: ${JSON.stringify(errorDetails)}`, "pandadoc");
       
       await db.update(pandaDocDocuments)
         .set({
@@ -1015,7 +1016,7 @@ Return ONLY valid JSON.`;
       .where(eq(pandaDocDocuments.id, documentId))
       .returning();
 
-    console.log(`PandaDoc approved: Created lead ${lead.id} (${dealStage}) and quote ${quote.id}`);
+    log(`PandaDoc approved: Created lead ${lead.id} (${dealStage}) and quote ${quote.id}`, "pandadoc");
 
     return { document: updated, quote, lead };
   }
