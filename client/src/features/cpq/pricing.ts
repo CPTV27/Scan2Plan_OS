@@ -329,7 +329,20 @@ const SCANNING_DAILY_RATE = 600;        // $600/day for scanning
 const SCANNING_SQFT_PER_DAY = 10000;    // 1 day per 10,000 sqft
 const HOTEL_PER_DIEM_DAILY = 300;       // $300/day for hotel + per diem (for multi-day scans)
 
-// Helper: Get area tier info
+/**
+ * Determines the area tier and volume discount multiplier for a given square footage.
+ * 
+ * Larger projects receive volume discounts. Tiers range from "0-5k" (no discount)
+ * to "100k+" (28% discount). This implements progressive pricing that rewards
+ * larger project commitments.
+ * 
+ * @param sqft - Project square footage
+ * @returns Object with tier label (e.g., "10k-20k") and multiplier (0.72-1.0)
+ * 
+ * @example
+ * getAreaTier(15000) // => { tier: "10k-20k", multiplier: 0.90 }
+ * getAreaTier(75000) // => { tier: "75k-100k", multiplier: 0.75 }
+ */
 export function getAreaTier(sqft: number): { tier: string; multiplier: number } {
   for (const tier of AREA_TIERS) {
     if (sqft >= tier.min && sqft < tier.max) {
@@ -339,7 +352,24 @@ export function getAreaTier(sqft: number): { tier: string; multiplier: number } 
   return { tier: "100k+", multiplier: 0.72 };
 }
 
-// Helper: Get base pricing rate
+/**
+ * Calculates the per-square-foot rate for a specific discipline and configuration.
+ * 
+ * Rate is determined by:
+ * 1. Building type (e.g., office, retail, industrial) - base rates vary by complexity
+ * 2. Discipline (architecture, mepf, structure, site) - each has different pricing
+ * 3. Level of Detail (LOD 100-400) - higher detail = higher multiplier
+ * 4. Area tier discount - larger projects get volume discounts
+ * 
+ * @param buildingTypeId - Building type ID (1-16)
+ * @param sqft - Project square footage (for tier discount calculation)
+ * @param discipline - BIM discipline ("architecture", "mepf", "structure", "site")
+ * @param lod - Level of Detail ("100", "200", "250", "300", "350", "400")
+ * @returns Per-square-foot rate in dollars
+ * 
+ * @example
+ * getPricingRate("1", 50000, "architecture", "200") // Office, 50k sqft, Arch LOD 200
+ */
 export function getPricingRate(
   buildingTypeId: string,
   sqft: number,
@@ -502,10 +532,44 @@ export function calculateTravelCost(
   return OTHER_DISPATCH_BASE_FEE + (distance * OTHER_DISPATCH_PER_MILE_RATE);
 }
 
-// Main pricing calculation function
-// NOTE: Risk premiums (Occupied/Hazardous) apply ONLY to Architecture discipline.
-// MEPF, Structure, Site, Travel, and other ancillary costs are explicitly EXCLUDED.
-// marginTarget: Optional target margin (0.35-0.60). When provided, adjusts client price to achieve target margin.
+/**
+ * Calculates complete pricing for a CPQ quote.
+ * 
+ * This is the main pricing engine function that processes all areas, services,
+ * travel costs, and risk factors to produce a complete quote breakdown.
+ * 
+ * @param areas - Array of Area objects containing building details (sqft, disciplines, LOD, scope)
+ * @param services - Record of additional services with quantities (e.g., { matterport: 10000 })
+ * @param travel - Travel configuration with dispatch location, distance, and mileage
+ * @param risks - Array of active risk factor IDs (e.g., ["hazardous", "occupied"])
+ * @param paymentTerms - Payment terms affecting final pricing (default: "standard")
+ * @param marginTarget - Optional target margin (0.35-0.60). When provided, adjusts client price using formula: clientPrice = cost / (1 - marginTarget)
+ * 
+ * @returns PricingResult containing:
+ *   - items: PricingLineItem[] - Line item breakdown with labels and amounts
+ *   - subtotal: number - Sum of all line items before adjustments
+ *   - totalClientPrice: number - Final client price (with margin adjustment if marginTarget provided)
+ *   - totalUpteamCost: number - Vendor/upteam cost total
+ *   - profitMargin: number - Calculated margin percentage (0-1)
+ *   - marginTarget: number (optional) - The target margin if specified
+ *   - marginWarnings: MarginWarning[] (optional) - Warnings if margin is below thresholds
+ *   - disciplineTotals: Object - Per-discipline cost breakdown (architecture, mep, structural, site, travel, cad, other)
+ * 
+ * @example
+ * const result = calculatePricing(
+ *   [{ squareFeet: "50000", buildingType: "1", disciplines: ["architecture"], lod: "200" }],
+ *   { matterport: 50000 },
+ *   { dispatchLocation: "brooklyn", distance: 15, mileage: 30 },
+ *   ["occupied"],
+ *   "standard",
+ *   0.45
+ * );
+ * // result.totalClientPrice = 45000
+ * // result.profitMargin = 0.45
+ * 
+ * @note Risk premiums apply ONLY to Architecture discipline costs.
+ * MEPF, Structure, Site, Travel, and services are explicitly excluded from risk adjustments.
+ */
 export function calculatePricing(
   areas: Area[],
   services: Record<string, number>,

@@ -530,6 +530,20 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
 
   const isLandscape = (buildingType: string) => buildingType === "14" || buildingType === "15";
 
+  /**
+   * Confidence Score Calculation Weights
+   * 
+   * Each factor contributes a percentage of the total confidence score:
+   * - Building type and square footage (15% each) establish project scope
+   * - Disciplines selection (20%) defines deliverables
+   * - MEP scope details (15%) refines mechanical estimates
+   * - Dispatch location and distance (10% + 5%) affect travel costs
+   * - Site status risks and services (10% each) capture project complexity
+   * 
+   * A score of 90%+ indicates high-confidence pricing.
+   * A score of 70-89% suggests moderate confidence with some gaps.
+   * Below 70% indicates significant missing information.
+   */
   const CONFIDENCE_WEIGHTS = {
     buildingType: 0.15,
     sqft: 0.15,
@@ -541,6 +555,12 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
     distance: 0.05,
   };
 
+  /**
+   * Calculates quote confidence score based on field completeness.
+   * 
+   * @returns A percentage score (0-100) indicating how complete the quote configuration is.
+   * Higher scores indicate more reliable pricing estimates.
+   */
   const calculateConfidenceScore = useMemo(() => {
     let score = 0;
     

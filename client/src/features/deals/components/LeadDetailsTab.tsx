@@ -1,5 +1,3 @@
-import { UseFormReturn } from "react-hook-form";
-import { UseMutationResult } from "@tanstack/react-query";
 import { TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,28 +41,7 @@ import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { LocationPreview } from "@/components/LocationPreview";
 import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
-import type { Lead, LeadDocument } from "@shared/schema";
-import type { QueryClient } from "@tanstack/react-query";
-
-const BUYER_PERSONAS: Record<string, string> = {
-  "BP-A": "Design Principal / Senior Architect",
-  "BP-B": "Project Architect / Manager",
-  "BP-C": "Owner Representative / Developer",
-  "BP-D": "GC / Construction Manager",
-};
-
-interface LeadDetailsTabProps {
-  lead: Lead;
-  leadId: number;
-  form: UseFormReturn<any>;
-  onSubmit: (data: any) => Promise<void>;
-  isPending: boolean;
-  queryClient: QueryClient;
-  updateMutation: UseMutationResult<any, Error, any, unknown>;
-  toast: (opts: { title: string; description?: string; variant?: "default" | "destructive" }) => void;
-  documents?: LeadDocument[];
-  uploadDocumentMutation: UseMutationResult<any, Error, File, unknown>;
-}
+import { LeadDetailsTabProps, BUYER_PERSONAS } from "@/features/deals/types";
 
 export function LeadDetailsTab({
   lead,

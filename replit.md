@@ -45,8 +45,14 @@ Key modules include:
 - **Unit Testing Suite:**
   - Added comprehensive unit tests for CPQ pricing engine (client/src/features/cpq/pricing.test.ts) - 72 tests covering margin calculations, travel costs, tier pricing, scope discounts, risk premiums, landscape pricing
   - Added unit tests for server-side CPQ validator (server/validators/cpqValidator.test.ts) - 33 tests covering margin floor enforcement, CEO override, dispatch location validation, Tier A classification, PandaDoc send validation
-  - Created vitest.config.ts for test configuration with proper path aliases
-  - All 105 unit tests passing
+  - Added LeadDetailsTab.test.tsx with 10 unit tests covering form rendering, input population, billing section, notes section
+  - Created vitest.config.ts for test configuration with proper path aliases supporting dual Node/jsdom environments
+  - ResizeObserver mock properly configured as class for Radix UI component compatibility
+  - All 115 unit tests passing
+- **JSDoc Documentation:**
+  - Added comprehensive JSDoc to calculatePricing() with full parameter/return documentation matching PricingResult interface
+  - Added JSDoc to getAreaTier() and getPricingRate() helper functions
+  - Added JSDoc to QuoteBuilderTab confidence score calculation explaining weight factors and score interpretation
 - **Centralized Error Handling:**
   - Enhanced server/middleware/errorHandler.ts with typed error classes: BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError, MarginGateError, ServiceError
   - Consistent HTTP status codes and error response format with code, message, requestId, and optional details

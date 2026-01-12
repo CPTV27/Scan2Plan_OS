@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -89,7 +90,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiRequest } from "@/lib/queryClient";
 import type { Lead, CpqQuote, DealAttribution, CpqCalculateRequest, CpqCalculateResponse, CpqApiArea } from "@shared/schema";
-import { insertLeadSchema, TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, CPQ_API_DISCIPLINES, CPQ_API_LODS, CPQ_API_SCOPES, CPQ_API_RISKS, CPQ_API_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
+import { TOUCHPOINT_OPTIONS, TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, CPQ_API_DISCIPLINES, CPQ_API_LODS, CPQ_API_SCOPES, CPQ_API_RISKS, CPQ_API_DISPATCH_LOCATIONS, CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -111,31 +112,7 @@ import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
 import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
 
-const BUYER_PERSONAS: Record<string, string> = {
-  "BP-A": "Design Principal / Senior Architect",
-  "BP-B": "Project Architect / Manager",
-  "BP-C": "Owner Representative / Developer",
-  "BP-D": "GC / Construction Manager",
-};
-
-const formSchema = insertLeadSchema.extend({
-  clientName: z.string().min(1, "Client name is required"),
-  projectAddress: z.string().min(1, "Project address is required"),
-  dealStage: z.string().min(1, "Deal stage is required"),
-  billingContactName: z.string().min(1, "Billing contact name is required"),
-  billingContactEmail: z.string().email("Valid billing email is required"),
-  billingContactPhone: z.string().optional().nullable(),
-  projectStatus: z.object({
-    proposalPhase: z.boolean().optional(),
-    inHand: z.boolean().optional(),
-    urgent: z.boolean().optional(),
-    other: z.boolean().optional(),
-    otherText: z.string().optional(),
-  }).optional(),
-  proofLinks: z.string().optional().nullable(),
-});
-
-type FormData = z.infer<typeof formSchema>;
+import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
 // QuoteBuilderTab extracted to client/src/features/deals/components/QuoteBuilderTab.tsx
 
@@ -460,8 +437,8 @@ export default function DealWorkspace() {
     staleTime: 60000,
   });
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<LeadFormData>({
+    resolver: zodResolver(leadFormSchema),
     defaultValues: {
       clientName: "",
       projectName: "",
@@ -527,7 +504,7 @@ export default function DealWorkspace() {
     }
   }, [lead, form]);
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: LeadFormData) {
     try {
       await updateMutation.mutateAsync({ id: leadId, ...data });
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
@@ -991,67 +968,81 @@ export default function DealWorkspace() {
         </div>
 
         {/* Lead Details Tab - Consolidated form with bordered sections */}
-        <LeadDetailsTab
-          lead={lead}
-          leadId={leadId}
-          form={form}
-          onSubmit={onSubmit}
-          isPending={isPending}
-          queryClient={queryClient}
-          updateMutation={updateMutation}
-          toast={toast}
-          documents={documents}
-          uploadDocumentMutation={uploadDocumentMutation}
-        />
+        <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
+          <LeadDetailsTab
+            lead={lead}
+            leadId={leadId}
+            form={form}
+            onSubmit={onSubmit}
+            isPending={isPending}
+            queryClient={queryClient}
+            updateMutation={updateMutation}
+            toast={toast}
+            documents={documents}
+            uploadDocumentMutation={uploadDocumentMutation}
+          />
+        </ErrorBoundary>
 
         {/* Quote Builder Tab */}
         <TabsContent value="quote" className="flex-1 overflow-hidden m-0">
-          <QuoteBuilderTab 
-            lead={lead} 
-            leadId={leadId}
-            toast={toast}
-            onQuoteSaved={() => {
-              setEditingFromQuote(null);
-              handleTabChange("history");
-            }}
-            existingQuotes={quotes}
-            sourceQuote={editingFromQuote}
-            onClearSourceQuote={() => setEditingFromQuote(null)}
-          />
+          <ErrorBoundary fallbackTitle="Quote Builder Error" fallbackMessage="Failed to load quote builder. Please try refreshing.">
+            <QuoteBuilderTab 
+              lead={lead} 
+              leadId={leadId}
+              toast={toast}
+              onQuoteSaved={() => {
+                setEditingFromQuote(null);
+                handleTabChange("history");
+              }}
+              existingQuotes={quotes}
+              sourceQuote={editingFromQuote}
+              onClearSourceQuote={() => setEditingFromQuote(null)}
+            />
+          </ErrorBoundary>
         </TabsContent>
 
         {/* Version History Tab */}
-        <VersionHistoryTab
-          quotes={quotes}
-          quotesLoading={quotesLoading}
-          onViewQuote={setViewingQuote}
-          onNavigateToQuoteBuilder={() => setActiveTab("quote")}
-        />
+        <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
+          <VersionHistoryTab
+            quotes={quotes}
+            quotesLoading={quotesLoading}
+            onViewQuote={setViewingQuote}
+            onNavigateToQuoteBuilder={() => setActiveTab("quote")}
+          />
+        </ErrorBoundary>
 
         {/* Proposal Tab - Evidence Vault + AI Assistant */}
-        <ProposalTab lead={lead} />
+        <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
+          <ProposalTab lead={lead} />
+        </ErrorBoundary>
 
         {/* Documents Tab */}
-        <DocumentsTab
-          documents={documents}
-          documentsLoading={documentsLoading}
-          uploadDocumentMutation={uploadDocumentMutation}
-          deleteDocumentMutation={deleteDocumentMutation}
-        />
+        <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
+          <DocumentsTab
+            documents={documents}
+            documentsLoading={documentsLoading}
+            uploadDocumentMutation={uploadDocumentMutation}
+            deleteDocumentMutation={deleteDocumentMutation}
+          />
+        </ErrorBoundary>
 
         {/* PandaDoc Tab - Document editing and signature */}
-        <PandaDocTab
-          pandaDocId={lead?.pandaDocId || null}
-          documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
-          leadId={leadId}
-          quoteId={latestQuote?.id}
-          queryClient={queryClient}
-          onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
-          proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
-        />
+        <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
+          <PandaDocTab
+            pandaDocId={lead?.pandaDocId || null}
+            documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
+            leadId={leadId}
+            quoteId={latestQuote?.id}
+            queryClient={queryClient}
+            onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
+            proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
+          />
+        </ErrorBoundary>
 
         {/* Communicate Tab - Email correspondence timeline */}
-        <CommunicateTab leadId={leadId} contactEmail={lead?.contactEmail} />
+        <ErrorBoundary fallbackTitle="Communicate Tab Error" fallbackMessage="Failed to load email communication. Please try refreshing.">
+          <CommunicateTab leadId={leadId} contactEmail={lead?.contactEmail} />
+        </ErrorBoundary>
       </Tabs>
 
       {lead && latestQuote && (
