@@ -92,4 +92,8 @@ export const HUNGRY_FIELD_QUESTIONS: Record<string, string> = {
   billingContactPhone: "What is the billing contact's phone number?",
   sqft: "What is the approximate square footage of the project?",
   buildingType: "What type of building is this (warehouse, office, historic, etc.)?",
+  registrationRms: "What is the registration RMS value from quality control?",
+  progress: "What percentage of the project has been completed?",
+  dueDate: "When is the project deadline?",
+  assignedTechId: "Which technician should be assigned to this project?",
 };
