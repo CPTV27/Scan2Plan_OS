@@ -8,3 +8,4 @@ export { QuoteVersionDialog } from "./QuoteVersionDialog";
 export { ProposalTab } from "./ProposalTab";
 export { PandaDocTab } from "./PandaDocTab";
 export { LeadDetailsTab } from "./LeadDetailsTab";
+export { default as QuoteBuilderTab, type QuoteBuilderArea, type QuoteBuilderTabProps } from "./QuoteBuilderTab";

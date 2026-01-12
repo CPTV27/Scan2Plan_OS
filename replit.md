@@ -37,24 +37,35 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 12, 2026)
-- **Code Quality Improvements:**
+- **DealWorkspace.tsx Phase 5 Refactoring:**
+  - Extracted QuoteBuilderTab component (~1,130 lines) to client/src/features/deals/components/QuoteBuilderTab.tsx
+  - DealWorkspace.tsx reduced from 2,239 to 1,087 lines (51% reduction, down from original 3,112 lines)
+  - Total extracted components (Phases 1-5): QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab (11 components total)
+  - All data-testid attributes preserved for e2e testing
+- **Unit Testing Suite:**
+  - Added comprehensive unit tests for CPQ pricing engine (client/src/features/cpq/pricing.test.ts) - 72 tests covering margin calculations, travel costs, tier pricing, scope discounts, risk premiums, landscape pricing
+  - Added unit tests for server-side CPQ validator (server/validators/cpqValidator.test.ts) - 33 tests covering margin floor enforcement, CEO override, dispatch location validation, Tier A classification, PandaDoc send validation
+  - Created vitest.config.ts for test configuration with proper path aliases
+  - All 105 unit tests passing
+- **Centralized Error Handling:**
+  - Enhanced server/middleware/errorHandler.ts with typed error classes: BadRequestError, UnauthorizedError, ForbiddenError, NotFoundError, ConflictError, ValidationError, MarginGateError, ServiceError
+  - Consistent HTTP status codes and error response format with code, message, requestId, and optional details
+  - Error code mapping from HTTP status for backward compatibility
+- **Performance Monitoring:**
+  - Added server/middleware/performanceLogger.ts for tracking API response times
+  - Slow request detection (>1s warning, >3s very slow) with automatic logging
+  - New endpoints: GET /api/performance/stats (view metrics), POST /api/performance/stats/clear (reset) - CEO role required
+  - Tracks p50/p95/p99 latencies per endpoint
+- **Component Self-Containment:**
+  - QuoteBuilderTab now uses useQueryClient hook internally instead of requiring prop injection
+  - Reduces prop drilling and improves component independence
+- **Code Quality Improvements (earlier today):**
   - Replaced console.log with structured log() utility in pandadoc-client.ts, proposal-vision.ts, personaLearning.ts
   - Created server/storage/ domain modules (leads.ts, quotes.ts, financial.ts, marketing.ts) for cleaner imports
   - Storage modules are backwards-compatible wrappers - existing imports unchanged
-  - Silent catch blocks reviewed - confirmed as intentional fallback patterns for localStorage/date parsing
-- **DealWorkspace.tsx Phase 4 Refactoring:**
-  - Extracted LeadDetailsTab component (~879 lines) to client/src/features/deals/components/LeadDetailsTab.tsx
-  - DealWorkspace.tsx reduced from 3,112 lines to 2,239 lines (-873 lines, 28% reduction)
-  - Total extracted components (Phases 1-4): QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab
-  - All data-testid attributes preserved for e2e testing
-  - Cleaned up unused imports: LocationPreview, PersonaSuggestion, ClipboardList, Users, Clock, FolderPlus
-  - QuoteBuilderTab remains inline (~850 lines) - candidate for future extraction
 - **CPQ Documentation Cleanup:**
   - Deleted 4 outdated docs: CPQ_PRICING_API.md, CPQ_COMPARISON_REPORT.md, CPQ_PRICING_REPAIR_REPORT.md, CPQ_CRM_ALIGNMENT_REPORT.md
   - Rewrote CPQ_INTEGRATION_GUIDE.md to reflect 100% client-side pricing architecture (no external CPQ service)
-  - Updated SYSTEM_ARCHITECTURE_EXPORT.md to mark sales_engine module and external CPQ proxy as completed cleanup
-  - Updated docs/CPQ_INTEGRITY_AUDITOR_INTEGRATION.md to describe client-side integrity checking
-  - Clarified .env.example: CPQ_API_KEY is for inbound API calls only (external integrations calling INTO the CRM)
 
 ### Previous Changes (January 11, 2026)
 - **PandaDoc Embedded Editor Integration:**

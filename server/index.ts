@@ -11,6 +11,7 @@ import { SERVER_CONSTANTS } from "./constants";
 import { pool } from "./db";
 import { log } from "./lib/logger";
 import { applyStalenessPenalties } from "./staleness";
+import { performanceLoggerMiddleware } from "./middleware/performanceLogger";
 
 export { log };
 
@@ -25,6 +26,7 @@ declare module "http" {
 }
 
 app.use(correlationIdMiddleware);
+app.use(performanceLoggerMiddleware);
 
 app.use(
   express.json({
@@ -63,6 +65,7 @@ app.get("/api/health", async (_req: Request, res: Response) => {
     });
   }
 });
+
 
 app.use((req, res, next) => {
   const start = Date.now();

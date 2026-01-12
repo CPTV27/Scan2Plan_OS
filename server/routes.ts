@@ -10,6 +10,11 @@ import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import OpenAI from "openai";
 import { applyStalenessPenalties, getStalenessStatus } from "./staleness";
+import { 
+  getPerformanceStats, 
+  getActiveRequests, 
+  clearPerformanceStats 
+} from "./middleware/performanceLogger";
 import { calculateProbability, recalculateAllProbabilities, getStageSpecificStaleness } from "./probability";
 import multer from "multer";
 import fs from "fs";
@@ -496,6 +501,20 @@ Return ONLY valid JSON:
       log("ERROR: Field translation error - " + (error?.message || error));
       res.status(500).json({ message: error.message || "Translation failed" });
     }
+  }));
+
+  app.get("/api/performance/stats", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    res.json({
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      endpoints: getPerformanceStats(),
+      activeRequests: getActiveRequests(),
+    });
+  }));
+
+  app.post("/api/performance/stats/clear", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    clearPerformanceStats();
+    res.json({ success: true, message: "Performance stats cleared" });
   }));
 
   app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
