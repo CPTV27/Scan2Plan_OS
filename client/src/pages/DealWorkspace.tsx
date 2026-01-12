@@ -42,7 +42,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -55,7 +54,6 @@ import {
   Cloud,
   DollarSign,
   ExternalLink,
-  FileDown,
   FileText,
   Folder,
   FolderCheck,
@@ -66,7 +64,6 @@ import {
   Mail,
   MapPin,
   MessageSquare,
-  MoreVertical,
   Plus,
   Save,
   Sparkles,
@@ -759,7 +756,6 @@ export default function DealWorkspace() {
           )}
           {/* QuickBooks Sync Status */}
           <QboEstimateBadge lead={lead} />
-          
 
           {/* Delete Button - Standalone with Confirmation */}
           <AlertDialog>
@@ -798,50 +794,6 @@ export default function DealWorkspace() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          
-          {/* More Actions Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" data-testid="button-more-actions">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {/* Push to QuickBooks - show if there's a quote and QBO is connected */}
-              {latestQuote && qboStatus?.connected && (
-                <DropdownMenuItem 
-                  onClick={() => pushToQboMutation.mutate(!!lead.qboEstimateId)}
-                  disabled={pushToQboMutation.isPending}
-                  data-testid="menu-push-to-qbo"
-                >
-                  {pushToQboMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <DollarSign className="w-4 h-4 mr-2" />
-                  )}
-                  {lead.qboEstimateId ? "Re-sync to QuickBooks" : "Push to QuickBooks"}
-                </DropdownMenuItem>
-              )}
-              {latestQuote && !qboStatus?.connected && (
-                <DropdownMenuItem disabled className="text-muted-foreground">
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  QuickBooks not connected
-                </DropdownMenuItem>
-              )}
-              {/* Download estimate PDF - show if estimate exists */}
-              {lead.qboEstimateId && qboStatus?.connected && (
-                <DropdownMenuItem 
-                  onClick={() => {
-                    window.open(`/api/quickbooks/estimate/${lead.qboEstimateId}/pdf`, '_blank');
-                  }}
-                  data-testid="menu-download-pdf"
-                >
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Download Estimate PDF
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </header>
 
