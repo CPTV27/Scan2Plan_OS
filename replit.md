@@ -25,6 +25,8 @@ Key architectural components and features include:
 - **Payment Terms Centralization:** Standardizes payment terms (e.g., Net 15, Net 45, 50/50) across the application with consistent UI and pricing logic.
 - **Hungry Fields Data Collection:** Implements a tri-state UI for optional fields ("I don't know" options), tracks data completeness, and auto-generates follow-up emails for missing information.
 - **Security:** Features multi-layer authentication with Replit Auth, domain restriction, bcrypt password verification, rate limiting, and global API middleware for authentication enforcement.
+- **Field Technician Module (FieldHub):** Comprehensive technician portal with time logging, expense tracking, mission briefs, scope checklists, and file uploads to Google Drive. Calendar events include quick links to mission briefs and Drive folders.
+- **Google Drive Organization:** Projects are organized under a shared "Scan2Plan OS Projects" parent folder with standardized subfolders (01_Field_Capture, 02_Registration, etc.).
 
 ## External Dependencies
 - **QuickBooks Online:** Used for accounting, estimates, and financial reporting.
