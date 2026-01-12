@@ -37,6 +37,11 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 12, 2026)
+- **Code Quality Improvements:**
+  - Replaced console.log with structured log() utility in pandadoc-client.ts, proposal-vision.ts, personaLearning.ts
+  - Created server/storage/ domain modules (leads.ts, quotes.ts, financial.ts, marketing.ts) for cleaner imports
+  - Storage modules are backwards-compatible wrappers - existing imports unchanged
+  - Silent catch blocks reviewed - confirmed as intentional fallback patterns for localStorage/date parsing
 - **DealWorkspace.tsx Phase 4 Refactoring:**
   - Extracted LeadDetailsTab component (~879 lines) to client/src/features/deals/components/LeadDetailsTab.tsx
   - DealWorkspace.tsx reduced from 3,112 lines to 2,239 lines (-873 lines, 28% reduction)
