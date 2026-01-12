@@ -333,6 +333,17 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Alias for setSetting with more descriptive name
+  async updateSetting(key: string, value: unknown): Promise<Setting> {
+    return this.setSetting(key, value);
+  }
+
+  // Type-safe getSetting helper
+  async getSettingValue<T>(key: string): Promise<T | null> {
+    const setting = await this.getSetting(key);
+    return setting?.value as T ?? null;
+  }
+
   // Lead Research - delegated to LeadResearchRepository
   async getLeadResearch(leadId: number): Promise<LeadResearch[]> {
     return leadResearchRepo.getLeadResearch(leadId);

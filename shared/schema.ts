@@ -1881,6 +1881,21 @@ export interface BusinessDefaultsConfig {
   defaultBimVersion: string;
 }
 
+// GCS (Google Cloud Storage) Configuration
+export interface GcsStorageConfig {
+  projectId: string;
+  defaultBucket: string;
+  configured: boolean;
+  defaultStorageMode: "legacy_drive" | "hybrid_gcs" | "gcs_native";
+  lastTestedAt?: string;
+}
+
+export const GCS_STORAGE_MODES = {
+  legacy_drive: { label: "Google Drive Only", description: "Store all files in Google Drive (current default)" },
+  hybrid_gcs: { label: "Hybrid (Recommended)", description: "Scan data in GCS, documents in Google Drive" },
+  gcs_native: { label: "GCS Only", description: "Store all files in Google Cloud Storage" },
+} as const;
+
 // === SALES REPS (Commission Tracking) ===
 export const salesReps = pgTable("sales_reps", {
   id: serial("id").primaryKey(),
