@@ -30,6 +30,7 @@ app.use(performanceLoggerMiddleware);
 
 app.use(
   express.json({
+    limit: "1mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
