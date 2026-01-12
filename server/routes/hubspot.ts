@@ -118,10 +118,7 @@ export async function registerHubspotRoutes(app: Express): Promise<void> {
     res.json({ connected });
   }));
 
-  app.get("/api/personas", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
-    const personaList = await hubspotService.getPersonas();
-    res.json(personaList);
-  }));
+  // Note: /api/personas is now handled by personasRouter (uses buyerPersonas table)
 
   app.get("/api/track", asyncHandler(async (req, res) => {
     const { leadId, dest } = req.query;
