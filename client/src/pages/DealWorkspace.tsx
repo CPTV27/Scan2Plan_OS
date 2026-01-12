@@ -563,7 +563,7 @@ export default function DealWorkspace() {
           mode: "drive",
           primary: driveFolderUrl 
             ? { url: driveFolderUrl, label: "Drive Folder", icon: HardDrive }
-            : { url: `https://drive.google.com/drive/search?q=${encodeURIComponent(lead.projectCode || "")}`, label: "Search Drive", icon: HardDrive },
+            : null,
           secondary: null,
         };
     }
