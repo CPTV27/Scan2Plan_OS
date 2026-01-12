@@ -37,6 +37,11 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 12, 2026)
+- **Google Solar API Building Insights Endpoint:**
+  - Added `/api/location/building-insights` endpoint to `server/routes/google.ts`
+  - Connects frontend LocationPreview component to Google Solar API
+  - Returns building footprint (sqft), roof segments, height, and imagery quality
+  - Requires authentication via `isAuthenticated` middleware
 - **DealWorkspace.tsx Phase 5 Refactoring:**
   - Extracted QuoteBuilderTab component (~1,130 lines) to client/src/features/deals/components/QuoteBuilderTab.tsx
   - DealWorkspace.tsx reduced from 2,239 to 1,087 lines (51% reduction, down from original 3,112 lines)
