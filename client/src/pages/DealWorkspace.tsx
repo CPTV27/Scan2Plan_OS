@@ -124,7 +124,7 @@ import {
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
-import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
+import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab } from "@/features/deals/components";
 
 const BUYER_PERSONAS: Record<string, string> = {
   "BP-A": "Design Principal / Senior Architect",
@@ -3056,146 +3056,12 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Version History Tab */}
-        <TabsContent value="history" className="flex-1 overflow-hidden m-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <History className="w-5 h-5" />
-                    Quote Version History
-                  </CardTitle>
-                  <CardDescription>
-                    Track all quote revisions for this deal
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {quotesLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : quotes && quotes.length > 0 ? (
-                    <div className="space-y-3">
-                      {quotes.map((quote) => (
-                        <div
-                          key={quote.id}
-                          className={`p-4 rounded-lg border transition-colors cursor-pointer hover-elevate ${
-                            quote.isLatest ? "border-primary/50 bg-primary/5" : "border-border"
-                          }`}
-                          data-testid={`version-card-${quote.id}`}
-                          onClick={() => setViewingQuote(quote)}
-                        >
-                          <div className="flex items-center justify-between gap-4 mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">Version {quote.versionNumber}</span>
-                              {quote.isLatest && (
-                                <Badge variant="default" className="text-xs">
-                                  Current
-                                </Badge>
-                              )}
-                              {(quote as any).createdBy === "external-cpq" && (
-                                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
-                                  External CPQ
-                                </Badge>
-                              )}
-                              {quote.versionName && (
-                                <span className="text-muted-foreground text-sm">
-                                  ({quote.versionName})
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Clock className="w-4 h-4" />
-                              {quote.createdAt &&
-                                formatDistanceToNow(new Date(quote.createdAt), { addSuffix: true })}
-                              <ChevronRight className="w-4 h-4 ml-1" />
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">
-                              Quote: <span className="font-mono">{quote.quoteNumber}</span>
-                            </span>
-                            {quote.totalPrice && (
-                              <span className="font-medium">
-                                ${Number(quote.totalPrice).toLocaleString()}
-                              </span>
-                            )}
-                            {quote.createdBy && quote.createdBy !== "external-cpq" && (
-                              <span className="text-muted-foreground">
-                                by {quote.createdBy}
-                              </span>
-                            )}
-                            {(quote as any).externalCpqUrl && (
-                              <a
-                                href={(quote as any).externalCpqUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-primary hover:underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                View in CPQ
-                              </a>
-                            )}
-                          </div>
-                          {/* Show cost breakdown - Tier A or Standard pricing */}
-                          {((quote as any).internalCosts?.tierAScanningCost != null || (quote as any).pricingBreakdown?.items?.length > 0) && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mt-2 pt-2 border-t border-muted">
-                              {/* Tier A costs */}
-                              {(quote as any).internalCosts?.tierAScanningCost != null && (
-                                <span className="text-muted-foreground">
-                                  Scanning: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAScanningCost).toLocaleString()}</span>
-                                </span>
-                              )}
-                              {(quote as any).internalCosts?.tierAModelingCost != null && (
-                                <span className="text-muted-foreground">
-                                  Modeling: <span className="font-mono font-medium text-foreground">${Number((quote as any).internalCosts.tierAModelingCost).toLocaleString()}</span>
-                                </span>
-                              )}
-                              {(quote as any).internalCosts?.assumedMargin && (
-                                <span className="text-muted-foreground">
-                                  Target Margin: <span className="font-mono font-medium text-foreground">{(quote as any).internalCosts.assumedMargin}%</span>
-                                </span>
-                              )}
-                              {/* Standard pricing items - show top 3 disciplines */}
-                              {!(quote as any).internalCosts?.tierAScanningCost && (quote as any).pricingBreakdown?.items?.slice(0, 3).map((item: any, idx: number) => (
-                                <span key={idx} className="text-muted-foreground">
-                                  {item.label}: <span className="font-mono font-medium text-foreground">${Number(item.value).toLocaleString()}</span>
-                                </span>
-                              ))}
-                              {/* Show "more" indicator if there are more items */}
-                              {!(quote as any).internalCosts?.tierAScanningCost && (quote as any).pricingBreakdown?.items?.length > 3 && (
-                                <span className="text-muted-foreground text-xs">
-                                  +{(quote as any).pricingBreakdown.items.length - 3} more
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-                      <h3 className="font-medium mb-1">No Quotes Yet</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Create your first quote using the Quote Builder tab.
-                      </p>
-                      <Button
-                        variant="default"
-                        onClick={() => setActiveTab("quote")}
-                        data-testid="button-create-first-quote"
-                      >
-                        <Calculator className="w-4 h-4 mr-2" />
-                        Start Quote
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </ScrollArea>
-        </TabsContent>
+        <VersionHistoryTab
+          quotes={quotes}
+          quotesLoading={quotesLoading}
+          onViewQuote={setViewingQuote}
+          onNavigateToQuoteBuilder={() => setActiveTab("quote")}
+        />
 
         {/* Proposal Tab - Evidence Vault + AI Assistant */}
         <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
@@ -3207,123 +3073,12 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Documents Tab */}
-        <TabsContent value="documents" className="flex-1 overflow-hidden m-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Paperclip className="w-4 h-4" />
-                    Project Documents
-                  </CardTitle>
-                  <CardDescription>
-                    Upload floor plans, pictures, or other files. When this deal closes, files will automatically move to Google Drive.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-center border-2 border-dashed border-muted rounded-lg p-6">
-                      <div className="flex flex-col items-center gap-2">
-                        <Upload className="w-8 h-8 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">Upload floor plans, pictures, or documents</span>
-                        <Button
-                          type="button"
-                          variant="default"
-                          size="sm"
-                          disabled={uploadDocumentMutation.isPending}
-                          onClick={() => {
-                            const input = document.getElementById('document-upload-input') as HTMLInputElement;
-                            input?.click();
-                          }}
-                          data-testid="button-upload-document"
-                        >
-                          {uploadDocumentMutation.isPending ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>Select File</>
-                          )}
-                        </Button>
-                        <input
-                          id="document-upload-input"
-                          type="file"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) uploadDocumentMutation.mutate(file);
-                            e.target.value = '';
-                          }}
-                          disabled={uploadDocumentMutation.isPending}
-                          data-testid="input-upload-document"
-                        />
-                      </div>
-                    </div>
-
-                    {documentsLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : documents && documents.length > 0 ? (
-                      <div className="space-y-2">
-                        {documents.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                            data-testid={`document-item-${doc.id}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <Paperclip className="w-4 h-4 text-muted-foreground" />
-                              <div>
-                                <p className="text-sm font-medium">{doc.originalName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {(doc.size / 1024).toFixed(1)} KB
-                                  {doc.uploadedAt && ` • ${formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true })}`}
-                                </p>
-                              </div>
-                              {doc.movedToDriveAt && (
-                                <Badge variant="secondary" className="text-xs gap-1">
-                                  <ExternalLink className="w-3 h-3" />
-                                  In Drive
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => window.open(`/api/documents/${doc.id}/download`, '_blank')}
-                                data-testid={`button-download-${doc.id}`}
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive"
-                                onClick={() => deleteDocumentMutation.mutate(doc.id)}
-                                disabled={deleteDocumentMutation.isPending}
-                                data-testid={`button-delete-document-${doc.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <Paperclip className="w-12 h-12 text-muted-foreground mb-4" />
-                        <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </ScrollArea>
-        </TabsContent>
+        <DocumentsTab
+          documents={documents}
+          documentsLoading={documentsLoading}
+          uploadDocumentMutation={uploadDocumentMutation}
+          deleteDocumentMutation={deleteDocumentMutation}
+        />
 
         {/* PandaDoc Tab - Document editing and signature */}
         <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0">
@@ -3344,16 +3099,7 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Communicate Tab - Email correspondence timeline */}
-        <TabsContent value="communicate" className="flex-1 overflow-hidden m-0">
-          <ScrollArea className="h-full">
-            <div className="p-4">
-              <CorrespondenceTimeline 
-                leadId={leadId} 
-                contactEmail={lead?.contactEmail}
-              />
-            </div>
-          </ScrollArea>
-        </TabsContent>
+        <CommunicateTab leadId={leadId} contactEmail={lead?.contactEmail} />
       </Tabs>
 
       {lead && latestQuote && (
