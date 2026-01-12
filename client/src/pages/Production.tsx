@@ -21,7 +21,9 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LocationPreview } from "@/components/LocationPreview";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -524,7 +526,7 @@ function ProjectDialog({
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
               <TabsTrigger value="quoted" data-testid="tab-project-quoted">Quoted Scope</TabsTrigger>
-              <TabsTrigger value="scoping" data-testid="tab-project-scoping">Live Scoping</TabsTrigger>
+              <TabsTrigger value="scheduling" data-testid="tab-project-scheduling">Scheduling</TabsTrigger>
               <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
               <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
             </TabsList>
@@ -545,9 +547,9 @@ function ProjectDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="scoping" className="mt-4">
+            <TabsContent value="scheduling" className="mt-4">
               <ScrollArea className="max-h-[60vh]">
-                <ScopingDetails lead={linkedLead} />
+                <SchedulingPanel project={project} technicianId={project.assignedTechId} />
               </ScrollArea>
             </TabsContent>
 
@@ -875,7 +877,173 @@ function QuotedScopeDetails({ project }: { project: Project }) {
   );
 }
 
-// Scoping Details Component - Shows all CPQ data from sales process
+// Scheduling Panel Component - Schedule scan appointments
+function SchedulingPanel({ project, technicianId }: { project: Project; technicianId: number | null | undefined }) {
+  const { toast } = useToast();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    project.scanDate ? new Date(project.scanDate) : undefined
+  );
+  const [selectedTime, setSelectedTime] = useState<string>("09:00");
+  const [duration, setDuration] = useState<string>("4");
+  
+  const { data: scantechs } = useQuery<Scantech[]>({
+    queryKey: ['/api/scantechs'],
+  });
+
+  const technician = scantechs?.find(t => t.id === technicianId);
+  
+  const scheduleMutation = useMutation({
+    mutationFn: async (data: { scheduledStart: string; duration: number }) => {
+      const res = await apiRequest("POST", `/api/projects/${project.id}/schedule`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Scan scheduled", description: "Calendar invite sent to technician." });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Scheduling failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSchedule = () => {
+    if (!selectedDate) {
+      toast({ title: "Select a date", description: "Please select a date for the scan.", variant: "destructive" });
+      return;
+    }
+    if (!technicianId) {
+      toast({ title: "No technician assigned", description: "Please assign a technician first.", variant: "destructive" });
+      return;
+    }
+
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const scheduledStart = new Date(selectedDate);
+    scheduledStart.setHours(hours, minutes, 0, 0);
+
+    scheduleMutation.mutate({
+      scheduledStart: scheduledStart.toISOString(),
+      duration: parseInt(duration),
+    });
+  };
+
+  return (
+    <div className="space-y-4 pr-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CalendarClock className="w-4 h-4" />
+            Schedule Scan Appointment
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!technicianId ? (
+            <div className="bg-muted/50 rounded-lg p-4 text-center">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
+              <p className="text-sm text-muted-foreground">
+                No technician assigned. Please assign a ScanTech in the Details tab before scheduling.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Assigned: {technician?.name || 'Loading...'}</span>
+                </div>
+                {technician?.baseLocation && (
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">{technician.baseLocation}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal"
+                        data-testid="button-select-date"
+                      >
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        {selectedDate ? selectedDate.toLocaleDateString() : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Time</label>
+                  <Select value={selectedTime} onValueChange={setSelectedTime}>
+                    <SelectTrigger data-testid="select-time">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="06:00">6:00 AM</SelectItem>
+                      <SelectItem value="07:00">7:00 AM</SelectItem>
+                      <SelectItem value="08:00">8:00 AM</SelectItem>
+                      <SelectItem value="09:00">9:00 AM</SelectItem>
+                      <SelectItem value="10:00">10:00 AM</SelectItem>
+                      <SelectItem value="11:00">11:00 AM</SelectItem>
+                      <SelectItem value="12:00">12:00 PM</SelectItem>
+                      <SelectItem value="13:00">1:00 PM</SelectItem>
+                      <SelectItem value="14:00">2:00 PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Duration (hours)</label>
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger data-testid="select-duration">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 hours</SelectItem>
+                    <SelectItem value="4">4 hours (half day)</SelectItem>
+                    <SelectItem value="6">6 hours</SelectItem>
+                    <SelectItem value="8">8 hours (full day)</SelectItem>
+                    <SelectItem value="10">10 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {project.calendarEventId && (
+                <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-600" />
+                  <span className="text-sm text-green-700 dark:text-green-400">
+                    Scan scheduled for {project.scanDate ? new Date(project.scanDate).toLocaleString() : 'pending'}
+                  </span>
+                </div>
+              )}
+
+              <Button 
+                onClick={handleSchedule} 
+                className="w-full"
+                disabled={scheduleMutation.isPending || !selectedDate}
+                data-testid="button-schedule-scan"
+              >
+                {scheduleMutation.isPending ? "Scheduling..." : project.calendarEventId ? "Reschedule Scan" : "Schedule Scan"}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Scoping Details Component - Shows all CPQ data from sales process (deprecated - use Quoted Scope)
 function ScopingDetails({ lead }: { lead: Lead | undefined }) {
   if (!lead) {
     return (
