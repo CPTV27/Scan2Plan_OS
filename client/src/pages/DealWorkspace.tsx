@@ -114,7 +114,6 @@ import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
 import { CorrespondenceTimeline } from "@/components/CorrespondenceTimeline";
-import { SalesCoPilot } from "@/components/SalesCoPilot";
 import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { Slider } from "@/components/ui/slider";
 import { 
@@ -2430,9 +2429,6 @@ export default function DealWorkspace() {
                   queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
                 }}
               />
-              
-              {/* Sales CoPilot - Persona-based guidance */}
-              <SalesCoPilot lead={lead} compact />
               
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
