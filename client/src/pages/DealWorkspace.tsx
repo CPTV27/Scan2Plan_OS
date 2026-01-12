@@ -999,6 +999,9 @@ export default function DealWorkspace() {
               existingQuotes={quotes}
               sourceQuote={editingFromQuote}
               onClearSourceQuote={() => setEditingFromQuote(null)}
+              onPaymentTermsChange={(terms) => {
+                form.setValue("paymentTerms", terms, { shouldDirty: false });
+              }}
             />
           </ErrorBoundary>
         </TabsContent>

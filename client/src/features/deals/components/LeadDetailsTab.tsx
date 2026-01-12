@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
+import type { BuyerPersona } from "@shared/schema";
 import {
   Form,
   FormControl,
@@ -44,7 +47,7 @@ import { DataCompleteness } from "@/components/DataCompleteness";
 import { FollowUpBuilder } from "@/components/FollowUpBuilder";
 import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
-import { LeadDetailsTabProps, BUYER_PERSONAS, MissingInfoEntry } from "@/features/deals/types";
+import { LeadDetailsTabProps, MissingInfoEntry } from "@/features/deals/types";
 
 export function LeadDetailsTab({
   lead,
@@ -58,6 +61,19 @@ export function LeadDetailsTab({
   documents,
   uploadDocumentMutation,
 }: LeadDetailsTabProps) {
+  const { data: personas = [] } = useQuery<BuyerPersona[]>({
+    queryKey: ["/api/personas"],
+  });
+  
+  // Sync form paymentTerms when lead changes (e.g., from QuoteBuilder updates)
+  useEffect(() => {
+    const currentFormValue = form.getValues("paymentTerms");
+    const leadValue = lead.paymentTerms ?? "";
+    if (leadValue !== currentFormValue) {
+      form.setValue("paymentTerms", leadValue, { shouldDirty: false });
+    }
+  }, [lead.paymentTerms, form]);
+  
   const missingInfo = form.watch("missingInfo") || [];
   
   const isFieldUnknown = (fieldKey: string): boolean => {
@@ -630,9 +646,9 @@ export function LeadDetailsTab({
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {Object.entries(BUYER_PERSONAS).map(([code, label]) => (
-                              <SelectItem key={code} value={code}>
-                                {code}: {label}
+                            {personas.map((persona) => (
+                              <SelectItem key={persona.code} value={persona.code}>
+                                {persona.code}: {persona.name}
                               </SelectItem>
                             ))}
                           </SelectContent>

@@ -78,9 +78,10 @@ export interface QuoteBuilderTabProps {
   existingQuotes?: CpqQuote[];
   sourceQuote?: CpqQuote | null;
   onClearSourceQuote?: () => void;
+  onPaymentTermsChange?: (terms: string) => void;
 }
 
-export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, existingQuotes, sourceQuote, onClearSourceQuote }: QuoteBuilderTabProps) {
+export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, existingQuotes, sourceQuote, onClearSourceQuote, onPaymentTermsChange }: QuoteBuilderTabProps) {
   const queryClient = useQueryClient();
   const updateLeadMutation = useUpdateLead();
   const [loadedSourceQuoteId, setLoadedSourceQuoteId] = useState<number | null>(null);
@@ -104,7 +105,35 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const [actScan, setActScan] = useState(false);
   const [additionalElevations, setAdditionalElevations] = useState<string>("");
   const [servicesAffirmed, setServicesAffirmed] = useState(false);
-  const [paymentTerms, setPaymentTerms] = useState<string>("standard");
+  const [paymentTerms, setPaymentTermsLocal] = useState<string>(lead.paymentTerms || "standard");
+  
+  // Sync local paymentTerms when lead.paymentTerms changes externally (e.g., from LeadDetails or query refetch)
+  useEffect(() => {
+    const leadValue = lead.paymentTerms || "standard";
+    if (leadValue !== paymentTerms) {
+      setPaymentTermsLocal(leadValue);
+    }
+  }, [lead.paymentTerms]);
+  
+  const setPaymentTerms = async (terms: string) => {
+    const previousValue = paymentTerms;
+    setPaymentTermsLocal(terms);
+    // Notify parent to update form state immediately (prevents race condition)
+    onPaymentTermsChange?.(terms);
+    
+    try {
+      await updateLeadMutation.mutateAsync({ id: leadId, paymentTerms: terms });
+    } catch (error) {
+      // Rollback on failure to prevent data inconsistency
+      setPaymentTermsLocal(previousValue);
+      onPaymentTermsChange?.(previousValue);
+      toast({
+        title: "Failed to update payment terms",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
   
   const [isSaving, setIsSaving] = useState(false);
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
@@ -181,7 +210,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       }
       
       if (sourceQuote.paymentTerms) {
-        setPaymentTerms(sourceQuote.paymentTerms);
+        setPaymentTermsLocal(sourceQuote.paymentTerms);
       }
       
       const breakdown = sourceQuote.pricingBreakdown as any;

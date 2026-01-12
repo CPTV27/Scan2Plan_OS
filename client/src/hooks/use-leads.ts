@@ -96,11 +96,20 @@ export function useUpdateLead() {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || `Server error (${res.status})`);
       }
-      return api.leads.update.responses[200].parse(await res.json());
+      const result = api.leads.update.responses[200].parse(await res.json());
+      // Return result with id for onSuccess invalidation
+      return { ...result, _updatedId: id };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.projects.list.path] });
+      // Invalidate both specific lead query patterns used in the codebase
+      if (data && typeof data._updatedId === 'number') {
+        // Pattern used by DealWorkspace: ["/api/leads", id]
+        queryClient.invalidateQueries({ queryKey: ["/api/leads", data._updatedId] });
+        // Pattern used by useLead hook: [api.leads.get.path, id]
+        queryClient.invalidateQueries({ queryKey: [api.leads.get.path, data._updatedId] });
+      }
     },
   });
 }

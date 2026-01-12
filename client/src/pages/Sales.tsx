@@ -515,7 +515,6 @@ export default function Sales() {
   const { data: leads, isLoading } = useLeads();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -634,6 +633,36 @@ export default function Sales() {
     },
     onError: () => {
       toast({ title: "Delete Failed", description: "Could not delete the deal.", variant: "destructive" });
+    },
+  });
+
+  const createDraftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/leads", {
+        clientName: "New Client",
+        projectName: "New Project",
+        projectAddress: "Address TBD",
+        dealStage: "Leads",
+        contactName: "Contact TBD",
+        contactEmail: "email@placeholder.com",
+        leadSource: "Manual Entry",
+        billingContactName: "Billing TBD",
+        billingContactEmail: "billing@placeholder.com",
+        value: 0,
+        probability: 0,
+      });
+      return res.json();
+    },
+    onSuccess: (data: Lead) => {
+      queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
+      navigate(`/deals/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create deal",
+        description: error.message || "Could not create new deal",
+        variant: "destructive",
+      });
     },
   });
 
@@ -822,19 +851,18 @@ export default function Sales() {
                 >
                   <Trash2 className="w-4 h-4 mr-2" /> Trash
                 </Button>
-                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                  <DialogTrigger asChild>
-                    <Button data-testid="button-new-lead">
-                      <Plus className="w-4 h-4 mr-2" /> New Deal
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-5xl max-h-[90vh]">
-                    <DialogHeader>
-                      <DialogTitle>Add New Deal</DialogTitle>
-                    </DialogHeader>
-                    <LeadForm onSuccess={() => setIsCreateOpen(false)} />
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  data-testid="button-new-lead"
+                  onClick={() => createDraftMutation.mutate()}
+                  disabled={createDraftMutation.isPending}
+                >
+                  {createDraftMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 mr-2" />
+                  )}
+                  New Deal
+                </Button>
               </div>
             </div>
 
