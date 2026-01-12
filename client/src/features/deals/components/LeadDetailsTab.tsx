@@ -41,6 +41,7 @@ import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { LocationPreview } from "@/components/LocationPreview";
 import { HungryField, HUNGRY_FIELD_QUESTIONS } from "@/components/HungryField";
 import { DataCompleteness } from "@/components/DataCompleteness";
+import { FollowUpBuilder } from "@/components/FollowUpBuilder";
 import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
 import { LeadDetailsTabProps, BUYER_PERSONAS, MissingInfoEntry } from "@/features/deals/types";
@@ -89,6 +90,16 @@ export function LeadDetailsTab({
       form.setValue("missingInfo", updated, { shouldDirty: true });
     }
   };
+  
+  const markFollowUpsAsSent = (fieldKeys: string[]) => {
+    const current = form.getValues("missingInfo") || [];
+    const updated = current.map((entry: MissingInfoEntry) => 
+      fieldKeys.includes(entry.fieldKey) && entry.status === "pending"
+        ? { ...entry, status: "sent" as const, sentAt: new Date().toISOString() }
+        : entry
+    );
+    form.setValue("missingInfo", updated, { shouldDirty: true });
+  };
 
   return (
     <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
@@ -120,6 +131,14 @@ export function LeadDetailsTab({
               { key: "notes", label: "Notes", value: form.watch("notes") },
             ]}
             missingInfo={missingInfo}
+          />
+          
+          <FollowUpBuilder
+            contactName={form.watch("contactName") || "Client"}
+            contactEmail={form.watch("contactEmail") || ""}
+            projectName={form.watch("projectName") || lead.projectName || "Your Project"}
+            missingInfo={missingInfo}
+            onMarkAsSent={markFollowUpsAsSent}
           />
           
           <Form {...form}>
