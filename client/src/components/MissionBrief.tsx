@@ -318,7 +318,7 @@ function BuildingLocationCard({ address }: { address: string }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`aspect-video rounded-lg overflow-hidden bg-muted ${satelliteError ? 'hidden' : ''}`}>
               <img 
-                src={`/api/google/maps/proxy?address=${encodeURIComponent(address)}&size=600x400&maptype=satellite&zoom=18`}
+                src={`/api/maps/static?center=${encodeURIComponent(address)}&size=600x400&maptype=satellite&zoom=18`}
                 alt="Satellite view"
                 className="w-full h-full object-cover"
                 onError={() => setSatelliteError(true)}
@@ -327,7 +327,7 @@ function BuildingLocationCard({ address }: { address: string }) {
             </div>
             <div className={`aspect-video rounded-lg overflow-hidden bg-muted ${roadmapError ? 'hidden' : ''}`}>
               <img 
-                src={`/api/google/maps/proxy?address=${encodeURIComponent(address)}&size=600x400&maptype=roadmap&zoom=16`}
+                src={`/api/maps/static?center=${encodeURIComponent(address)}&size=600x400&maptype=roadmap&zoom=16`}
                 alt="Road map view"
                 className="w-full h-full object-cover"
                 onError={() => setRoadmapError(true)}

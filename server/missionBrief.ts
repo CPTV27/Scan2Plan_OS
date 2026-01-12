@@ -170,7 +170,15 @@ export function generateMissionBrief(project: any): MissionBrief {
     additionalNotes: siteReadiness.additionalNotes || null,
   };
 
-  const suggestedEquipment = deriveSuggestedEquipment(mappedAreas, rawServices, siteConditions);
+  // Get configured equipment from project
+  const configuredEquipment = {
+    scannerType: project.scannerType || 'trimble_x7',
+    matterportRequired: toBool(project.matterportRequired),
+    droneRequired: toBool(project.droneRequired),
+    extensionTripodNeeded: toBool(project.extensionTripodNeeded),
+  };
+
+  const suggestedEquipment = deriveSuggestedEquipment(mappedAreas, rawServices, siteConditions, configuredEquipment);
 
   const estimatedDriveTime = project.distance 
     ? `~${Math.ceil(project.distance / 50)} hours` 
@@ -227,17 +235,51 @@ function generateDefaultScopeSummary(project: any, areas: any[]): string {
   return `${totalSqft.toLocaleString()} sqft across ${areas.length} area${areas.length > 1 ? 's' : ''}: ${areaList}`;
 }
 
+interface ConfiguredEquipment {
+  scannerType: string;
+  matterportRequired: boolean;
+  droneRequired: boolean;
+  extensionTripodNeeded: boolean;
+}
+
+const SCANNER_NAMES: Record<string, string> = {
+  'trimble_x7': 'Trimble X7',
+  'navvis_slam': 'NavVis SLAM',
+};
+
 function deriveSuggestedEquipment(
   areas: any[], 
   services: any, 
-  siteConditions: any
+  siteConditions: any,
+  configured: ConfiguredEquipment
 ): string[] {
   const equipment: string[] = [];
 
-  equipment.push("Trimble X7 or NavVis SLAM");
-  equipment.push("Tripod");
+  // Primary scanner from configuration
+  const scannerName = SCANNER_NAMES[configured.scannerType] || 'Trimble X7';
+  equipment.push(`${scannerName} (Primary Scanner)`);
+  
+  // Standard tripod or extension tripod based on configuration
+  if (configured.extensionTripodNeeded) {
+    equipment.push("Extension Tripod (High-reach)");
+  } else {
+    equipment.push("Standard Tripod");
+  }
+  
   equipment.push("Targets (minimum 6)");
   equipment.push("Tablet with field software");
+
+  // Matterport from configuration (takes priority over services)
+  if (configured.matterportRequired || toBool(services.matterport)) {
+    equipment.push("Matterport Pro2 or Pro3");
+  }
+
+  // Drone from configuration
+  if (configured.droneRequired) {
+    equipment.push("Drone (aerial capture)");
+    equipment.push("Drone batteries (2+)");
+    equipment.push("Drone controller");
+  }
 
   if (toBool(services.actScanning)) {
     equipment.push("Ladder (8ft minimum)");
@@ -264,10 +306,6 @@ function deriveSuggestedEquipment(
   if (hasExterior) {
     equipment.push("GPS unit");
     equipment.push("Survey stakes / markers");
-  }
-
-  if (toBool(services.matterport)) {
-    equipment.push("Matterport Pro2 or Pro3");
   }
 
   if (toBool(services.georeferencing)) {

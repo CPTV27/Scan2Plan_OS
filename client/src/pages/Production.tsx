@@ -1,7 +1,7 @@
 import { useProjects, useCreateProject, useUpdateProject } from "@/hooks/use-projects";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import { Plus, Check, Scan, Layers, Box, ClipboardCheck, Package, CalendarClock, MapPin, Building2, Users, Truck, AlertTriangle, FileText, Phone, Mail, User, HelpCircle, ScrollText } from "lucide-react";
+import { Plus, Check, Scan, Layers, Box, ClipboardCheck, Package, CalendarClock, MapPin, Building2, Users, Truck, AlertTriangle, FileText, Phone, Mail, User, HelpCircle, ScrollText, Camera, Plane, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProjectCard } from "@/components/ProjectCard";
 import { useForm } from "react-hook-form";
@@ -213,6 +213,10 @@ function ProjectDialog({
       bValidationStatus: "pending",
       cValidationStatus: "pending",
       billingAdjustmentApproved: false,
+      scannerType: "trimble_x7",
+      matterportRequired: false,
+      droneRequired: false,
+      extensionTripodNeeded: false,
     },
   });
 
@@ -230,6 +234,10 @@ function ProjectDialog({
         registrationRms: project.registrationRms ? Number(project.registrationRms) : undefined,
         assignedTechId: project.assignedTechId || undefined,
         billingAdjustmentApproved: project.billingAdjustmentApproved || false,
+        scannerType: (project.scannerType as "trimble_x7" | "navvis_slam") || "trimble_x7",
+        matterportRequired: project.matterportRequired || false,
+        droneRequired: project.droneRequired || false,
+        extensionTripodNeeded: project.extensionTripodNeeded || false,
       });
     }
   }, [project?.id, open]);
@@ -525,9 +533,10 @@ function ProjectDialog({
         
         {project && projectAddress ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
               <TabsTrigger value="quoted" data-testid="tab-project-quoted">Quoted Scope</TabsTrigger>
+              <TabsTrigger value="equipment" data-testid="tab-project-equipment">Equipment</TabsTrigger>
               <TabsTrigger value="scheduling" data-testid="tab-project-scheduling">Scheduling</TabsTrigger>
               <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
               <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
@@ -546,6 +555,130 @@ function ProjectDialog({
             <TabsContent value="quoted" className="mt-4">
               <ScrollArea className="max-h-[60vh]">
                 <QuotedScopeDetails project={project} />
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="equipment" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pr-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Settings2 className="w-4 h-4" />
+                          Field Equipment Configuration
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="scannerType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Primary Scanner</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value || "trimble_x7"}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-scanner-type">
+                                    <Scan className="w-4 h-4 mr-2 text-muted-foreground" />
+                                    <SelectValue placeholder="Select scanner" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="trimble_x7">Trimble X7</SelectItem>
+                                  <SelectItem value="navvis_slam">NavVis SLAM</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Separator />
+
+                        <div className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="matterportRequired"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    data-testid="checkbox-matterport"
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                    <Camera className="w-4 h-4 text-muted-foreground" />
+                                    Matterport Virtual Tour
+                                  </FormLabel>
+                                  <p className="text-xs text-muted-foreground">
+                                    Capture 360° imagery for virtual walkthroughs
+                                  </p>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="droneRequired"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    data-testid="checkbox-drone"
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                    <Plane className="w-4 h-4 text-muted-foreground" />
+                                    Drone Capture
+                                  </FormLabel>
+                                  <p className="text-xs text-muted-foreground">
+                                    Aerial imagery for rooftop/exterior documentation
+                                  </p>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="extensionTripodNeeded"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    data-testid="checkbox-extension-tripod"
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                  <FormLabel className="text-sm font-medium flex items-center gap-2">
+                                    <Layers className="w-4 h-4 text-muted-foreground" />
+                                    Extension Tripod
+                                  </FormLabel>
+                                  <p className="text-xs text-muted-foreground">
+                                    High-reach tripod for elevated scan positions
+                                  </p>
+                                </div>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
+                      {updateMutation.isPending ? "Saving..." : "Save Equipment Configuration"}
+                    </Button>
+                  </form>
+                </Form>
               </ScrollArea>
             </TabsContent>
 
