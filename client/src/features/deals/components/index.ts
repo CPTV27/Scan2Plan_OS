@@ -4,3 +4,6 @@ export { MarketingInfluenceWidget } from "./MarketingInfluenceWidget";
 export { VersionHistoryTab } from "./VersionHistoryTab";
 export { DocumentsTab } from "./DocumentsTab";
 export { CommunicateTab } from "./CommunicateTab";
+export { QuoteVersionDialog } from "./QuoteVersionDialog";
+export { ProposalTab } from "./ProposalTab";
+export { PandaDocTab } from "./PandaDocTab";
