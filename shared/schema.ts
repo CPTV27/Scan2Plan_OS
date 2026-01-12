@@ -78,13 +78,10 @@ export const DISCIPLINE_OPTIONS = [
 ] as const;
 
 export const SCANNER_TYPES = [
-  "Leica RTC360",
-  "Leica BLK360",
-  "Leica P-Series",
-  "NavVis VLX",
+  "Trimble X7",
+  "NavVis SLAM",
   "Matterport Pro",
   "FARO Focus",
-  "Trimble X7",
   "Other",
 ] as const;
 

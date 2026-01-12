@@ -234,7 +234,7 @@ function deriveSuggestedEquipment(
 ): string[] {
   const equipment: string[] = [];
 
-  equipment.push("Leica RTC360 or BLK360");
+  equipment.push("Trimble X7 or NavVis SLAM");
   equipment.push("Tripod");
   equipment.push("Targets (minimum 6)");
   equipment.push("Tablet with field software");

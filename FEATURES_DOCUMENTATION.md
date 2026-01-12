@@ -438,7 +438,7 @@ Automatically sets LOD 350+ for heritage building types:
 - **Scope Options**: Full Building, Interior Only, Exterior Only, etc.
 - **LOD Levels**: 100, 200, 300, 350, 400
 - **LoA Levels**: 10, 20, 30, 40, 50 (tolerance thresholds)
-- **Scanner Types**: Leica RTC360, BLK360, NavVis VLX, Matterport, FARO, Trimble
+- **Scanner Types**: Trimble X7, NavVis SLAM, Matterport, FARO
 - **BIM Deliverables**: Revit, AutoCAD, Point Cloud, Navisworks, IFC, SketchUp
 - **CPQ Disciplines**: arch, struct, mech, elec, plumb, site
 - **Travel Modes**: local, regional, flyout
