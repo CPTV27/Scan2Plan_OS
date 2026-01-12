@@ -1,66 +1,10 @@
 import { db } from '../db';
-import { personas, evidenceVault } from '@shared/schema';
+import { evidenceVault } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { log } from "../lib/logger";
 
-export const PERSONA_SEED = [
-  {
-    code: "BP1",
-    name: "The Engineer",
-    painPoints: ["Accuracy drift", "Field verification", "Coordination time"],
-    preferredTags: ["mep", "industrial", "coordination"],
-    scriptTemplate: "{{firstName}}, your team is losing hours on field verification. {{hook}} Worth 15 min?"
-  },
-  {
-    code: "BP2",
-    name: "The GC",
-    painPoints: ["Schedule risk", "RFI volume", "Trade coordination"],
-    preferredTags: ["commercial", "renovation", "coordination"],
-    scriptTemplate: "{{firstName}}, RFIs killing your schedule? {{hook}} Quick call?"
-  },
-  {
-    code: "BP3",
-    name: "The Owner's Rep",
-    painPoints: ["Budget variance", "Change orders", "Accountability"],
-    preferredTags: ["commercial", "historic", "documentation"],
-    scriptTemplate: "{{firstName}}, change orders eating your contingency? {{hook}}"
-  },
-  {
-    code: "BP4",
-    name: "The Facilities Manager",
-    painPoints: ["Asset documentation", "Emergency response", "Space planning"],
-    preferredTags: ["industrial", "education", "healthcare"],
-    scriptTemplate: "{{firstName}}, still hunting for drawings during emergencies? {{hook}} Here's how."
-  },
-  {
-    code: "BP5",
-    name: "The Architect",
-    painPoints: ["As-built accuracy", "Design intent", "Historic preservation"],
-    preferredTags: ["historic", "residential", "renovation"],
-    scriptTemplate: "{{firstName}}, as-builts lying to you again? {{hook}} PDF attached."
-  },
-  {
-    code: "BP6",
-    name: "The Developer",
-    painPoints: ["Due diligence speed", "Acquisition risk", "Repositioning cost"],
-    preferredTags: ["commercial", "industrial", "documentation"],
-    scriptTemplate: "{{firstName}}, how much is bad survey data costing your pro forma? {{hook}}"
-  },
-  {
-    code: "BP7",
-    name: "The Surveyor",
-    painPoints: ["Turnaround time", "Interior access", "Deliverable format"],
-    preferredTags: ["industrial", "commercial", "mep"],
-    scriptTemplate: "{{firstName}}, subbing out interior scans? We white-label for firms like yours. {{hook}}"
-  },
-  {
-    code: "BP8",
-    name: "The Influencer / Tech Leader",
-    painPoints: ["Content fatigue", "Finding novel tech", "Audience engagement"],
-    preferredTags: ["vdc", "reality-capture", "proptech"],
-    scriptTemplate: "Hey {{firstName}}, huge fan of your work on {{hook}}. We just automated a 'Variance Cop' that catches 10% drift instantly. Thought your audience might like the raw data?"
-  }
-];
+// Note: Old PERSONA_SEED has been deprecated. 
+// Buyer personas are now managed via buyerPersonas table and seeded from server/seed/personas.ts
 
 export const EVIDENCE_SEED = [
   { personaCode: "BP1", hookContent: "Maine Penthouse: Captured complex rooftop MEP without a single climb. Zero safety risk, 100% clash detection ready.", ewsScore: 5, sourceUrl: "https://a360.co/3wXjC4e" },
@@ -85,10 +29,7 @@ export const EVIDENCE_SEED = [
 export async function seedMarketingData() {
   log('Seeding Marketing Engine...');
 
-  for (const p of PERSONA_SEED) {
-    await db.insert(personas).values(p).onConflictDoNothing();
-  }
-
+  // Seed evidence vault hooks
   for (const e of EVIDENCE_SEED) {
     const existing = await db.select().from(evidenceVault).where(eq(evidenceVault.hookContent, e.hookContent)).limit(1);
     if (existing.length === 0) {

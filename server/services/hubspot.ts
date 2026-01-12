@@ -1,8 +1,8 @@
 import { Client } from '@hubspot/api-client';
 import Bottleneck from 'bottleneck';
-import { Lead, Persona, CaseStudy } from '@shared/schema';
+import { Lead, BuyerPersona, CaseStudy } from '@shared/schema';
 import { db } from '../db';
-import { hubspotSyncLogs, trackingEvents, notifications, leads, personas, caseStudies } from '@shared/schema';
+import { hubspotSyncLogs, trackingEvents, notifications, leads, buyerPersonas, caseStudies } from '@shared/schema';
 import { eq, and, gte, inArray } from 'drizzle-orm';
 import { log } from "../lib/logger";
 
@@ -62,14 +62,22 @@ export async function isHubSpotConnected(): Promise<boolean> {
 }
 
 export async function rankCaseStudies(personaCode: string): Promise<CaseStudy[]> {
-  const [persona] = await db.select().from(personas).where(eq(personas.code, personaCode));
-  if (!persona || !persona.preferredTags) return [];
+  const [persona] = await db.select().from(buyerPersonas).where(eq(buyerPersonas.code, personaCode));
+  if (!persona) return [];
+  
+  // Use organization type and purchase triggers for matching
+  const matchTerms = [
+    persona.organizationType?.toLowerCase(),
+    ...(persona.purchaseTriggers || []).map(t => t.toLowerCase()),
+  ].filter(Boolean) as string[];
+  
+  if (matchTerms.length === 0) return [];
   
   const allStudies = await db.select().from(caseStudies).where(eq(caseStudies.isActive, true));
   
   const scored = allStudies.map(study => {
     const matchCount = study.tags.filter(tag => 
-      persona.preferredTags?.includes(tag)
+      matchTerms.some(term => tag.toLowerCase().includes(term) || term.includes(tag.toLowerCase()))
     ).length;
     return { study, score: matchCount };
   });
@@ -97,7 +105,7 @@ function generateOutreachScript(template: string, lead: Lead, caseStudy: CaseStu
     .replace(/\{\{caseStudyTitle\}\}/g, caseStudy?.title || 'our latest case study');
 }
 
-export async function syncLead(lead: Lead, persona: Persona): Promise<{ success: boolean; hubspotId?: string; error?: string }> {
+export async function syncLead(lead: Lead, persona: BuyerPersona): Promise<{ success: boolean; hubspotId?: string; error?: string }> {
   return limiter.schedule(async () => {
     try {
       const client = await getHubSpotClient();
@@ -106,8 +114,9 @@ export async function syncLead(lead: Lead, persona: Persona): Promise<{ success:
       const topStudy = rankedStudies[0];
       const pdfUrl = topStudy?.imageUrl || '';
       const trackingUrl = pdfUrl ? buildTrackingUrl(lead.id, pdfUrl) : '';
-      const outreachScript = persona.scriptTemplate 
-        ? generateOutreachScript(persona.scriptTemplate, lead, topStudy)
+      // Generate outreach script from persona value hook
+      const outreachScript = persona.valueHook 
+        ? `${lead.contactName?.split(' ')[0] || 'Hi'}, ${persona.valueHook}`
         : '';
 
       const properties: Record<string, string> = {
@@ -194,11 +203,11 @@ export async function batchSyncLeads(leadIds: number[]): Promise<{ synced: numbe
   const failed: { id: number; error: string }[] = [];
 
   const leadsToSync = await db.select().from(leads).where(inArray(leads.id, leadIds));
-  const allPersonas = await db.select().from(personas);
+  const allPersonas = await db.select().from(buyerPersonas);
   const personaMap = new Map(allPersonas.map(p => [p.code, p]));
 
   for (const lead of leadsToSync) {
-    const personaCode = lead.buyerPersona || 'BP1';
+    const personaCode = lead.buyerPersona || 'BP-OWNER';
     const persona = personaMap.get(personaCode);
     
     if (!persona) {
@@ -266,8 +275,8 @@ export async function recordTrackingEvent(
   return true;
 }
 
-export async function getPersonas(): Promise<Persona[]> {
-  return db.select().from(personas);
+export async function getPersonas(): Promise<BuyerPersona[]> {
+  return db.select().from(buyerPersonas).where(eq(buyerPersonas.isActive, true));
 }
 
 export async function getNotifications(userId: string, unreadOnly = false): Promise<any[]> {
