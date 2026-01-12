@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { useUpdateProject } from "./use-projects";
+import type { AutosaveStatus as BaseAutosaveStatus } from "./use-lead-autosave";
 
-export type AutosaveStatus = "idle" | "saving" | "saved" | "error";
+export type AutosaveStatus = BaseAutosaveStatus;
 
 export interface ProjectFormData {
   name: string;
@@ -15,11 +16,12 @@ export interface ProjectFormData {
   assignedTechId?: number;
   billingAdjustmentApproved?: boolean;
   dueDate?: Date;
+  leadId?: number;
 }
 
 interface UseProjectAutosaveOptions {
   projectId: number;
-  form: UseFormReturn<ProjectFormData>;
+  form: UseFormReturn<any>;
   debounceMs?: number;
   enabled?: boolean;
 }
@@ -29,6 +31,7 @@ interface UseProjectAutosaveReturn {
   lastSavedAt: Date | null;
   error: string | null;
   retry: () => void;
+  resetBaseline: (values: Partial<ProjectFormData>) => void;
 }
 
 function deepEqual(obj1: any, obj2: any): boolean {
@@ -65,10 +68,10 @@ export function useProjectAutosave({
   const pendingDataRef = useRef<Partial<ProjectFormData> | null>(null);
   const isMountedRef = useRef(true);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const initializedRef = useRef(false);
   
   useEffect(() => {
     isMountedRef.current = true;
-    lastSavedValuesRef.current = form.getValues();
     
     return () => {
       isMountedRef.current = false;
@@ -79,10 +82,24 @@ export function useProjectAutosave({
         clearTimeout(idleTimerRef.current);
       }
     };
-  }, [form]);
+  }, []);
+
+  useEffect(() => {
+    if (projectId) {
+      initializedRef.current = false;
+      lastSavedValuesRef.current = null;
+    }
+  }, [projectId]);
+
+  const resetBaseline = useCallback((values: Partial<ProjectFormData>) => {
+    if (!enabled) return;
+    lastSavedValuesRef.current = { ...values };
+    initializedRef.current = true;
+    setStatus("idle");
+  }, [enabled]);
 
   const saveData = useCallback(async (data: Partial<ProjectFormData>) => {
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current || !enabled || !projectId) return;
     
     setStatus("saving");
     setError(null);
@@ -116,7 +133,7 @@ export function useProjectAutosave({
         pendingDataRef.current = data;
       }
     }
-  }, [projectId, updateMutation]);
+  }, [projectId, updateMutation, enabled]);
 
   const retry = useCallback(() => {
     if (pendingDataRef.current) {
@@ -125,9 +142,11 @@ export function useProjectAutosave({
   }, [saveData]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !projectId) return;
 
     const subscription = form.watch((formValues) => {
+      if (!initializedRef.current) return;
+      
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
@@ -136,7 +155,13 @@ export function useProjectAutosave({
         const lastSaved = lastSavedValuesRef.current || {};
         const changedData: Partial<ProjectFormData> = {};
         
-        for (const key of Object.keys(formValues) as (keyof ProjectFormData)[]) {
+        const keysToWatch: (keyof ProjectFormData)[] = [
+          'name', 'status', 'priority', 'progress', 
+          'bValidationStatus', 'cValidationStatus',
+          'registrationRms', 'assignedTechId', 'billingAdjustmentApproved'
+        ];
+        
+        for (const key of keysToWatch) {
           const currentValue = formValues[key];
           const savedValue = lastSaved[key];
           
@@ -157,12 +182,13 @@ export function useProjectAutosave({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [form, enabled, debounceMs, saveData]);
+  }, [form, enabled, debounceMs, saveData, projectId]);
 
   return {
     status,
     lastSavedAt,
     error,
     retry,
+    resetBaseline,
   };
 }
