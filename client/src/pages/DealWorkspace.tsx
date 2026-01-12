@@ -466,6 +466,7 @@ export default function DealWorkspace() {
         otherText: "",
       },
       proofLinks: "",
+      missingInfo: [],
     },
   });
 
@@ -500,6 +501,7 @@ export default function DealWorkspace() {
           otherText: projectStatus.otherText || "",
         },
         proofLinks: (lead as any).proofLinks || "",
+        missingInfo: (lead as any).missingInfo || [],
       });
     }
   }, [lead, form]);

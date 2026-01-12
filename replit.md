@@ -37,6 +37,15 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 12, 2026)
+- **Hungry Fields Data Collection System:**
+  - Added "I don't know" buttons to Timeline, Payment Terms, and Proof Links fields in LeadDetailsTab
+  - HungryField component (client/src/components/HungryField.tsx) provides tri-state UI for optional fields
+  - DataCompleteness component (client/src/components/DataCompleteness.tsx) shows form completion percentage
+  - Fields marked "I don't know" are tracked in lead.missingInfo array with status transitions (pending → sent → answered)
+  - Schema extended with missingInfo jsonb field on leads table for persistence
+  - Required field validation added for Project Name, Contact Name, Contact Email, and Lead Source
+  - Status history preserved when fields are answered (instead of deleted)
+  - Completion meter treats "pending" and "sent" items as "handled" for accurate progress tracking
 - **Google Solar API Building Insights Endpoint:**
   - Added `/api/location/building-insights` endpoint to `server/routes/google.ts`
   - Connects frontend LocationPreview component to Google Solar API

@@ -678,6 +678,15 @@ export const leads = pgTable("leads", {
   clientTokenExpiresAt: timestamp("client_token_expires_at"), // Token expiration
   // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
   fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(), // {contactPhone: true, proofLinks: true} = explicitly marked N/A
+  // Hungry Fields - Missing Info Tracking (fields marked "I don't know" for follow-up)
+  missingInfo: jsonb("missing_info").$type<Array<{
+    fieldKey: string;          // e.g., "timeline", "paymentTerms", "proofLinks"
+    question: string;          // Human-readable question for follow-up
+    addedAt: string;           // ISO timestamp when marked unknown
+    status: "pending" | "sent" | "answered";
+    sentAt?: string;           // When follow-up was sent
+    answeredAt?: string;       // When client answered
+  }>>(),
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
@@ -884,6 +893,15 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   }).optional(),
   // Proof Links
   proofLinks: optionalString,
+  // Hungry Fields - Missing Info for follow-up
+  missingInfo: z.array(z.object({
+    fieldKey: z.string(),
+    question: z.string(),
+    addedAt: z.string(),
+    status: z.enum(["pending", "sent", "answered"]),
+    sentAt: z.string().optional(),
+    answeredAt: z.string().optional(),
+  })).optional(),
 });
 
 // === QC VALIDATION STATUS ENUM ===

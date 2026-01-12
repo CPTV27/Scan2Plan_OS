@@ -39,9 +39,11 @@ import {
 } from "lucide-react";
 import { PersonaSuggestion } from "@/components/PersonaSuggestion";
 import { LocationPreview } from "@/components/LocationPreview";
+import { HungryField, HUNGRY_FIELD_QUESTIONS } from "@/components/HungryField";
+import { DataCompleteness } from "@/components/DataCompleteness";
 import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
-import { LeadDetailsTabProps, BUYER_PERSONAS } from "@/features/deals/types";
+import { LeadDetailsTabProps, BUYER_PERSONAS, MissingInfoEntry } from "@/features/deals/types";
 
 export function LeadDetailsTab({
   lead,
@@ -55,6 +57,39 @@ export function LeadDetailsTab({
   documents,
   uploadDocumentMutation,
 }: LeadDetailsTabProps) {
+  const missingInfo = form.watch("missingInfo") || [];
+  
+  const isFieldUnknown = (fieldKey: string): boolean => {
+    return missingInfo.some((entry: MissingInfoEntry) => entry.fieldKey === fieldKey && entry.status !== "answered");
+  };
+  
+  const toggleMissingInfo = (fieldKey: string, isUnknown: boolean) => {
+    const current = form.getValues("missingInfo") || [];
+    if (isUnknown) {
+      const existingIdx = current.findIndex((e: MissingInfoEntry) => e.fieldKey === fieldKey);
+      if (existingIdx >= 0) {
+        const updated = [...current];
+        updated[existingIdx] = { ...updated[existingIdx], status: "pending" };
+        form.setValue("missingInfo", updated, { shouldDirty: true });
+      } else {
+        const newEntry: MissingInfoEntry = {
+          fieldKey,
+          question: HUNGRY_FIELD_QUESTIONS[fieldKey] || `What is the ${fieldKey}?`,
+          addedAt: new Date().toISOString(),
+          status: "pending",
+        };
+        form.setValue("missingInfo", [...current, newEntry], { shouldDirty: true });
+      }
+    } else {
+      const updated = current.map((entry: MissingInfoEntry) => 
+        entry.fieldKey === fieldKey 
+          ? { ...entry, status: "answered" as const, answeredAt: new Date().toISOString() }
+          : entry
+      );
+      form.setValue("missingInfo", updated, { shouldDirty: true });
+    }
+  };
+
   return (
     <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
       <ScrollArea className="h-full">
@@ -71,6 +106,20 @@ export function LeadDetailsTab({
             onPersonaAssigned={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
             }}
+          />
+          
+          <DataCompleteness
+            fields={[
+              { key: "projectName", label: "Project Name", value: form.watch("projectName"), required: true },
+              { key: "contactName", label: "Contact Name", value: form.watch("contactName"), required: true },
+              { key: "contactEmail", label: "Contact Email", value: form.watch("contactEmail"), required: true },
+              { key: "leadSource", label: "Lead Source", value: form.watch("leadSource"), required: true },
+              { key: "timeline", label: "Project Timeline", value: form.watch("timeline") },
+              { key: "paymentTerms", label: "Payment Terms", value: form.watch("paymentTerms") },
+              { key: "proofLinks", label: "Proof Links", value: form.watch("proofLinks") },
+              { key: "notes", label: "Notes", value: form.watch("notes") },
+            ]}
+            missingInfo={missingInfo}
           />
           
           <Form {...form}>
@@ -102,7 +151,7 @@ export function LeadDetailsTab({
                     name="projectName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Project Name</FormLabel>
+                        <FormLabel>Project Name <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="4900 Tank Trail, Roofs" {...field} value={field.value || ""} data-testid="input-project-name" />
                         </FormControl>
@@ -233,7 +282,7 @@ export function LeadDetailsTab({
                       name="leadSource"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Lead Source</FormLabel>
+                          <FormLabel>Lead Source <span className="text-destructive">*</span></FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger data-testid="select-lead-source">
@@ -418,7 +467,7 @@ export function LeadDetailsTab({
                     name="contactName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Primary Contact Name</FormLabel>
+                        <FormLabel>Primary Contact Name <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="Andrew Schuster" {...field} value={field.value || ""} data-testid="input-contact-name" />
                         </FormControl>
@@ -433,7 +482,7 @@ export function LeadDetailsTab({
                       name="contactEmail"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Contact Email</FormLabel>
+                          <FormLabel>Contact Email <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input type="email" placeholder="email@company.com" {...field} value={field.value || ""} data-testid="input-contact-email" />
                           </FormControl>
@@ -510,24 +559,31 @@ export function LeadDetailsTab({
                       control={form.control}
                       name="paymentTerms"
                       render={({ field }) => (
-                        <FormItem className="mt-4">
-                          <FormLabel>Payment Terms</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-payment-terms">
-                                <SelectValue placeholder="Select payment terms" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="standard">Standard (Net 30)</SelectItem>
-                              <SelectItem value="net15">Net 15</SelectItem>
-                              <SelectItem value="net45">Net 45</SelectItem>
-                              <SelectItem value="due_on_receipt">Due on Receipt</SelectItem>
-                              <SelectItem value="50_50">50/50 Split</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                        <HungryField
+                          fieldKey="paymentTerms"
+                          question={HUNGRY_FIELD_QUESTIONS.paymentTerms}
+                          onUnknownChange={(isUnknown) => toggleMissingInfo("paymentTerms", isUnknown)}
+                          isUnknown={isFieldUnknown("paymentTerms")}
+                        >
+                          <FormItem className="mt-4">
+                            <FormLabel>Payment Terms</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-terms">
+                                  <SelectValue placeholder="Select payment terms" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="standard">Standard (Net 30)</SelectItem>
+                                <SelectItem value="net15">Net 15</SelectItem>
+                                <SelectItem value="net45">Net 45</SelectItem>
+                                <SelectItem value="due_on_receipt">Due on Receipt</SelectItem>
+                                <SelectItem value="50_50">50/50 Split</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        </HungryField>
                       )}
                     />
                   </div>
@@ -582,13 +638,20 @@ export function LeadDetailsTab({
                     control={form.control}
                     name="timeline"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Project Timeline</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Q1 2026, Urgent, etc." {...field} value={field.value || ""} data-testid="input-timeline" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                      <HungryField
+                        fieldKey="timeline"
+                        question={HUNGRY_FIELD_QUESTIONS.timeline}
+                        onUnknownChange={(isUnknown) => toggleMissingInfo("timeline", isUnknown)}
+                        isUnknown={isFieldUnknown("timeline")}
+                      >
+                        <FormItem>
+                          <FormLabel>Project Timeline</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Q1 2026, Urgent, etc." {...field} value={field.value || ""} data-testid="input-timeline" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      </HungryField>
                     )}
                   />
 
@@ -596,22 +659,29 @@ export function LeadDetailsTab({
                     control={form.control}
                     name="proofLinks"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Proof Links</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Links to evidence (LinkedIn, case studies, etc.)"
-                            {...field}
-                            value={field.value || ""}
-                            data-testid="input-proof-links"
-                            rows={3}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-xs">
-                          Add links to supporting materials like LinkedIn posts, case studies, or reference projects
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                      <HungryField
+                        fieldKey="proofLinks"
+                        question={HUNGRY_FIELD_QUESTIONS.proofLinks}
+                        onUnknownChange={(isUnknown) => toggleMissingInfo("proofLinks", isUnknown)}
+                        isUnknown={isFieldUnknown("proofLinks")}
+                      >
+                        <FormItem>
+                          <FormLabel>Proof Links</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Links to evidence (LinkedIn, case studies, etc.)"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-proof-links"
+                              rows={3}
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            Add links to supporting materials like LinkedIn posts, case studies, or reference projects
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      </HungryField>
                     )}
                   />
                 </CardContent>

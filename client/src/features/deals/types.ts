@@ -18,8 +18,12 @@ import type { Lead, LeadDocument, CpqQuote } from "@shared/schema";
  */
 export const leadFormSchema = insertLeadSchema.extend({
   clientName: z.string().min(1, "Client name is required"),
+  projectName: z.string().min(1, "Project name is required"),
   projectAddress: z.string().min(1, "Project address is required"),
   dealStage: z.string().min(1, "Deal stage is required"),
+  contactName: z.string().min(1, "Primary contact name is required"),
+  contactEmail: z.string().email("Valid contact email is required"),
+  leadSource: z.string().min(1, "Lead source is required for attribution"),
   billingContactName: z.string().min(1, "Billing contact name is required"),
   billingContactEmail: z.string().email("Valid billing email is required"),
   billingContactPhone: z.string().optional().nullable(),
@@ -31,7 +35,24 @@ export const leadFormSchema = insertLeadSchema.extend({
     otherText: z.string().optional(),
   }).optional(),
   proofLinks: z.string().optional().nullable(),
+  missingInfo: z.array(z.object({
+    fieldKey: z.string(),
+    question: z.string(),
+    addedAt: z.string(),
+    status: z.enum(["pending", "sent", "answered"]),
+    sentAt: z.string().optional(),
+    answeredAt: z.string().optional(),
+  })).optional(),
 });
+
+export interface MissingInfoEntry {
+  fieldKey: string;
+  question: string;
+  addedAt: string;
+  status: "pending" | "sent" | "answered";
+  sentAt?: string;
+  answeredAt?: string;
+}
 
 /**
  * Inferred type from the lead form schema
