@@ -49,6 +49,8 @@ import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/c
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
 import { LeadDetailsTabProps, MissingInfoEntry } from "@/features/deals/types";
 import { CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
+import { useLeadAutosave } from "@/hooks/use-lead-autosave";
+import { AutosaveStatus } from "@/components/AutosaveStatus";
 
 export function LeadDetailsTab({
   lead,
@@ -64,6 +66,13 @@ export function LeadDetailsTab({
 }: LeadDetailsTabProps) {
   const { data: personas = [] } = useQuery<BuyerPersona[]>({
     queryKey: ["/api/personas"],
+  });
+  
+  const autosave = useLeadAutosave({
+    leadId,
+    form,
+    debounceMs: 1500,
+    enabled: true,
   });
   
   // Sync form paymentTerms when lead changes (e.g., from QuoteBuilder updates)
@@ -828,10 +837,22 @@ export function LeadDetailsTab({
 
               <MarketingInfluenceWidget leadId={leadId} />
 
-              <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm py-4 border-t -mx-4 px-4">
+              <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm py-4 border-t -mx-4 px-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <AutosaveStatus
+                    status={autosave.status}
+                    error={autosave.error}
+                    onRetry={autosave.retry}
+                  />
+                  {autosave.lastSavedAt && (
+                    <span className="text-xs text-muted-foreground">
+                      Last saved {autosave.lastSavedAt.toLocaleTimeString()}
+                    </span>
+                  )}
+                </div>
                 <Button type="submit" disabled={isPending} className="w-full" data-testid="button-submit-lead">
                   <Save className="w-4 h-4 mr-2" />
-                  {isPending ? "Saving..." : "Save Lead Details"}
+                  {isPending ? "Saving..." : "Save & Sync"}
                 </Button>
               </div>
             </form>
