@@ -266,6 +266,7 @@ export function validateShiftGate(
 }
 
 export interface CreateScanEventParams {
+  projectId: number;
   projectName: string;
   projectAddress: string;
   universalProjectId?: string;
@@ -275,6 +276,8 @@ export interface CreateScanEventParams {
   technicianEmail?: string;
   travelInfo?: DistanceResult;
   notes?: string;
+  driveFolderUrl?: string;
+  missionBriefUrl?: string;
 }
 
 export async function createScanCalendarEvent(params: CreateScanEventParams): Promise<{ eventId: string; htmlLink: string } | null> {
@@ -295,6 +298,14 @@ export async function createScanCalendarEvent(params: CreateScanEventParams): Pr
       description += `Project ID: ${params.universalProjectId}\n`;
     }
     description += `Location: ${params.projectAddress}\n`;
+    
+    description += `\n--- Quick Links ---\n`;
+    if (params.missionBriefUrl) {
+      description += `Mission Brief: ${params.missionBriefUrl}\n`;
+    }
+    if (params.driveFolderUrl) {
+      description += `Project Files: ${params.driveFolderUrl}\n`;
+    }
     
     if (params.travelInfo) {
       description += `\n--- Travel Info ---\n`;

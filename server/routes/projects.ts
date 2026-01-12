@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { asyncHandler } from "../middleware/errorHandler";
@@ -6,6 +6,40 @@ import { calculateTravelDistance, validateShiftGate, createScanCalendarEvent, ge
 import { log } from "../lib/logger";
 import { generateMissionBrief } from "../missionBrief";
 import { generateMissionBriefPdf } from "../missionBriefPdf";
+import { uploadFileToDrive, isGoogleDriveConnected } from "../googleDrive";
+import { uploadLimiter } from "../middleware/rateLimiter";
+import { logSecurityEvent } from "../middleware/securityLogger";
+import multer from "multer";
+import fs from "fs";
+
+const MAX_FIELD_UPLOAD_SIZE = 100 * 1024 * 1024;
+const MAX_FILES_PER_REQUEST = 20;
+
+const fieldUpload = multer({ 
+  dest: "/tmp/field-uploads/",
+  limits: { 
+    fileSize: MAX_FIELD_UPLOAD_SIZE,
+    files: MAX_FILES_PER_REQUEST,
+  }
+});
+
+const validateFieldUploadSize = (req: Request, res: Response, next: NextFunction) => {
+  const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+  const maxTotalSize = MAX_FIELD_UPLOAD_SIZE * MAX_FILES_PER_REQUEST;
+  
+  if (contentLength > maxTotalSize) {
+    logSecurityEvent({
+      type: "suspicious_activity",
+      subtype: "oversized_upload",
+      ip: req.ip || req.socket.remoteAddress || "unknown",
+      path: req.path,
+      method: req.method,
+      message: `Content-Length ${contentLength} exceeds limit ${maxTotalSize}`,
+    });
+    return res.status(413).json({ message: "Request payload too large" });
+  }
+  next();
+};
 
 export function registerProjectRoutes(app: Express): void {
   app.get("/api/projects", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
@@ -234,7 +268,21 @@ export function registerProjectRoutes(app: Express): void {
         }
       }
 
+      const appBaseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPL_SLUG 
+          ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+          : "https://scan2plan-os.replit.app";
+      
+      const missionBriefUrl = `${appBaseUrl}/projects/${project.id}/mission-brief`;
+      const driveFolderUrl = project.driveFolderId 
+        ? `https://drive.google.com/drive/folders/${project.driveFolderId}`
+        : (lead?.driveFolderId 
+            ? `https://drive.google.com/drive/folders/${lead.driveFolderId}`
+            : undefined);
+
       const eventResult = await createScanCalendarEvent({
+        projectId: project.id,
         projectName: project.name,
         projectAddress: lead?.projectAddress || "Address not available",
         universalProjectId: project.universalProjectId || undefined,
@@ -244,6 +292,8 @@ export function registerProjectRoutes(app: Express): void {
         technicianEmail,
         travelInfo: travelInfo || undefined,
         notes,
+        driveFolderUrl,
+        missionBriefUrl,
       });
 
       if (!eventResult) {
@@ -388,6 +438,126 @@ export function registerProjectRoutes(app: Express): void {
     } catch (error) {
       log("ERROR: Predictive cashflow error - " + (error as any)?.message);
       res.status(500).json({ message: "Failed to generate cashflow forecast" });
+    }
+  }));
+
+  app.post("/api/projects/:id/data-handover", 
+    isAuthenticated, 
+    requireRole("ceo", "production"), 
+    uploadLimiter,
+    validateFieldUploadSize,
+    fieldUpload.array("files", MAX_FILES_PER_REQUEST), 
+    asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const files = req.files as Express.Multer.File[];
+    
+    const cleanupFiles = () => {
+      if (!files) return;
+      for (const file of files) {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch {}
+      }
+    };
+
+    try {
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        cleanupFiles();
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files provided" });
+      }
+
+      const driveConnected = await isGoogleDriveConnected();
+      if (!driveConnected) {
+        cleanupFiles();
+        return res.status(503).json({ message: "Google Drive not connected. Please connect Google Drive to upload files." });
+      }
+
+      const subfolders = project.driveSubfolders as { fieldCapture?: string } | null;
+      let targetFolderId = subfolders?.fieldCapture;
+
+      if (!targetFolderId) {
+        if (!project.driveFolderId) {
+          cleanupFiles();
+          return res.status(400).json({ message: "Project does not have a Google Drive folder. Please create one first." });
+        }
+        targetFolderId = project.driveFolderId;
+      }
+
+      let areaDescriptions: string[] = [];
+      if (req.body.areaDescriptions) {
+        try {
+          const parsed = JSON.parse(req.body.areaDescriptions);
+          areaDescriptions = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          log("WARN: Invalid areaDescriptions JSON, using defaults");
+        }
+      }
+
+      const uploadResults: { fileName: string; fileId: string; webViewLink: string }[] = [];
+      const errors: { fileName: string; error: string }[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const areaDesc = (areaDescriptions[i] || "Site_Capture").replace(/[^a-zA-Z0-9_-]/g, "_");
+        
+        try {
+          if (!fs.existsSync(file.path)) {
+            errors.push({ fileName: file.originalname, error: "Temp file not found" });
+            continue;
+          }
+          
+          const fileBuffer = fs.readFileSync(file.path);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+          const sanitizedOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const sanitizedName = `${areaDesc}_${timestamp}_${sanitizedOriginal}`;
+          
+          const result = await uploadFileToDrive(
+            targetFolderId,
+            sanitizedName,
+            file.mimetype,
+            fileBuffer
+          );
+          
+          uploadResults.push({
+            fileName: sanitizedName,
+            fileId: result.fileId,
+            webViewLink: result.webViewLink,
+          });
+          
+          try { fs.unlinkSync(file.path); } catch {}
+        } catch (error: any) {
+          log(`ERROR: Failed to upload file ${file.originalname} - ${error.message}`);
+          errors.push({ fileName: file.originalname, error: "Upload failed" });
+          try { fs.unlinkSync(file.path); } catch {}
+        }
+      }
+
+      const shouldAdvanceStatus = project.status === "Scanning" && uploadResults.length > 0;
+      if (shouldAdvanceStatus) {
+        await storage.updateProject(projectId, { status: "Registration" });
+      }
+
+      log(`Data handover for project ${projectId}: ${uploadResults.length} files uploaded, ${errors.length} errors`);
+
+      res.json({
+        success: true,
+        uploadedCount: uploadResults.length,
+        errorCount: errors.length,
+        uploads: uploadResults,
+        errors,
+        statusAdvanced: shouldAdvanceStatus,
+      });
+    } catch (error: any) {
+      cleanupFiles();
+      log(`ERROR: Data handover failed for project ${projectId} - ${error.message}`);
+      res.status(500).json({ message: "Failed to process data handover" });
     }
   }));
 }

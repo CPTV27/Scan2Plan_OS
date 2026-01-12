@@ -66,14 +66,47 @@ export interface ProjectFolderResult {
   };
 }
 
+const SCAN2PLAN_PARENT_FOLDER_NAME = "Scan2Plan OS Projects";
+
+async function getOrCreateParentFolder(drive: any): Promise<string | null> {
+  try {
+    const response = await drive.files.list({
+      q: `name='${SCAN2PLAN_PARENT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name)',
+      spaces: 'drive',
+    });
+    
+    if (response.data.files && response.data.files.length > 0) {
+      log(`Found existing parent folder: ${SCAN2PLAN_PARENT_FOLDER_NAME}`);
+      return response.data.files[0].id;
+    }
+    
+    const createResponse = await drive.files.create({
+      requestBody: {
+        name: SCAN2PLAN_PARENT_FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder',
+      },
+      fields: 'id',
+    });
+    
+    log(`Created parent folder: ${SCAN2PLAN_PARENT_FOLDER_NAME}`);
+    return createResponse.data.id;
+  } catch (error) {
+    log(`WARN: Could not get/create parent folder - ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
 export async function createProjectFolder(universalProjectId: string): Promise<ProjectFolderResult> {
   const drive = await getGoogleDriveClient();
   
-  // Create the main project folder
+  const parentFolderId = await getOrCreateParentFolder(drive);
+  
   const mainFolderResponse = await drive.files.create({
     requestBody: {
       name: universalProjectId,
       mimeType: 'application/vnd.google-apps.folder',
+      ...(parentFolderId && { parents: [parentFolderId] }),
     },
     fields: 'id, webViewLink',
   });
