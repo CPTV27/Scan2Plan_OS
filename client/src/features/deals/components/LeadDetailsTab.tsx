@@ -48,6 +48,7 @@ import { FollowUpBuilder } from "@/components/FollowUpBuilder";
 import { TierAEstimatorCard, MarketingInfluenceWidget } from "@/features/deals/components";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
 import { LeadDetailsTabProps, MissingInfoEntry } from "@/features/deals/types";
+import { CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
 
 export function LeadDetailsTab({
   lead,
@@ -609,11 +610,11 @@ export function LeadDetailsTab({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="standard">Standard (Net 30)</SelectItem>
-                                <SelectItem value="net15">Net 15</SelectItem>
-                                <SelectItem value="net45">Net 45</SelectItem>
-                                <SelectItem value="due_on_receipt">Due on Receipt</SelectItem>
-                                <SelectItem value="50_50">50/50 Split</SelectItem>
+                                {CPQ_PAYMENT_TERMS.filter(term => term !== "other").map((term) => (
+                                  <SelectItem key={term} value={term}>
+                                    {CPQ_PAYMENT_TERMS_DISPLAY[term]}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />
