@@ -29,10 +29,15 @@ export function getSession() {
     tableName: "sessions",
   });
   
-  // In test/development mode, allow non-secure cookies for localhost
-  const isTestMode = process.env.PLAYWRIGHT_TEST === 'true';
+  // Detect production environment - check multiple indicators
   const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasReplitAppDomain = (process.env.REPLIT_DOMAINS || '').includes('.replit.app');
+  
+  // Use secure cookies in any production-like environment
+  const useSecureCookies = isDeployment || isProduction || hasReplitAppDomain;
+  
+  log(`Session config: isDeployment=${isDeployment}, isProduction=${isProduction}, hasReplitAppDomain=${hasReplitAppDomain}, useSecureCookies=${useSecureCookies}`);
   
   return session({
     secret: process.env.SESSION_SECRET!,
@@ -41,9 +46,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      // Secure must be true for https in production, false for localhost/test
-      // In development, dynamically set based on request protocol
-      secure: isDeployment ? true : 'auto',
+      // Secure must be true for https in production
+      // Use explicit boolean instead of 'auto' for reliability
+      secure: useSecureCookies,
       // Must be 'lax' to allow OAuth redirects from Replit's auth server
       sameSite: 'lax',
       maxAge: sessionTtl,
@@ -114,6 +119,7 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    log(`Login initiated - hostname: ${req.hostname}, protocol: ${req.protocol}, secure: ${req.secure}`);
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
@@ -122,11 +128,19 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    log(`Callback received - hostname: ${req.hostname}, sessionID: ${req.sessionID}, hasSession: ${!!req.session}`);
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
-    })(req, res, next);
+    })(req, res, (err: any) => {
+      if (err) {
+        log(`ERROR: Callback authentication failed - ${err.message || err}`);
+        return next(err);
+      }
+      log(`Callback successful - user: ${(req as any).user?.claims?.email || 'unknown'}, sessionID: ${req.sessionID}`);
+      next();
+    });
   });
 
   app.get("/api/logout", (req, res) => {
