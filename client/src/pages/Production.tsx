@@ -549,7 +549,7 @@ function ProjectDialog({
 
             <TabsContent value="scheduling" className="mt-4">
               <ScrollArea className="max-h-[60vh]">
-                <SchedulingPanel project={project} technicianId={project.assignedTechId} />
+                <SchedulingPanel project={project} technicianId={project.assignedTechId} projectAddress={linkedLead?.projectAddress} />
               </ScrollArea>
             </TabsContent>
 
@@ -878,7 +878,7 @@ function QuotedScopeDetails({ project }: { project: Project }) {
 }
 
 // Scheduling Panel Component - Schedule scan appointments
-function SchedulingPanel({ project, technicianId }: { project: Project; technicianId: number | null | undefined }) {
+function SchedulingPanel({ project, technicianId, projectAddress }: { project: Project; technicianId: number | null | undefined; projectAddress?: string | null }) {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     project.scanDate ? new Date(project.scanDate) : undefined
@@ -907,6 +907,10 @@ function SchedulingPanel({ project, technicianId }: { project: Project; technici
   });
 
   const handleSchedule = () => {
+    if (!projectAddress) {
+      toast({ title: "Address required", description: "Please add a project address in the Sales module first.", variant: "destructive" });
+      return;
+    }
     if (!selectedDate) {
       toast({ title: "Select a date", description: "Please select a date for the scan.", variant: "destructive" });
       return;
@@ -925,6 +929,8 @@ function SchedulingPanel({ project, technicianId }: { project: Project; technici
       duration: parseInt(duration),
     });
   };
+  
+  const canSchedule = Boolean(projectAddress && technicianId && selectedDate);
 
   return (
     <div className="space-y-4 pr-4">
@@ -936,7 +942,14 @@ function SchedulingPanel({ project, technicianId }: { project: Project; technici
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!technicianId ? (
+          {!projectAddress ? (
+            <div className="bg-muted/50 rounded-lg p-4 text-center">
+              <MapPin className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
+              <p className="text-sm text-muted-foreground">
+                Project address is required for scheduling. Please add an address to the lead in the Sales module.
+              </p>
+            </div>
+          ) : !technicianId ? (
             <div className="bg-muted/50 rounded-lg p-4 text-center">
               <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
               <p className="text-sm text-muted-foreground">
@@ -1030,7 +1043,7 @@ function SchedulingPanel({ project, technicianId }: { project: Project; technici
               <Button 
                 onClick={handleSchedule} 
                 className="w-full"
-                disabled={scheduleMutation.isPending || !selectedDate}
+                disabled={scheduleMutation.isPending || !canSchedule}
                 data-testid="button-schedule-scan"
               >
                 {scheduleMutation.isPending ? "Scheduling..." : project.calendarEventId ? "Reschedule Scan" : "Schedule Scan"}

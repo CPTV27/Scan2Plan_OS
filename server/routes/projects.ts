@@ -11,6 +11,7 @@ import { uploadLimiter } from "../middleware/rateLimiter";
 import { logSecurityEvent } from "../middleware/securityLogger";
 import multer from "multer";
 import fs from "fs";
+import { z } from "zod";
 
 const MAX_FIELD_UPLOAD_SIZE = 100 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 20;
@@ -418,6 +419,98 @@ export function registerProjectRoutes(app: Express): void {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Mission-Brief-${project.universalProjectId || project.id}.pdf"`);
     res.send(pdfBuffer);
+  }));
+
+  const scheduleSchema = z.object({
+    scheduledStart: z.string().datetime(),
+    duration: z.coerce.number().min(1).max(12),
+  });
+
+  app.post("/api/projects/:id/schedule", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    const parseResult = scheduleSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ message: "Invalid request", errors: parseResult.error.flatten() });
+    }
+
+    const { scheduledStart, duration } = parseResult.data;
+    const startDate = new Date(scheduledStart);
+    const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
+
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (!project.assignedTechId) {
+      return res.status(400).json({ message: "No technician assigned to this project" });
+    }
+
+    const technician = await storage.getScantech(project.assignedTechId);
+    if (!technician) {
+      return res.status(400).json({ message: "Assigned technician not found" });
+    }
+
+    const lead = project.leadId ? await storage.getLead(project.leadId) : null;
+    
+    if (!lead?.projectAddress) {
+      return res.status(400).json({ 
+        message: "Project address is required for scheduling. Please add an address to the lead first." 
+      });
+    }
+    
+    const projectAddress = lead.projectAddress;
+    
+    const appBaseUrl = process.env.REPLIT_DEPLOYMENT_URL 
+      ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+      : process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`
+        : "https://localhost:5000";
+
+    const missionBriefUrl = `${appBaseUrl}/projects/${projectId}/mission-brief`;
+    const driveFolderUrl = project.driveFolderId 
+      ? `https://drive.google.com/drive/folders/${project.driveFolderId}` 
+      : undefined;
+
+    const startHour = startDate.getHours();
+    const startMinute = startDate.getMinutes();
+    const endHour = endDate.getHours();
+    const endMinute = endDate.getMinutes();
+
+    const result = await createScanCalendarEvent({
+      projectName: project.name,
+      projectAddress,
+      scanDate: startDate,
+      startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
+      endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`,
+      universalProjectId: project.universalProjectId || undefined,
+      technicianEmail: technician.email || undefined,
+      missionBriefUrl,
+      driveFolderUrl,
+    });
+
+    if (!result) {
+      return res.status(500).json({ message: "Failed to create calendar event. Please check Google Calendar connection." });
+    }
+
+    await storage.updateProject(projectId, {
+      scanDate: startDate,
+      calendarEventId: result.eventId,
+    });
+
+    log(`Scheduled scan for project ${projectId} on ${startDate.toISOString()}, event ID: ${result.eventId}`);
+
+    res.json({
+      message: "Scan scheduled successfully",
+      eventId: result.eventId,
+      eventLink: result.htmlLink,
+      scheduledStart: startDate.toISOString(),
+      scheduledEnd: endDate.toISOString(),
+    });
   }));
 
   let cashflowCache: { data: any; timestamp: number } | null = null;

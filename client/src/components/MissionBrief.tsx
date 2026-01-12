@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   MapPin, Phone, Mail, Car, AlertTriangle, 
   CheckSquare, Package, FileText, Download, Printer,
-  Loader2
+  Loader2, Map, ExternalLink
 } from "lucide-react";
 import type { MissionBrief } from "@shared/missionBrief";
 
@@ -115,6 +116,10 @@ export function MissionBriefView({ projectId }: MissionBriefProps) {
           </CardContent>
         </Card>
       </div>
+
+      {brief.projectAddress && (
+        <BuildingLocationCard address={brief.projectAddress} />
+      )}
 
       <Card>
         <CardHeader className="pb-2">
@@ -284,5 +289,73 @@ export function MissionBriefView({ projectId }: MissionBriefProps) {
         <p>Scan2Plan • {brief.universalProjectId || `Project #${brief.projectId}`} • Generated {new Date(brief.generatedAt).toLocaleDateString()}</p>
       </div>
     </div>
+  );
+}
+
+function BuildingLocationCard({ address }: { address: string }) {
+  const [satelliteError, setSatelliteError] = useState(false);
+  const [roadmapError, setRoadmapError] = useState(false);
+  const bothFailed = satelliteError && roadmapError;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Map className="w-5 h-5" />
+          Building Location
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {bothFailed ? (
+          <div className="bg-muted rounded-lg p-4 text-center">
+            <MapPin className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="font-medium">{address}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Maps could not be loaded. Use the button below to view in Google Maps.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`aspect-video rounded-lg overflow-hidden bg-muted ${satelliteError ? 'hidden' : ''}`}>
+              <img 
+                src={`/api/google/maps/proxy?address=${encodeURIComponent(address)}&size=600x400&maptype=satellite&zoom=18`}
+                alt="Satellite view"
+                className="w-full h-full object-cover"
+                onError={() => setSatelliteError(true)}
+                data-testid="map-satellite-view"
+              />
+            </div>
+            <div className={`aspect-video rounded-lg overflow-hidden bg-muted ${roadmapError ? 'hidden' : ''}`}>
+              <img 
+                src={`/api/google/maps/proxy?address=${encodeURIComponent(address)}&size=600x400&maptype=roadmap&zoom=16`}
+                alt="Road map view"
+                className="w-full h-full object-cover"
+                onError={() => setRoadmapError(true)}
+                data-testid="map-road-view"
+              />
+            </div>
+            {(satelliteError || roadmapError) && !bothFailed && (
+              <div className="bg-muted rounded-lg p-4 flex items-center justify-center">
+                <p className="text-sm text-muted-foreground text-center">{address}</p>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank')}
+            data-testid="button-open-google-maps"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open in Google Maps
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2">
+            Use "Street View" in Google Maps to see building imagery
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
