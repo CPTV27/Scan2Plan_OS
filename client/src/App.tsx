@@ -33,7 +33,7 @@ import BrandGenerator from "@/pages/BrandGenerator";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
-import PasswordGate from "@/pages/PasswordGate";
+import AuthGate from "@/pages/AuthGate";
 import MissionBriefPage from "@/pages/MissionBriefPage";
 
 function ProtectedRoutes() {
@@ -181,9 +181,9 @@ function Router() {
   }
 
   return (
-    <PasswordGate>
+    <AuthGate>
       <ProtectedRoutes />
-    </PasswordGate>
+    </AuthGate>
   );
 }
 
