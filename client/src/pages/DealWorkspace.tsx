@@ -856,12 +856,51 @@ function QuoteBuilderTab({ lead, leadId, queryClient, toast, onQuoteSaved, exist
       }
 
       const response = await apiRequest("POST", `/api/leads/${leadId}/cpq-quotes`, quoteData);
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to save quote");
+        if (responseData.errors && Array.isArray(responseData.errors)) {
+          const primaryError = responseData.errors[0];
+          const errorCode = primaryError.code;
+          
+          if (errorCode === "MARGIN_BELOW_FLOOR") {
+            toast({ 
+              title: "Quote Blocked", 
+              description: primaryError.message,
+              variant: "destructive" 
+            });
+          } else if (errorCode === "PRICE_INTEGRITY_FAILED") {
+            toast({ 
+              title: "Price Mismatch", 
+              description: primaryError.message,
+              variant: "destructive" 
+            });
+          } else {
+            toast({ 
+              title: "Validation Error", 
+              description: primaryError.message,
+              variant: "destructive" 
+            });
+          }
+        } else {
+          toast({ 
+            title: "Error", 
+            description: responseData.message || "Failed to save quote", 
+            variant: "destructive" 
+          });
+        }
+        return;
       }
 
-      // Clear the source quote state after successful save
+      if (responseData.warnings && responseData.warnings.length > 0) {
+        responseData.warnings.forEach((warning: { code: string; message: string }) => {
+          toast({ 
+            title: warning.code === "TIER_A_PROJECT" ? "Tier A Project" : "Quote Warning",
+            description: warning.message,
+          });
+        });
+      }
+
       setLoadedSourceQuoteId(null);
       
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "cpq-quotes"] });

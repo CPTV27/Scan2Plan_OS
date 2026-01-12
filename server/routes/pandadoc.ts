@@ -4,6 +4,7 @@ import { isAuthenticated } from "../replit_integrations/auth";
 import { db } from "../db";
 import { leads, cpqQuotes } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { validatePandaDocSend } from "../validators/cpqValidator";
 
 const router = Router();
 
@@ -28,13 +29,22 @@ router.post("/documents", isAuthenticated, async (req: Request, res: Response) =
       return res.status(404).json({ error: "Lead not found" });
     }
     
-    // Prepare recipient
+    const validation = validatePandaDocSend(
+      { leadId: quote.leadId },
+      lead,
+      req.body
+    );
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        errors: validation.errors,
+        message: validation.errors[0]?.message,
+      });
+    }
+    
     const recipientEmail = lead.contactEmail || lead.billingContactEmail;
     const recipientName = lead.contactName || lead.billingContactName || lead.clientName;
-    
-    if (!recipientEmail) {
-      return res.status(400).json({ error: "Lead must have a contact email to create a proposal" });
-    }
     
     // Parse line items from quote's pricingBreakdown
     const pricingBreakdown = quote.pricingBreakdown as any;
