@@ -54,6 +54,7 @@ interface LocationPreviewProps {
 interface LocationData {
   available: boolean;
   mapUrl?: string;
+  satelliteUrl?: string;
   streetViewUrl?: string;
   staticMapUrl?: string;
   error?: string;
@@ -563,8 +564,8 @@ export function LocationPreview({
         <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)}>
           <TabsList className="w-full grid grid-cols-4">
             <TabsTrigger value="map" data-testid="tab-map-view">
-              <Map className="w-3 h-3 mr-1" />
-              Map
+              <Layers className="w-3 h-3 mr-1" />
+              Satellite
             </TabsTrigger>
             <TabsTrigger value="streetview" data-testid="tab-streetview">
               <Eye className="w-3 h-3 mr-1" />
@@ -581,9 +582,9 @@ export function LocationPreview({
           </TabsList>
 
           <TabsContent value="map" className="mt-2">
-            {locationData?.mapUrl && (
+            {locationData?.satelliteUrl && (
               <iframe
-                src={locationData.mapUrl}
+                src={locationData.satelliteUrl}
                 width="100%"
                 height="320"
                 style={{ border: 0, borderRadius: "0.375rem" }}
