@@ -37,6 +37,13 @@ Key modules include:
 - **GoHighLevel:** Not yet configured for CRM and marketing automation.
 
 ## Recent Changes (January 12, 2026)
+- **DealWorkspace.tsx Phase 4 Refactoring:**
+  - Extracted LeadDetailsTab component (~879 lines) to client/src/features/deals/components/LeadDetailsTab.tsx
+  - DealWorkspace.tsx reduced from 3,112 lines to 2,239 lines (-873 lines, 28% reduction)
+  - Total extracted components (Phases 1-4): QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab
+  - All data-testid attributes preserved for e2e testing
+  - Cleaned up unused imports: LocationPreview, PersonaSuggestion, ClipboardList, Users, Clock, FolderPlus
+  - QuoteBuilderTab remains inline (~850 lines) - candidate for future extraction
 - **CPQ Documentation Cleanup:**
   - Deleted 4 outdated docs: CPQ_PRICING_API.md, CPQ_COMPARISON_REPORT.md, CPQ_PRICING_REPAIR_REPORT.md, CPQ_CRM_ALIGNMENT_REPORT.md
   - Rewrote CPQ_INTEGRATION_GUIDE.md to reflect 100% client-side pricing architecture (no external CPQ service)
