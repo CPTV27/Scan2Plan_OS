@@ -6,7 +6,7 @@ import { createServer } from "http";
 import { seedMarketingData } from "./data/seedMarketing";
 import { seedPersonas } from "./seed/personas";
 import { correlationIdMiddleware } from "./middleware/correlationId";
-import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
+import { apiLimiter, authLimiter, uploadLimiter, aiLimiter, passwordLimiter } from "./middleware/rateLimiter";
 import { csrfProtection } from "./middleware/csrf";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { SERVER_CONSTANTS } from "./constants";
@@ -47,6 +47,13 @@ app.use("/api/", csrfProtection());
 
 app.use("/api/", apiLimiter);
 app.use("/api/auth/", authLimiter);
+app.use("/api/leads/import", uploadLimiter);
+app.use("/api/leads/:id/documents", uploadLimiter);
+app.use("/api/google/drive/upload", uploadLimiter);
+app.use("/api/ai/", aiLimiter);
+app.use("/api/brand-generator/", aiLimiter);
+app.use("/api/auth/verify-password", passwordLimiter);
+app.use("/api/auth/set-password", passwordLimiter);
 
 app.get("/api/health", async (_req: Request, res: Response) => {
   if (isShuttingDown) {

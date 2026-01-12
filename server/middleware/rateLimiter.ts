@@ -1,26 +1,74 @@
 import rateLimit from "express-rate-limit";
 import { SERVER_CONSTANTS, HTTP_STATUS } from "../constants";
+import { logSecurityEvent } from "./securityLogger";
 
-export const apiLimiter = rateLimit({
-  windowMs: SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS,
-  max: SERVER_CONSTANTS.RATE_LIMIT_MAX_REQUESTS,
-  message: {
-    error: "Too many requests, please try again later.",
-    retryAfter: Math.ceil(SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS / 1000),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
-});
+function createRateLimiter(
+  windowMs: number,
+  max: number,
+  message: string,
+  eventType: string
+) {
+  return rateLimit({
+    windowMs,
+    max,
+    message: {
+      error: message,
+      retryAfter: Math.ceil(windowMs / 1000),
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
+    handler: (req, res) => {
+      logSecurityEvent({
+        type: "rate_limit_exceeded",
+        subtype: eventType,
+        ip: req.ip || req.socket.remoteAddress || "unknown",
+        path: req.path,
+        method: req.method,
+        userId: (req as any).user?.id,
+      });
+      res.status(HTTP_STATUS.TOO_MANY_REQUESTS).json({
+        error: message,
+        retryAfter: Math.ceil(windowMs / 1000),
+      });
+    },
+  });
+}
 
-export const authLimiter = rateLimit({
-  windowMs: SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS,
-  max: SERVER_CONSTANTS.AUTH_RATE_LIMIT_MAX_REQUESTS,
-  message: {
-    error: "Too many login attempts, please try again later.",
-    retryAfter: Math.ceil(SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS / 1000),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  statusCode: HTTP_STATUS.TOO_MANY_REQUESTS,
-});
+export const apiLimiter = createRateLimiter(
+  SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS,
+  SERVER_CONSTANTS.RATE_LIMIT_MAX_REQUESTS,
+  "Too many requests, please try again later.",
+  "api"
+);
+
+export const authLimiter = createRateLimiter(
+  SERVER_CONSTANTS.RATE_LIMIT_WINDOW_MS,
+  SERVER_CONSTANTS.AUTH_RATE_LIMIT_MAX_REQUESTS,
+  "Too many login attempts, please try again later.",
+  "auth"
+);
+
+// Stricter limiter for file uploads (10 per minute)
+export const uploadLimiter = createRateLimiter(
+  60 * 1000, // 1 minute window
+  10,
+  "Too many file uploads, please wait a moment.",
+  "upload"
+);
+
+// Stricter limiter for AI/LLM endpoints (20 per minute)
+export const aiLimiter = createRateLimiter(
+  60 * 1000, // 1 minute window
+  20,
+  "Too many AI requests, please wait a moment.",
+  "ai"
+);
+
+// Very strict limiter for password operations (5 per 15 minutes)
+export const passwordLimiter = createRateLimiter(
+  15 * 60 * 1000, // 15 minute window
+  5,
+  "Too many password attempts, please try again later.",
+  "password"
+);

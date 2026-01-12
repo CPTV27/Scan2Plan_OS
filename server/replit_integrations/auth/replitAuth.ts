@@ -20,7 +20,9 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week max age
+  const idleTimeout = 30 * 60 * 1000; // 30 minutes idle timeout
+  
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -44,6 +46,7 @@ export function getSession() {
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    rolling: true, // Reset session expiry on each request (session rotation)
     cookie: {
       httpOnly: true,
       // Secure must be true for https in production
