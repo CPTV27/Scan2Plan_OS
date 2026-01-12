@@ -11,7 +11,6 @@ import { ResearchButton, IntelligenceBadges } from "@/components/ResearchButton"
 import { QuickResearchButtons } from "@/components/QuickResearchButtons";
 import { LeadForm } from "@/components/LeadForm";
 import { PDFImportDrawer } from "@/components/PDFImportDrawer";
-import { EvidenceVault } from "@/components/EvidenceVault";
 import { CommunicationCenter } from "@/components/CommunicationCenter";
 import { GHLImport } from "@/components/GHLImport";
 import { PersonaSelect } from "@/components/PersonaSelect";
@@ -189,7 +188,6 @@ function DealCard({
   onMove,
   onDelete,
   onOpenCPQ,
-  onOpenVault,
   isMoving,
   isDeleting,
   isSelected,
@@ -200,7 +198,6 @@ function DealCard({
   onMove: (direction: 'prev' | 'next') => void;
   onDelete: () => void;
   onOpenCPQ: () => void;
-  onOpenVault: () => void;
   isMoving: boolean;
   isDeleting: boolean;
   isSelected?: boolean;
@@ -434,7 +431,6 @@ function StageColumn({
   onMove,
   onDelete,
   onOpenCPQ,
-  onOpenVault,
   movingLeadId,
   deletingLeadId,
   selectedLeads,
@@ -446,7 +442,6 @@ function StageColumn({
   onMove: (leadId: number, direction: 'prev' | 'next') => void;
   onDelete: (leadId: number) => void;
   onOpenCPQ: (lead: Lead) => void;
-  onOpenVault: (lead: Lead) => void;
   movingLeadId: number | null;
   deletingLeadId: number | null;
   selectedLeads: number[];
@@ -497,7 +492,6 @@ function StageColumn({
                 onMove={(dir) => onMove(lead.id, dir)}
                 onDelete={() => onDelete(lead.id)}
                 onOpenCPQ={() => onOpenCPQ(lead)}
-                onOpenVault={() => onOpenVault(lead)}
                 isMoving={movingLeadId === lead.id}
                 isDeleting={deletingLeadId === lead.id}
                 isSelected={selectedLeads.includes(lead.id)}
@@ -519,7 +513,6 @@ export default function Sales() {
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [movingLeadId, setMovingLeadId] = useState<number | null>(null);
-  const [vaultLead, setVaultLead] = useState<Lead | null>(null);
   const [commLead, setCommLead] = useState<Lead | null>(null);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   // QBO Filter State
@@ -534,9 +527,6 @@ export default function Sales() {
     navigate(`/deals/${lead.id}`);
   };
 
-  const handleOpenVault = (lead: Lead) => {
-    setVaultLead(lead);
-  };
 
   const handleOpenCommunication = (lead: Lead) => {
     setCommLead(lead);
@@ -1016,7 +1006,6 @@ export default function Sales() {
                     onMove={handleMove}
                     onDelete={(leadId) => deleteMutation.mutate(leadId)}
                     onOpenCPQ={handleOpenCPQ}
-                    onOpenVault={handleOpenVault}
                     movingLeadId={movingLeadId}
                     deletingLeadId={deleteMutation.isPending ? (deleteMutation.variables as number) : null}
                     selectedLeads={selectedLeads}
@@ -1045,9 +1034,6 @@ export default function Sales() {
               <LeadForm 
                 lead={selectedLead} 
                 onSuccess={() => setSelectedLead(null)}
-                onOpenVault={() => {
-                  setVaultLead(selectedLead);
-                }}
                 onOpenCPQ={() => {
                   setSelectedLead(null);
                   navigate(`/deals/${selectedLead.id}`);
@@ -1073,13 +1059,6 @@ export default function Sales() {
           onOpenChange={setIsPdfImportOpen}
         />
 
-        {vaultLead && (
-          <EvidenceVault
-            lead={vaultLead}
-            open={!!vaultLead}
-            onOpenChange={(open) => !open && setVaultLead(null)}
-          />
-        )}
 
         {commLead && (
           <Dialog open={!!commLead} onOpenChange={(open) => !open && setCommLead(null)}>

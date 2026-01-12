@@ -110,7 +110,7 @@ import {
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
-import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, CommunicateTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
+import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
 
 import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
@@ -122,7 +122,7 @@ export default function DealWorkspace() {
   const leadId = params.id ? parseInt(params.id.split("?")[0], 10) : NaN;
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
-    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc", "communicate"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
     const urlParams = new URLSearchParams(window.location.search);
     const tabFromUrl = urlParams.get("tab");
     if (tabFromUrl && validTabs.includes(tabFromUrl)) {
@@ -136,7 +136,7 @@ export default function DealWorkspace() {
   const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
   
   const handleTabChange = (value: string) => {
-    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc", "communicate"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
   };
   const queryClient = useQueryClient();
@@ -664,20 +664,6 @@ export default function DealWorkspace() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Evidence Vault Button - Purple */}
-          <Button
-            size="sm"
-            className="bg-purple-600 hover:bg-purple-700 text-white dark:bg-purple-700 dark:hover:bg-purple-600"
-            onClick={() => {
-              // Navigate to marketing page with this lead's persona context
-              setLocation("/marketing");
-            }}
-            data-testid="button-evidence-vault"
-          >
-            <Briefcase className="w-4 h-4 mr-2" />
-            Evidence Vault
-          </Button>
-          
           {/* Generate Estimate in QuickBooks Button */}
           {latestQuote && qboStatus?.connected && (
             <Button
@@ -695,20 +681,6 @@ export default function DealWorkspace() {
               {lead.qboEstimateId ? "Sync to QuickBooks" : "Generate Estimate in QuickBooks"}
             </Button>
           )}
-          
-          {/* Communicate Button - Green */}
-          <Button
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-600"
-            onClick={() => {
-              // Open communications tab or drawer
-              window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${lead.billingContactEmail || lead.contactEmail || ""}`, "_blank");
-            }}
-            data-testid="button-communicate"
-          >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Communicate
-          </Button>
           
           {/* Files Status Badge - Always show to indicate folder state */}
           <Tooltip>
@@ -958,10 +930,6 @@ export default function DealWorkspace() {
               <FileSignature className="w-4 h-4" />
               PandaDoc
             </TabsTrigger>
-            <TabsTrigger value="communicate" className="gap-2" data-testid="tab-communicate">
-              <Mail className="w-4 h-4" />
-              Communicate
-            </TabsTrigger>
             <TabsTrigger value="documents" className="gap-2" data-testid="tab-documents">
               <Paperclip className="w-4 h-4" />
               Documents
@@ -1044,10 +1012,6 @@ export default function DealWorkspace() {
           />
         </ErrorBoundary>
 
-        {/* Communicate Tab - Email correspondence timeline */}
-        <ErrorBoundary fallbackTitle="Communicate Tab Error" fallbackMessage="Failed to load email communication. Please try refreshing.">
-          <CommunicateTab leadId={leadId} contactEmail={lead?.contactEmail} />
-        </ErrorBoundary>
       </Tabs>
 
       {lead && latestQuote && (

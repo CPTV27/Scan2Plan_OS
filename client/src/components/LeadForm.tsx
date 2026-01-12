@@ -57,7 +57,6 @@ type FormData = z.infer<typeof formSchema>;
 interface LeadFormProps {
   lead?: Lead;
   onSuccess?: () => void;
-  onOpenVault?: () => void;
   onOpenCPQ?: () => void;
   onOpenResearch?: () => void;
   onOpenCommunication?: () => void;
@@ -65,7 +64,7 @@ interface LeadFormProps {
   isDeleting?: boolean;
 }
 
-export function LeadForm({ lead, onSuccess, onOpenVault, onOpenCPQ, onOpenResearch, onOpenCommunication, onDelete, isDeleting }: LeadFormProps) {
+export function LeadForm({ lead, onSuccess, onOpenCPQ, onOpenResearch, onOpenCommunication, onDelete, isDeleting }: LeadFormProps) {
   const { toast } = useToast();
   const createMutation = useCreateLead();
   const updateMutation = useUpdateLead();
@@ -338,21 +337,9 @@ export function LeadForm({ lead, onSuccess, onOpenVault, onOpenCPQ, onOpenResear
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {lead && (onOpenVault || onOpenCPQ || onOpenResearch || onDelete) && (
+        {lead && (onOpenCPQ || onOpenResearch || onDelete) && (
           <div className="flex items-center justify-between gap-2 pb-2 border-b">
             <div className="flex items-center gap-2 flex-wrap">
-              {onOpenVault && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onOpenVault}
-                  data-testid="button-vault"
-                >
-                  <Briefcase className="w-4 h-4 mr-1" />
-                  Evidence Vault
-                </Button>
-              )}
               {onOpenCPQ && (
                 <Button
                   type="button"
