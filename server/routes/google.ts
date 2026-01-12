@@ -937,6 +937,95 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
     }
   }));
 
+  // Building insights endpoint - Solar API for building data
+  app.get("/api/location/building-insights", isAuthenticated, asyncHandler(async (req, res) => {
+    try {
+      const lat = parseFloat(req.query.lat as string);
+      const lng = parseFloat(req.query.lng as string);
+      
+      if (isNaN(lat) || isNaN(lng)) {
+        return res.status(400).json({ error: "Valid latitude and longitude are required" });
+      }
+
+      const apiKey = process.env.GOOGLE_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ 
+          available: false,
+          error: "Google API key not configured" 
+        });
+      }
+
+      // Call Solar API buildingInsights:findClosest
+      const url = new URL("https://solar.googleapis.com/v1/buildingInsights:findClosest");
+      url.searchParams.set("location.latitude", lat.toString());
+      url.searchParams.set("location.longitude", lng.toString());
+      url.searchParams.set("key", apiKey);
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`WARN: Solar API error: ${response.status} - ${errorText}`);
+        return res.json({
+          available: false,
+          error: `Solar API error: ${response.status}`,
+          message: "Building data not available for this location"
+        });
+      }
+
+      const data = await response.json();
+
+      // Check if we have roof data
+      if (!data.solarPotential?.roofSegmentStats) {
+        return res.json({
+          available: false,
+          message: "No building data found for this location"
+        });
+      }
+
+      const roofStats = data.solarPotential.roofSegmentStats;
+      const totalRoofArea = roofStats.reduce((sum: number, seg: any) => 
+        sum + (seg.stats?.areaMeters2 || 0), 0);
+      
+      const squareMeters = Math.round(totalRoofArea);
+      const squareFeet = Math.round(totalRoofArea * 10.764);
+
+      // Estimate max height from max array area (rough approximation)
+      const maxHeight = data.solarPotential.maxArrayAreaMeters2 
+        ? Math.round(Math.sqrt(data.solarPotential.maxArrayAreaMeters2))
+        : undefined;
+
+      // Map to frontend-expected structure
+      res.json({
+        available: true,
+        buildingArea: {
+          squareMeters,
+          squareFeet
+        },
+        roofStats: {
+          segments: roofStats.length,
+          pitchDegrees: roofStats[0]?.pitchDegrees,
+          azimuthDegrees: roofStats[0]?.azimuthDegrees
+        },
+        height: maxHeight ? {
+          maxRoofHeightMeters: maxHeight,
+          maxRoofHeightFeet: Math.round(maxHeight * 3.281)
+        } : undefined,
+        imagery: {
+          date: data.imageryDate,
+          quality: data.imageryQuality === "HIGH" ? "High" : 
+                   data.imageryQuality === "MEDIUM" ? "Medium" : "Low"
+        }
+      });
+    } catch (error) {
+      log("ERROR: Building insights error - " + (error as any)?.message);
+      res.status(500).json({ 
+        available: false,
+        error: "Failed to fetch building insights" 
+      });
+    }
+  }));
+
   app.get("/api/location/aerial-view", isAuthenticated, asyncHandler(async (req, res) => {
     try {
       const lat = parseFloat(req.query.lat as string);
