@@ -939,6 +939,112 @@ Scan2Plan | Troy, NY | (518) 362-2403 | admin@scan2plan.io`;
     }
   }));
 
+  // Static map endpoint - Returns a static map image URL for thumbnails
+  app.get("/api/location/static-map", asyncHandler(async (req, res) => {
+    try {
+      const address = req.query.address as string;
+      const lat = req.query.lat as string;
+      const lng = req.query.lng as string;
+      const zoom = parseInt(req.query.zoom as string) || 17;
+      const size = (req.query.size as string) || "400x300";
+      const maptype = (req.query.maptype as string) || "satellite";
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ 
+          available: false,
+          error: "Google Maps API key not configured" 
+        });
+      }
+
+      let center = "";
+      if (lat && lng) {
+        center = `${lat},${lng}`;
+      } else if (address) {
+        center = encodeURIComponent(address);
+      } else {
+        return res.status(400).json({ error: "Address or coordinates required" });
+      }
+
+      const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${size}&maptype=${maptype}&key=${apiKey}`;
+
+      res.json({
+        available: true,
+        url: staticMapUrl,
+        thumbnailUrl: staticMapUrl
+      });
+    } catch (error) {
+      log("ERROR: Static map URL error - " + (error as any)?.message);
+      res.status(500).json({ error: "Failed to generate static map URL" });
+    }
+  }));
+
+  // Place details endpoint - Returns geocoded place information
+  app.get("/api/location/place-details", asyncHandler(async (req, res) => {
+    try {
+      const address = req.query.address as string;
+      if (!address || address.trim().length < 5) {
+        return res.status(400).json({ error: "Address is required (min 5 characters)" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({ 
+          available: false,
+          error: "Google Maps API key not configured" 
+        });
+      }
+
+      const encodedAddress = encodeURIComponent(address);
+      
+      // Geocode the address to get coordinates and formatted address
+      const geocodeResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`
+      );
+      const geocodeData = await geocodeResponse.json();
+
+      if (geocodeData.status !== "OK" || !geocodeData.results?.[0]) {
+        return res.json({
+          available: false,
+          error: "Address not found",
+          message: "Could not geocode this address"
+        });
+      }
+
+      const result = geocodeData.results[0];
+      const location = result.geometry?.location;
+      const lat = location?.lat;
+      const lng = location?.lng;
+
+      // Generate static map thumbnail URL
+      const thumbnailUrl = lat && lng 
+        ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=17&size=400x300&maptype=satellite&key=${apiKey}`
+        : null;
+
+      // Generate street view URL
+      const streetViewUrl = lat && lng
+        ? `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${lat},${lng}&key=${apiKey}`
+        : null;
+
+      res.json({
+        available: true,
+        formattedAddress: result.formatted_address,
+        coordinates: {
+          lat,
+          lng
+        },
+        placeId: result.place_id,
+        addressComponents: result.address_components,
+        thumbnailUrl,
+        streetViewUrl,
+        viewport: result.geometry?.viewport
+      });
+    } catch (error) {
+      log("ERROR: Place details error - " + (error as any)?.message);
+      res.status(500).json({ error: "Failed to fetch place details" });
+    }
+  }));
+
   // Building insights endpoint - Solar API for building data
   app.get("/api/location/building-insights", isAuthenticated, asyncHandler(async (req, res) => {
     try {
