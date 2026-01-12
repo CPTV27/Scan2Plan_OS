@@ -24,6 +24,13 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, lt, sql, max, ilike, isNull, isNotNull } from "drizzle-orm";
 import { getNextQuoteNumber } from "@shared/utils/projectId";
+import { leadRepo, leadResearchRepo, leadDocumentRepo } from "./storage/leads";
+import { cpqQuoteRepo, quoteVersionRepo, cpqPricingRepo } from "./storage/quotes";
+import { accountRepo, invoiceRepo, internalLoanRepo, vendorPayableRepo } from "./storage/financial";
+import { 
+  caseStudyRepo, eventRepo, eventRegistrationRepo, dealAttributionRepo, 
+  notificationRepo, proposalEmailRepo, abmAnalyticsRepo 
+} from "./storage/marketing";
 
 export interface IStorage {
   // Leads
@@ -188,128 +195,65 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // Leads
+  // Leads - delegated to LeadRepository
   async getLeads(): Promise<Lead[]> {
-    // Filter out soft-deleted leads (deletedAt is null = active)
-    return await db.select().from(leads)
-      .where(isNull(leads.deletedAt))
-      .orderBy(desc(leads.lastContactDate));
+    return leadRepo.getLeads();
   }
 
   async getDeletedLeads(): Promise<Lead[]> {
-    // Get soft-deleted leads for trash view
-    return await db.select().from(leads)
-      .where(isNotNull(leads.deletedAt))
-      .orderBy(desc(leads.deletedAt));
+    return leadRepo.getDeletedLeads();
   }
 
   async getLead(id: number): Promise<Lead | undefined> {
-    const [lead] = await db.select().from(leads).where(eq(leads.id, id));
-    return lead;
+    return leadRepo.getLead(id);
   }
 
   async getLeadByQboInvoiceId(qboInvoiceId: string): Promise<Lead | undefined> {
-    const [lead] = await db.select().from(leads).where(eq(leads.qboInvoiceId, qboInvoiceId));
-    return lead;
+    return leadRepo.getLeadByQboInvoiceId(qboInvoiceId);
   }
 
   async getLeadByQboEstimateId(qboEstimateId: string): Promise<Lead | undefined> {
-    const [lead] = await db.select().from(leads).where(eq(leads.qboEstimateId, qboEstimateId));
-    return lead;
+    return leadRepo.getLeadByQboEstimateId(qboEstimateId);
   }
 
   async getLeadByClientName(clientName: string): Promise<Lead | undefined> {
-    const [lead] = await db.select().from(leads).where(eq(leads.clientName, clientName));
-    return lead;
+    return leadRepo.getLeadByClientName(clientName);
   }
 
   async getLeadsByClientName(clientName: string): Promise<Lead[]> {
-    return await db.select().from(leads).where(eq(leads.clientName, clientName)).orderBy(desc(leads.lastContactDate));
+    return leadRepo.getLeadsByClientName(clientName);
   }
 
   async getLeadsByQboCustomerId(qboCustomerId: string): Promise<Lead[]> {
-    return await db.select().from(leads).where(eq(leads.qboCustomerId, qboCustomerId)).orderBy(desc(leads.lastContactDate));
+    return leadRepo.getLeadsByQboCustomerId(qboCustomerId);
   }
 
   async getLeadsByImportSource(importSource: string): Promise<Lead[]> {
-    return await db.select().from(leads).where(
-      and(
-        eq(leads.importSource, importSource),
-        isNull(leads.deletedAt)
-      )
-    ).orderBy(desc(leads.lastContactDate));
+    return leadRepo.getLeadsByImportSource(importSource);
   }
 
   async getLeadByClientToken(token: string): Promise<Lead | undefined> {
-    const [lead] = await db.select().from(leads).where(eq(leads.clientToken, token)).limit(1);
-    return lead;
+    return leadRepo.getLeadByClientToken(token);
   }
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
-    const dbValues = {
-      ...insertLead,
-      value: insertLead.value?.toString(),
-      travelRate: insertLead.travelRate?.toString(),
-    };
-    const [lead] = await db.insert(leads).values(dbValues).returning();
-    return lead;
+    return leadRepo.createLead(insertLead);
   }
 
   async updateLead(id: number, updates: Partial<InsertLead>): Promise<Lead> {
-    const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
-    
-    // Copy over all fields, converting numbers to strings for decimal columns
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue; // Skip undefined values
-      
-      if (key === 'value' && value !== null) {
-        dbUpdates[key] = value.toString();
-      } else if (key === 'travelRate' && value !== null) {
-        dbUpdates[key] = value.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    
-    const [updated] = await db.update(leads)
-      .set(dbUpdates)
-      .where(eq(leads.id, id))
-      .returning();
-    return updated;
+    return leadRepo.updateLead(id, updates);
   }
 
   async softDeleteLead(id: number, deletedBy?: string): Promise<Lead> {
-    const [deleted] = await db.update(leads)
-      .set({ deletedAt: new Date(), deletedBy: deletedBy || null })
-      .where(eq(leads.id, id))
-      .returning();
-    return deleted;
+    return leadRepo.softDeleteLead(id, deletedBy);
   }
 
   async restoreLead(id: number): Promise<Lead> {
-    const [restored] = await db.update(leads)
-      .set({ deletedAt: null, deletedBy: null })
-      .where(eq(leads.id, id))
-      .returning();
-    return restored;
+    return leadRepo.restoreLead(id);
   }
 
   async deleteLead(id: number): Promise<void> {
-    // Delete all CPQ quotes for this lead (which cascades to PandaDoc documents)
-    const leadQuotes = await this.getCpqQuotesByLead(id);
-    for (const quote of leadQuotes) {
-      await this.deleteCpqQuote(quote.id);
-    }
-    
-    // Delete related records to satisfy foreign key constraints
-    await db.delete(leadResearch).where(eq(leadResearch.leadId, id));
-    await db.delete(projects).where(eq(projects.leadId, id));
-    await db.delete(fieldNotes).where(eq(fieldNotes.leadId, id));
-    await db.delete(dealAttributions).where(eq(dealAttributions.leadId, id));
-    await db.delete(quoteVersions).where(eq(quoteVersions.leadId, id));
-    
-    // Finally delete the lead
-    await db.delete(leads).where(eq(leads.id, id));
+    return leadRepo.deleteLead(id);
   }
 
   // Projects
@@ -389,21 +333,17 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Lead Research
+  // Lead Research - delegated to LeadResearchRepository
   async getLeadResearch(leadId: number): Promise<LeadResearch[]> {
-    return await db.select().from(leadResearch)
-      .where(eq(leadResearch.leadId, leadId))
-      .orderBy(desc(leadResearch.createdAt));
+    return leadResearchRepo.getLeadResearch(leadId);
   }
 
   async getAllResearch(): Promise<LeadResearch[]> {
-    return await db.select().from(leadResearch)
-      .orderBy(desc(leadResearch.createdAt));
+    return leadResearchRepo.getAllResearch();
   }
 
   async createLeadResearch(research: InsertLeadResearch): Promise<LeadResearch> {
-    const [created] = await db.insert(leadResearch).values(research).returning();
-    return created;
+    return leadResearchRepo.createLeadResearch(research);
   }
 
   // User Management
@@ -419,194 +359,103 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // === FINANCIAL MODULE ===
+  // === FINANCIAL MODULE === (delegated to domain repositories)
 
   // Accounts (Profit First)
   async getAccounts(): Promise<Account[]> {
-    return await db.select().from(accounts).orderBy(accounts.accountType);
+    return accountRepo.getAccounts();
   }
 
   async getAccount(id: number): Promise<Account | undefined> {
-    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
-    return account;
+    return accountRepo.getAccount(id);
   }
 
   async createAccount(insertAccount: InsertAccount): Promise<Account> {
-    const dbValues = {
-      ...insertAccount,
-      actualBalance: insertAccount.actualBalance?.toString() || "0",
-      virtualBalance: insertAccount.virtualBalance?.toString() || "0",
-      allocationPercent: insertAccount.allocationPercent.toString(),
-    };
-    const [account] = await db.insert(accounts).values(dbValues).returning();
-    return account;
+    return accountRepo.createAccount(insertAccount);
   }
 
   async updateAccount(id: number, updates: Partial<InsertAccount>): Promise<Account> {
-    const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (key === 'actualBalance' || key === 'virtualBalance' || key === 'allocationPercent') {
-        dbUpdates[key] = value?.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    const [updated] = await db.update(accounts).set(dbUpdates).where(eq(accounts.id, id)).returning();
-    return updated;
+    return accountRepo.updateAccount(id, updates);
   }
 
   // Invoices (AR with Interest)
   async getInvoices(): Promise<Invoice[]> {
-    return await db.select().from(invoices).orderBy(desc(invoices.dueDate));
+    return invoiceRepo.getInvoices();
   }
 
   async getInvoice(id: number): Promise<Invoice | undefined> {
-    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
-    return invoice;
+    return invoiceRepo.getInvoice(id);
   }
 
   async getInvoicesByLead(leadId: number): Promise<Invoice[]> {
-    return await db.select().from(invoices).where(eq(invoices.leadId, leadId)).orderBy(desc(invoices.dueDate));
+    return invoiceRepo.getInvoicesByLead(leadId);
   }
 
   async getOverdueInvoices(): Promise<Invoice[]> {
-    const now = new Date();
-    return await db.select().from(invoices)
-      .where(and(
-        lt(invoices.dueDate, now),
-        sql`${invoices.status} != 'Paid' AND ${invoices.status} != 'Written Off'`
-      ))
-      .orderBy(desc(invoices.dueDate));
+    return invoiceRepo.getOverdueInvoices();
   }
 
   async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
-    const dbValues = {
-      ...insertInvoice,
-      totalAmount: insertInvoice.totalAmount.toString(),
-      amountPaid: (insertInvoice.amountPaid || 0).toString(),
-    };
-    const [invoice] = await db.insert(invoices).values(dbValues).returning();
-    return invoice;
+    return invoiceRepo.createInvoice(insertInvoice);
   }
 
   async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice> {
-    const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (key === 'totalAmount' || key === 'amountPaid' || key === 'interestAccrued') {
-        dbUpdates[key] = value?.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    const [updated] = await db.update(invoices).set(dbUpdates).where(eq(invoices.id, id)).returning();
-    return updated;
+    return invoiceRepo.updateInvoice(id, updates);
   }
 
   // Internal Loans
   async getInternalLoans(): Promise<InternalLoan[]> {
-    return await db.select().from(internalLoans).orderBy(desc(internalLoans.loanDate));
+    return internalLoanRepo.getInternalLoans();
   }
 
   async getActiveLoan(): Promise<InternalLoan | undefined> {
-    const [loan] = await db.select().from(internalLoans)
-      .where(eq(internalLoans.isFullyRepaid, false))
-      .orderBy(desc(internalLoans.loanDate));
-    return loan;
+    return internalLoanRepo.getActiveLoan();
   }
 
   async createInternalLoan(insertLoan: InsertInternalLoan): Promise<InternalLoan> {
-    const originalAmount = insertLoan.originalAmount;
-    const amountRepaid = insertLoan.amountRepaid || 0;
-    const remainingBalance = originalAmount - amountRepaid;
-    
-    const dbValues = {
-      ...insertLoan,
-      originalAmount: originalAmount.toString(),
-      amountRepaid: amountRepaid.toString(),
-      remainingBalance: remainingBalance.toString(),
-      isFullyRepaid: remainingBalance <= 0,
-    };
-    const [loan] = await db.insert(internalLoans).values(dbValues).returning();
-    return loan;
+    return internalLoanRepo.createInternalLoan(insertLoan);
   }
 
   async updateInternalLoan(id: number, updates: Partial<InternalLoan>): Promise<InternalLoan> {
-    const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (key === 'originalAmount' || key === 'amountRepaid' || key === 'remainingBalance') {
-        dbUpdates[key] = value?.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    const [updated] = await db.update(internalLoans).set(dbUpdates).where(eq(internalLoans.id, id)).returning();
-    return updated;
+    return internalLoanRepo.updateInternalLoan(id, updates);
   }
 
   // Vendor Payables (AP)
   async getVendorPayables(): Promise<VendorPayable[]> {
-    return await db.select().from(vendorPayables).orderBy(vendorPayables.dueDate);
+    return vendorPayableRepo.getVendorPayables();
   }
 
   async getUnpaidPayables(): Promise<VendorPayable[]> {
-    return await db.select().from(vendorPayables)
-      .where(eq(vendorPayables.isPaid, false))
-      .orderBy(vendorPayables.dueDate);
+    return vendorPayableRepo.getUnpaidPayables();
   }
 
   async createVendorPayable(insertPayable: InsertVendorPayable): Promise<VendorPayable> {
-    const dbValues = {
-      ...insertPayable,
-      amount: insertPayable.amount.toString(),
-    };
-    const [payable] = await db.insert(vendorPayables).values(dbValues).returning();
-    return payable;
+    return vendorPayableRepo.createVendorPayable(insertPayable);
   }
 
   async updateVendorPayable(id: number, updates: Partial<VendorPayable>): Promise<VendorPayable> {
-    const dbUpdates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (key === 'amount') {
-        dbUpdates[key] = value?.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    const [updated] = await db.update(vendorPayables).set(dbUpdates).where(eq(vendorPayables.id, id)).returning();
-    return updated;
+    return vendorPayableRepo.updateVendorPayable(id, updates);
   }
 
-  // Quote Versions (CPQ History)
+  // Quote Versions - delegated to QuoteVersionRepository
   async getQuoteVersions(leadId: number): Promise<QuoteVersion[]> {
-    return await db.select().from(quoteVersions)
-      .where(eq(quoteVersions.leadId, leadId))
-      .orderBy(desc(quoteVersions.versionNumber));
+    return quoteVersionRepo.getQuoteVersions(leadId);
   }
 
   async getQuoteVersion(id: number): Promise<QuoteVersion | undefined> {
-    const [version] = await db.select().from(quoteVersions).where(eq(quoteVersions.id, id));
-    return version;
+    return quoteVersionRepo.getQuoteVersion(id);
   }
 
   async createQuoteVersion(insertVersion: InsertQuoteVersion): Promise<QuoteVersion> {
-    const [version] = await db.insert(quoteVersions).values(insertVersion).returning();
-    return version;
+    return quoteVersionRepo.createQuoteVersion(insertVersion);
   }
 
   async updateQuoteVersion(id: number, updates: Partial<QuoteVersion>): Promise<QuoteVersion> {
-    const [updated] = await db.update(quoteVersions).set(updates).where(eq(quoteVersions.id, id)).returning();
-    return updated;
+    return quoteVersionRepo.updateQuoteVersion(id, updates);
   }
 
   async getNextVersionNumber(leadId: number): Promise<number> {
-    const result = await db.select({ maxVersion: max(quoteVersions.versionNumber) })
-      .from(quoteVersions)
-      .where(eq(quoteVersions.leadId, leadId));
-    return (result[0]?.maxVersion ?? 0) + 1;
+    return quoteVersionRepo.getNextVersionNumber(leadId);
   }
 
   // ScanTechs (Field Technicians)
@@ -663,385 +512,178 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count ?? 0;
   }
 
-  // CPQ Internal Pricing & Quotes
+  // CPQ Internal Pricing & Quotes - delegated to CpqQuoteRepository and CpqPricingRepository
   async getCpqPricingMatrix(): Promise<CpqPricingMatrix[]> {
-    return await db.select().from(cpqPricingMatrix);
+    return cpqPricingRepo.getCpqPricingMatrix();
   }
 
   async getCpqUpteamPricingMatrix(): Promise<CpqUpteamPricingMatrix[]> {
-    return await db.select().from(cpqUpteamPricingMatrix);
+    return cpqPricingRepo.getCpqUpteamPricingMatrix();
   }
 
   async getCpqCadPricingMatrix(): Promise<CpqCadPricingMatrix[]> {
-    return await db.select().from(cpqCadPricingMatrix);
+    return cpqPricingRepo.getCpqCadPricingMatrix();
   }
 
   async getCpqPricingParameters(): Promise<CpqPricingParameter[]> {
-    return await db.select().from(cpqPricingParameters);
+    return cpqPricingRepo.getCpqPricingParameters();
   }
 
   async getCpqQuote(id: number): Promise<CpqQuote | undefined> {
-    const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.id, id));
-    return quote;
+    return cpqQuoteRepo.getCpqQuote(id);
   }
 
   async getCpqQuoteByToken(token: string): Promise<CpqQuote | undefined> {
-    const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.clientToken, token));
-    return quote;
+    return cpqQuoteRepo.getCpqQuoteByToken(token);
   }
 
   async getCpqQuoteByPandadocId(documentId: string): Promise<CpqQuote | undefined> {
-    const [quote] = await db.select().from(cpqQuotes).where(eq(cpqQuotes.pandadocDocumentId, documentId));
-    return quote;
+    return cpqQuoteRepo.getCpqQuoteByPandadocId(documentId);
   }
 
   async getCpqQuotesByLead(leadId: number): Promise<CpqQuote[]> {
-    return await db.select().from(cpqQuotes)
-      .where(eq(cpqQuotes.leadId, leadId))
-      .orderBy(desc(cpqQuotes.versionNumber));
+    return cpqQuoteRepo.getCpqQuotesByLead(leadId);
   }
 
   async getLatestCpqQuoteForLead(leadId: number): Promise<CpqQuote | undefined> {
-    const [quote] = await db.select().from(cpqQuotes)
-      .where(and(eq(cpqQuotes.leadId, leadId), eq(cpqQuotes.isLatest, true)))
-      .limit(1);
-    return quote;
+    return cpqQuoteRepo.getLatestCpqQuoteForLead(leadId);
   }
 
   async generateNextQuoteNumber(): Promise<string> {
-    const currentYear = new Date().getFullYear();
-    const yearPrefix = `S2P-${currentYear}-`;
-    
-    // Find the highest sequence number for this year
-    const quotesThisYear = await db.select({ qn: cpqQuotes.quoteNumber })
-      .from(cpqQuotes)
-      .where(sql`${cpqQuotes.quoteNumber} LIKE ${yearPrefix + '%'}`);
-    
-    let maxSeq = 0;
-    for (const q of quotesThisYear) {
-      if (q.qn) {
-        const match = q.qn.match(/S2P-\d{4}-(\d{4})$/);
-        if (match) {
-          const seq = parseInt(match[1], 10);
-          if (seq > maxSeq) maxSeq = seq;
-        }
-      }
-    }
-    
-    const nextSeq = maxSeq + 1;
-    return `S2P-${currentYear}-${String(nextSeq).padStart(4, '0')}`;
+    return cpqQuoteRepo.generateNextQuoteNumber();
   }
 
   async createCpqQuote(insertQuote: InsertCpqQuote): Promise<CpqQuote> {
-    // Use provided quoteNumber or generate a sequential one (S2P-YYYY-NNNN format)
-    let quoteNumber = insertQuote.quoteNumber;
-    if (!quoteNumber) {
-      quoteNumber = await this.generateNextQuoteNumber();
-    }
-    
-    // Check if versionNumber was explicitly provided
-    const providedVersionNumber = (insertQuote as any).versionNumber;
-    let versionNumber = providedVersionNumber ?? 1;
-    let shouldBeLatest = true;
-    
-    if (insertQuote.leadId) {
-      const existingQuotes = await db.select().from(cpqQuotes)
-        .where(eq(cpqQuotes.leadId, insertQuote.leadId));
-      
-      const maxVersion = Math.max(...existingQuotes.map(q => q.versionNumber), 0);
-      
-      // Only auto-increment if no version was provided
-      if (providedVersionNumber === undefined || providedVersionNumber === null) {
-        versionNumber = maxVersion + 1;
-      }
-      
-      // Only mark as latest if this version is strictly greater than current max
-      // or if there are no existing quotes (maxVersion is 0)
-      shouldBeLatest = maxVersion === 0 || versionNumber > maxVersion;
-      
-      // Only update isLatest flags if this will be the new latest
-      if (shouldBeLatest && existingQuotes.length > 0) {
-        await db.update(cpqQuotes)
-          .set({ isLatest: false })
-          .where(eq(cpqQuotes.leadId, insertQuote.leadId));
-      }
-    }
-    
-    const [quote] = await db.insert(cpqQuotes).values({
-      ...insertQuote,
-      quoteNumber,
-      versionNumber,
-      isLatest: shouldBeLatest,
-    }).returning();
-    return quote;
+    return cpqQuoteRepo.createCpqQuote(insertQuote);
   }
 
   async updateCpqQuote(id: number, updates: Partial<InsertCpqQuote>): Promise<CpqQuote | undefined> {
-    const [updated] = await db.update(cpqQuotes)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(cpqQuotes.id, id))
-      .returning();
-    return updated;
+    return cpqQuoteRepo.updateCpqQuote(id, updates);
   }
 
   async deleteCpqQuote(id: number): Promise<void> {
-    // First delete any PandaDoc documents referencing this quote
-    await db.delete(pandaDocDocuments).where(eq(pandaDocDocuments.cpqQuoteId, id));
-    await db.delete(cpqQuotes).where(eq(cpqQuotes.id, id));
+    return cpqQuoteRepo.deleteCpqQuote(id);
   }
 
   async createCpqQuoteVersion(sourceQuoteId: number, versionName: string | undefined, createdBy: string): Promise<CpqQuote> {
-    const sourceQuote = await this.getCpqQuote(sourceQuoteId);
-    if (!sourceQuote) {
-      throw new Error("Source quote not found");
-    }
-
-    // Determine the root parent ID
-    const rootId = sourceQuote.parentQuoteId || sourceQuote.id;
-
-    // Get all existing versions to determine the next version number
-    const existingVersions = await db.select().from(cpqQuotes)
-      .where(sql`${cpqQuotes.id} = ${rootId} OR ${cpqQuotes.parentQuoteId} = ${rootId}`);
-    const maxVersion = Math.max(...existingVersions.map(v => v.versionNumber), 0);
-    const newVersionNumber = maxVersion + 1;
-
-    // Generate new quote number (S2P-YYYY-NNNN format)
-    const quoteNumber = await this.generateNextQuoteNumber();
-
-    // Create the new version by copying all data from source
-    const { id, quoteNumber: _qn, createdAt, updatedAt, versionNumber, versionName: _vn, parentQuoteId: _pid, ...quoteData } = sourceQuote;
-
-    const [newVersion] = await db.insert(cpqQuotes).values({
-      ...quoteData,
-      quoteNumber,
-      parentQuoteId: rootId,
-      versionNumber: newVersionNumber,
-      versionName: versionName || `Version ${newVersionNumber}`,
-      createdBy,
-    }).returning();
-
-    return newVersion;
+    return cpqQuoteRepo.createCpqQuoteVersion(sourceQuoteId, versionName, createdBy);
   }
+
+  // === MARKETING MODULE === (delegated to domain repositories)
 
   // Case Studies (Proof Vault)
   async getCaseStudies(): Promise<CaseStudy[]> {
-    return await db.select().from(caseStudies)
-      .where(eq(caseStudies.isActive, true))
-      .orderBy(desc(caseStudies.createdAt));
+    return caseStudyRepo.getCaseStudies();
   }
 
   async getCaseStudiesByTags(tags: string[]): Promise<CaseStudy[]> {
-    if (!tags.length) return this.getCaseStudies();
-    const allStudies = await this.getCaseStudies();
-    return allStudies.filter(study => 
-      study.tags.some(tag => tags.some(t => 
-        tag.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(tag.toLowerCase())
-      ))
-    );
+    return caseStudyRepo.getCaseStudiesByTags(tags);
   }
 
   async getCaseStudy(id: number): Promise<CaseStudy | undefined> {
-    const [study] = await db.select().from(caseStudies).where(eq(caseStudies.id, id));
-    return study;
+    return caseStudyRepo.getCaseStudy(id);
   }
 
   async createCaseStudy(insertStudy: InsertCaseStudy): Promise<CaseStudy> {
-    const [study] = await db.insert(caseStudies).values(insertStudy).returning();
-    return study;
+    return caseStudyRepo.createCaseStudy(insertStudy);
   }
 
   async updateCaseStudy(id: number, updates: Partial<InsertCaseStudy>): Promise<CaseStudy | undefined> {
-    const [updated] = await db.update(caseStudies)
-      .set(updates)
-      .where(eq(caseStudies.id, id))
-      .returning();
-    return updated;
+    return caseStudyRepo.updateCaseStudy(id, updates);
   }
 
   // Notifications
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [created] = await db.insert(notifications).values(notification).returning();
-    return created;
+    return notificationRepo.createNotification(notification);
   }
 
   async getNotificationsForUser(userId: string): Promise<Notification[]> {
-    return await db.select().from(notifications)
-      .where(eq(notifications.userId, userId))
-      .orderBy(desc(notifications.createdAt));
+    return notificationRepo.getNotificationsForUser(userId);
   }
 
   async markNotificationRead(id: number): Promise<void> {
-    await db.update(notifications)
-      .set({ read: true })
-      .where(eq(notifications.id, id));
+    return notificationRepo.markNotificationRead(id);
   }
 
   // Proposal Email Tracking
   async createProposalEmailEvent(event: InsertProposalEmailEvent): Promise<ProposalEmailEvent> {
-    const [created] = await db.insert(proposalEmailEvents).values(event).returning();
-    return created;
+    return proposalEmailRepo.createProposalEmailEvent(event);
   }
 
   async getProposalEmailEventByToken(token: string): Promise<ProposalEmailEvent | undefined> {
-    const [event] = await db.select().from(proposalEmailEvents)
-      .where(eq(proposalEmailEvents.token, token));
-    return event;
+    return proposalEmailRepo.getProposalEmailEventByToken(token);
   }
 
   async getProposalEmailEventsByLead(leadId: number): Promise<ProposalEmailEvent[]> {
-    return await db.select().from(proposalEmailEvents)
-      .where(eq(proposalEmailEvents.leadId, leadId))
-      .orderBy(desc(proposalEmailEvents.sentAt));
+    return proposalEmailRepo.getProposalEmailEventsByLead(leadId);
   }
 
   async recordProposalOpen(token: string): Promise<ProposalEmailEvent | undefined> {
-    const [updated] = await db.update(proposalEmailEvents)
-      .set({ 
-        openCount: sql`${proposalEmailEvents.openCount} + 1`,
-        lastOpenedAt: new Date(),
-        firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
-      })
-      .where(eq(proposalEmailEvents.token, token))
-      .returning();
-    return updated;
+    return proposalEmailRepo.recordProposalOpen(token);
   }
 
   async recordProposalClick(token: string): Promise<ProposalEmailEvent | undefined> {
-    const [updated] = await db.update(proposalEmailEvents)
-      .set({ 
-        clickCount: sql`${proposalEmailEvents.clickCount} + 1`,
-        lastOpenedAt: new Date(),
-        firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
-      })
-      .where(eq(proposalEmailEvents.token, token))
-      .returning();
-    return updated;
+    return proposalEmailRepo.recordProposalClick(token);
   }
 
   // Deal Attributions (Marketing Influence Tracker)
   async getDealAttributions(leadId: number): Promise<DealAttribution[]> {
-    return await db.select().from(dealAttributions)
-      .where(eq(dealAttributions.leadId, leadId))
-      .orderBy(desc(dealAttributions.recordedAt));
+    return dealAttributionRepo.getDealAttributions(leadId);
   }
 
   async createDealAttribution(attribution: InsertDealAttribution): Promise<DealAttribution> {
-    const [created] = await db.insert(dealAttributions).values(attribution).returning();
-    return created;
+    return dealAttributionRepo.createDealAttribution(attribution);
   }
 
   async deleteDealAttribution(id: number): Promise<void> {
-    await db.delete(dealAttributions).where(eq(dealAttributions.id, id));
+    return dealAttributionRepo.deleteDealAttribution(id);
   }
 
   // Events (Education-Led Sales)
   async getEvents(): Promise<Event[]> {
-    return await db.select().from(events).orderBy(desc(events.date));
+    return eventRepo.getEvents();
   }
 
   async getEvent(id: number): Promise<Event | undefined> {
-    const [event] = await db.select().from(events).where(eq(events.id, id));
-    return event;
+    return eventRepo.getEvent(id);
   }
 
   async createEvent(insertEvent: InsertEvent): Promise<Event> {
-    const dbValues = {
-      ...insertEvent,
-      ceuCredits: insertEvent.ceuCredits?.toString(),
-    };
-    const [event] = await db.insert(events).values(dbValues).returning();
-    return event;
+    return eventRepo.createEvent(insertEvent);
   }
 
   async updateEvent(id: number, updates: Partial<InsertEvent>): Promise<Event> {
-    const dbUpdates: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(updates)) {
-      if (value === undefined) continue;
-      if (key === 'ceuCredits' && value !== null) {
-        dbUpdates[key] = value.toString();
-      } else {
-        dbUpdates[key] = value;
-      }
-    }
-    const [updated] = await db.update(events)
-      .set(dbUpdates)
-      .where(eq(events.id, id))
-      .returning();
-    return updated;
+    return eventRepo.updateEvent(id, updates);
   }
 
   async deleteEvent(id: number): Promise<void> {
-    // First delete related registrations
-    await db.delete(eventRegistrations).where(eq(eventRegistrations.eventId, id));
-    await db.delete(events).where(eq(events.id, id));
+    return eventRepo.deleteEvent(id);
   }
 
   // Event Registrations
   async getEventRegistrations(eventId: number): Promise<EventRegistration[]> {
-    return await db.select().from(eventRegistrations)
-      .where(eq(eventRegistrations.eventId, eventId))
-      .orderBy(desc(eventRegistrations.registeredAt));
+    return eventRegistrationRepo.getEventRegistrations(eventId);
   }
 
   async getEventRegistrationsByLead(leadId: number): Promise<EventRegistration[]> {
-    return await db.select().from(eventRegistrations)
-      .where(eq(eventRegistrations.leadId, leadId))
-      .orderBy(desc(eventRegistrations.registeredAt));
+    return eventRegistrationRepo.getEventRegistrationsByLead(leadId);
   }
 
   async createEventRegistration(registration: InsertEventRegistration): Promise<EventRegistration> {
-    const [created] = await db.insert(eventRegistrations).values(registration).returning();
-    return created;
+    return eventRegistrationRepo.createEventRegistration(registration);
   }
 
   async updateEventRegistrationStatus(id: number, status: string, leadId: number): Promise<EventRegistration> {
-    const updateData: Record<string, unknown> = { status };
-    
-    // Set timestamp based on status
-    if (status === 'attended') {
-      updateData.attendedAt = new Date();
-      // Award +10 lead score points for attending
-      await db.update(leads)
-        .set({ leadScore: sql`COALESCE(lead_score, 0) + 10` })
-        .where(eq(leads.id, leadId));
-    } else if (status === 'certificate_sent') {
-      updateData.certificateSentAt = new Date();
-    }
-    
-    const [updated] = await db.update(eventRegistrations)
-      .set(updateData)
-      .where(eq(eventRegistrations.id, id))
-      .returning();
-    return updated;
+    return eventRegistrationRepo.updateEventRegistrationStatus(id, status, leadId);
   }
 
   async deleteEventRegistration(id: number): Promise<void> {
-    await db.delete(eventRegistrations).where(eq(eventRegistrations.id, id));
+    return eventRegistrationRepo.deleteEventRegistration(id);
   }
 
   // ABM Analytics
   async getTierAAccountPenetration(): Promise<{ total: number; engaged: number; percentage: number }> {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-    // Count total Tier A accounts
-    const [totalResult] = await db.select({ count: sql<number>`COUNT(*)` })
-      .from(leads)
-      .where(eq(leads.abmTier, 'Tier A'));
-    const total = Number(totalResult?.count || 0);
-
-    // Count Tier A accounts with Meeting or Proposal stage in last 90 days
-    const [engagedResult] = await db.select({ count: sql<number>`COUNT(*)` })
-      .from(leads)
-      .where(and(
-        eq(leads.abmTier, 'Tier A'),
-        sql`(deal_stage IN ('Proposal', 'Negotiation', 'Closed Won') OR last_contact_date >= ${ninetyDaysAgo})`
-      ));
-    const engaged = Number(engagedResult?.count || 0);
-
-    const percentage = total > 0 ? Math.round((engaged / total) * 100) : 0;
-
-    return { total, engaged, percentage };
+    return abmAnalyticsRepo.getTierAAccountPenetration();
   }
 
   // QuickBooks Customers
@@ -1077,42 +719,29 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Lead Documents
+  // Lead Documents - delegated to LeadDocumentRepository
   async getLeadDocuments(leadId: number): Promise<LeadDocument[]> {
-    return await db.select().from(leadDocuments)
-      .where(eq(leadDocuments.leadId, leadId))
-      .orderBy(desc(leadDocuments.uploadedAt));
+    return leadDocumentRepo.getLeadDocuments(leadId);
   }
 
   async getLeadDocument(id: number): Promise<LeadDocument | undefined> {
-    const [doc] = await db.select().from(leadDocuments).where(eq(leadDocuments.id, id));
-    return doc;
+    return leadDocumentRepo.getLeadDocument(id);
   }
 
   async createLeadDocument(doc: InsertLeadDocument): Promise<LeadDocument> {
-    const [created] = await db.insert(leadDocuments).values(doc).returning();
-    return created;
+    return leadDocumentRepo.createLeadDocument(doc);
   }
 
   async updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> {
-    const [updated] = await db.update(leadDocuments)
-      .set(updates)
-      .where(eq(leadDocuments.id, id))
-      .returning();
-    return updated;
+    return leadDocumentRepo.updateLeadDocument(id, updates);
   }
 
   async deleteLeadDocument(id: number): Promise<void> {
-    await db.delete(leadDocuments).where(eq(leadDocuments.id, id));
+    return leadDocumentRepo.deleteLeadDocument(id);
   }
 
   async getUnmigratedDocuments(leadId: number): Promise<LeadDocument[]> {
-    return await db.select().from(leadDocuments)
-      .where(and(
-        eq(leadDocuments.leadId, leadId),
-        isNull(leadDocuments.movedToDriveAt)
-      ))
-      .orderBy(leadDocuments.uploadedAt);
+    return leadDocumentRepo.getUnmigratedDocuments(leadId);
   }
 }
 

@@ -70,10 +70,17 @@ Key modules include:
 - **Component Self-Containment:**
   - QuoteBuilderTab now uses useQueryClient hook internally instead of requiring prop injection
   - Reduces prop drilling and improves component independence
+- **Storage Layer Refactoring:**
+  - Migrated monolithic storage.ts (originally 1,120 lines) to domain-specific repositories
+  - server/storage/leads.ts (230 lines): LeadRepository, LeadResearchRepository, LeadDocumentRepository
+  - server/storage/quotes.ts (229 lines): CpqQuoteRepository, QuoteVersionRepository, CpqPricingRepository
+  - server/storage/financial.ts (217 lines): AccountRepository, InvoiceRepository, InternalLoanRepository, VendorPayableRepository
+  - server/storage/marketing.ts (306 lines): CaseStudyRepository, EventRepository, EventRegistrationRepository, DealAttributionRepository, NotificationRepository, ProposalEmailRepository, AbmAnalyticsRepository
+  - Main storage.ts reduced to 748 lines (33% reduction), delegates to repositories while maintaining IStorage interface
+  - Full backwards compatibility preserved - existing imports continue to work
+  - PandaDoc document cleanup properly cascades on lead deletion
 - **Code Quality Improvements (earlier today):**
   - Replaced console.log with structured log() utility in pandadoc-client.ts, proposal-vision.ts, personaLearning.ts
-  - Created server/storage/ domain modules (leads.ts, quotes.ts, financial.ts, marketing.ts) for cleaner imports
-  - Storage modules are backwards-compatible wrappers - existing imports unchanged
 - **CPQ Documentation Cleanup:**
   - Deleted 4 outdated docs: CPQ_PRICING_API.md, CPQ_COMPARISON_REPORT.md, CPQ_PRICING_REPAIR_REPORT.md, CPQ_CRM_ALIGNMENT_REPORT.md
   - Rewrote CPQ_INTEGRATION_GUIDE.md to reflect 100% client-side pricing architecture (no external CPQ service)
