@@ -12,9 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   Sun, Moon, Plus, X, Check, AlertTriangle, 
-  Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign
+  Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign, Cloud, HelpCircle
 } from "lucide-react";
-import type { LeadSourcesConfig, StalenessConfig, BusinessDefaultsConfig } from "@shared/schema";
+import type { LeadSourcesConfig, StalenessConfig, BusinessDefaultsConfig, GcsStorageConfig } from "@shared/schema";
+import { GCS_STORAGE_MODES } from "@shared/schema";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PersonaManager from "@/components/PersonaManager";
 
 interface IntegrationStatus {
@@ -353,6 +357,9 @@ export default function Settings() {
 
             {/* Buyer Personas */}
             <PersonaManager />
+
+            {/* Cloud Storage Settings */}
+            <CloudStorageEditor />
 
             {/* Business Defaults */}
             <BusinessDefaultsEditor config={businessDefaults} />
@@ -836,6 +843,299 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
           {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
           Save Business Defaults
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Cloud Storage (GCS) Configuration
+function CloudStorageEditor() {
+  const { toast } = useToast();
+  const [projectId, setProjectId] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [storageMode, setStorageMode] = useState<"legacy_drive" | "hybrid_gcs" | "gcs_native">("hybrid_gcs");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Fetch current GCS configuration
+  const { data: gcsData, isLoading } = useQuery<{ 
+    config: GcsStorageConfig | null; 
+    hasCredentials: boolean;
+  }>({
+    queryKey: ["/api/storage/gcs/config"],
+  });
+
+  useEffect(() => {
+    if (gcsData?.config) {
+      setProjectId(gcsData.config.projectId || "");
+      setBucket(gcsData.config.defaultBucket || "");
+      setStorageMode(gcsData.config.defaultStorageMode || "hybrid_gcs");
+    }
+  }, [gcsData]);
+
+  // Test connection mutation
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/storage/gcs/test", {
+        projectId,
+        bucket,
+      });
+      return response.json();
+    },
+    onSuccess: (data: { success: boolean; message?: string; error?: string; bucketLocation?: string }) => {
+      if (data.success) {
+        setTestResult({ 
+          success: true, 
+          message: `Connection successful! Bucket location: ${data.bucketLocation || "Unknown"}` 
+        });
+        toast({ title: "Connection test passed" });
+      } else {
+        setTestResult({ success: false, message: data.error || "Connection failed" });
+      }
+    },
+    onError: (error: any) => {
+      setTestResult({ success: false, message: error.message || "Connection test failed" });
+      toast({ 
+        title: "Connection test failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Save configuration mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/storage/gcs/configure", {
+        projectId,
+        bucket,
+        defaultStorageMode: storageMode,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/storage/gcs/config"] });
+      toast({ title: "Cloud storage configuration saved" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to save configuration", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Disconnect mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/storage/gcs/disconnect");
+      return response.json();
+    },
+    onSuccess: () => {
+      setProjectId("");
+      setBucket("");
+      setStorageMode("legacy_drive");
+      setTestResult(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/storage/gcs/config"] });
+      toast({ title: "Cloud storage disconnected" });
+    },
+  });
+
+  const isConfigured = gcsData?.config?.configured;
+  const hasCredentials = gcsData?.hasCredentials;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Cloud className="h-5 w-5" />
+          Cloud Storage (GCS)
+        </CardTitle>
+        <CardDescription>
+          Configure Google Cloud Storage for project files
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            {/* Status Badge */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Connection Status</p>
+                <p className="text-xs text-muted-foreground">
+                  {isConfigured 
+                    ? `Connected to ${gcsData?.config?.defaultBucket}` 
+                    : "Not configured"}
+                </p>
+              </div>
+              <Badge variant={isConfigured ? "default" : "secondary"}>
+                {isConfigured ? "Connected" : "Not Connected"}
+              </Badge>
+            </div>
+
+            <Separator />
+
+            {/* Setup Instructions */}
+            {!hasCredentials && (
+              <Alert>
+                <HelpCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <strong>Step 1 - Add Credentials:</strong> Before configuring storage, add your Google Cloud service account credentials as a Replit secret.
+                  <ol className="mt-2 ml-4 list-decimal space-y-1 text-xs">
+                    <li><strong>Google Cloud Console:</strong> Go to IAM &amp; Admin &gt; Service Accounts</li>
+                    <li><strong>Create Service Account:</strong> Give it "Storage Admin" role for your bucket</li>
+                    <li><strong>Generate Key:</strong> Create a JSON key and download it</li>
+                    <li><strong>Add to Replit:</strong> In the Secrets tab, create <code className="bg-muted px-1 rounded">GCS_SERVICE_ACCOUNT_JSON</code> and paste the entire JSON content</li>
+                    <li><strong>Restart:</strong> Restart the app after adding the secret</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {hasCredentials && !isConfigured && (
+              <Alert>
+                <Check className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm">
+                  <strong>Credentials Found!</strong> Your service account is configured. Now enter your project details below and test the connection.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {hasCredentials && (
+              <>
+                {/* Project ID Input */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="gcs-project-id">GCP Project ID</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Find this in your Google Cloud Console dashboard</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    id="gcs-project-id"
+                    placeholder="my-project-id"
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    data-testid="input-gcs-project-id"
+                  />
+                </div>
+
+                {/* Bucket Name Input */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="gcs-bucket">Default Bucket Name</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>The GCS bucket where project files will be stored</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    id="gcs-bucket"
+                    placeholder="my-scan-data-bucket"
+                    value={bucket}
+                    onChange={(e) => setBucket(e.target.value)}
+                    data-testid="input-gcs-bucket"
+                  />
+                </div>
+
+                {/* Storage Mode Selection */}
+                <div className="space-y-3">
+                  <Label>Default Storage Mode for New Projects</Label>
+                  <RadioGroup 
+                    value={storageMode} 
+                    onValueChange={(v) => setStorageMode(v as typeof storageMode)}
+                    className="space-y-2"
+                  >
+                    {(Object.entries(GCS_STORAGE_MODES) as [keyof typeof GCS_STORAGE_MODES, typeof GCS_STORAGE_MODES[keyof typeof GCS_STORAGE_MODES]][]).map(([key, value]) => (
+                      <div key={key} className="flex items-start space-x-3">
+                        <RadioGroupItem value={key} id={`storage-mode-${key}`} data-testid={`radio-storage-${key}`} />
+                        <div className="space-y-0.5">
+                          <Label htmlFor={`storage-mode-${key}`} className="font-medium cursor-pointer">
+                            {value.label}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">{value.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                {/* Test Result */}
+                {testResult && (
+                  <Alert variant={testResult.success ? "default" : "destructive"}>
+                    {testResult.success ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4" />
+                    )}
+                    <AlertDescription>{testResult.message}</AlertDescription>
+                  </Alert>
+                )}
+
+                <Separator />
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => testMutation.mutate()}
+                    disabled={!projectId || !bucket || testMutation.isPending}
+                    data-testid="button-test-gcs"
+                  >
+                    {testMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-2" />
+                    )}
+                    Test Connection
+                  </Button>
+
+                  <Button
+                    onClick={() => saveMutation.mutate()}
+                    disabled={!projectId || !bucket || saveMutation.isPending}
+                    data-testid="button-save-gcs"
+                  >
+                    {saveMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Configuration
+                  </Button>
+
+                  {isConfigured && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => disconnectMutation.mutate()}
+                      disabled={disconnectMutation.isPending}
+                      data-testid="button-disconnect-gcs"
+                    >
+                      {disconnectMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <X className="h-4 w-4 mr-2" />
+                      )}
+                      Disconnect
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );
