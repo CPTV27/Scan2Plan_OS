@@ -638,14 +638,58 @@ const SITE_READINESS_LABELS: Record<string, string> = {
 
 // Quoted Scope Details Component - Shows snapshot of what was sold at close
 function QuotedScopeDetails({ project }: { project: Project }) {
-  const areas = (project.quotedAreas as any[]) || [];
-  const risksRaw = project.quotedRisks;
+  const { toast } = useToast();
+  
+  // Fetch linked lead for fallback scope data
+  const { data: linkedLead, isLoading: leadLoading } = useQuery<Lead>({
+    queryKey: [`/api/leads/${project.leadId}`],
+    enabled: !!project.leadId,
+  });
+  
+  // Sync scope mutation
+  const syncScopeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/projects/${project.id}/sync-scope`);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      toast({ title: "Success", description: "Scope data synced from deal" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to sync scope", variant: "destructive" });
+    },
+  });
+  
+  // Use project data first, fall back to linked lead data
+  const projectAreas = (project.quotedAreas as any[]) || [];
+  const leadAreas = (linkedLead?.cpqAreas as any[]) || [];
+  const areas = projectAreas.length > 0 ? projectAreas : leadAreas;
+  
+  const risksRaw = project.quotedRisks || linkedLead?.cpqRisks;
   const risks: string[] = Array.isArray(risksRaw) ? risksRaw : [];
-  const travel = (project.quotedTravel as CpqTravel | null) || null;
-  const services = (project.quotedServices as Record<string, number> | null) || null;
-  const siteReadiness = (project.siteReadiness as Record<string, any>) || {};
+  
+  const travel = (project.quotedTravel as CpqTravel | null) || (linkedLead?.cpqTravel as CpqTravel | null) || null;
+  const services = (project.quotedServices as Record<string, number> | null) || (linkedLead?.cpqServices as Record<string, number> | null) || null;
+  const siteReadiness = (project.siteReadiness as Record<string, any>) || (linkedLead?.siteReadiness as Record<string, any>) || {};
+  
+  // Use linked lead values as fallback for price/margin
+  const quotedPrice = project.quotedPrice || linkedLead?.value?.toString();
+  const quotedMargin = project.quotedMargin || linkedLead?.grossMarginPercent?.toString();
+  const dispatchLocation = project.dispatchLocation || linkedLead?.dispatchLocation;
+  const scopeSummary = project.scopeSummary;
 
-  const hasQuotedData = areas.length > 0 || project.quotedPrice || project.scopeSummary;
+  const hasQuotedData = areas.length > 0 || quotedPrice || scopeSummary;
+  const isUsingLeadFallback = projectAreas.length === 0 && leadAreas.length > 0;
+
+  if (leadLoading) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
+        <p>Loading scope data...</p>
+      </div>
+    );
+  }
 
   if (!hasQuotedData) {
     return (
@@ -653,16 +697,48 @@ function QuotedScopeDetails({ project }: { project: Project }) {
         <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
         <p>No quoted scope data available.</p>
         <p className="text-sm mt-1">This project was created before quote inheritance was enabled.</p>
+        {project.leadId && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-4"
+            onClick={() => syncScopeMutation.mutate()}
+            disabled={syncScopeMutation.isPending}
+            data-testid="button-sync-scope-empty"
+          >
+            {syncScopeMutation.isPending ? "Syncing..." : "Sync from Deal"}
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-4 pr-4">
-      {project.scopeSummary && (
+      {isUsingLeadFallback && (
+        <Card className="bg-amber-500/10 border-amber-500/30">
+          <CardContent className="pt-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm">Showing scope from linked deal. Click to save permanently.</span>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => syncScopeMutation.mutate()}
+              disabled={syncScopeMutation.isPending}
+              data-testid="button-sync-scope"
+            >
+              {syncScopeMutation.isPending ? "Syncing..." : "Save to Project"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {scopeSummary && (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="pt-4">
-            <p className="text-sm text-primary font-medium">{project.scopeSummary}</p>
+            <p className="text-sm text-primary font-medium">{scopeSummary}</p>
           </CardContent>
         </Card>
       )}
@@ -677,16 +753,16 @@ function QuotedScopeDetails({ project }: { project: Project }) {
         <CardContent className="space-y-3">
           <div className="flex justify-between py-2 border-b">
             <span className="text-muted-foreground">Quoted Price</span>
-            <span className="font-semibold text-lg">${Number(project.quotedPrice || 0).toLocaleString()}</span>
+            <span className="font-semibold text-lg">${Number(quotedPrice || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between py-2 border-b">
             <span className="text-muted-foreground">Quoted Margin</span>
-            <span className="font-semibold">{Number(project.quotedMargin || 0).toFixed(1)}%</span>
+            <span className="font-semibold">{Number(quotedMargin || 0).toFixed(1)}%</span>
           </div>
-          {project.dispatchLocation && (
+          {dispatchLocation && (
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Dispatch Location</span>
-              <span>{project.dispatchLocation}{project.distance ? ` (${project.distance} mi)` : ""}</span>
+              <span>{dispatchLocation}{project.distance ? ` (${project.distance} mi)` : ""}</span>
             </div>
           )}
         </CardContent>

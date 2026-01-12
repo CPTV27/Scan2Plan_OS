@@ -110,6 +110,55 @@ export function registerProjectRoutes(app: Express): void {
     res.json(responseProject);
   }));
 
+  // Sync scope data from linked lead to project
+  app.post("/api/projects/:id/sync-scope", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = Number(req.params.id);
+    
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+    
+    if (!project.leadId) {
+      return res.status(400).json({ message: "Project has no linked deal to sync from" });
+    }
+    
+    const lead = await storage.getLead(project.leadId);
+    if (!lead) {
+      return res.status(404).json({ message: "Linked deal not found" });
+    }
+    
+    // Sync all scope-related fields from lead to project (only if lead has data)
+    const updateData: Record<string, any> = {};
+    
+    if (lead.value != null) updateData.quotedPrice = lead.value.toString();
+    if (lead.grossMarginPercent != null) updateData.quotedMargin = lead.grossMarginPercent.toString();
+    if (lead.cpqAreas && Array.isArray(lead.cpqAreas) && lead.cpqAreas.length > 0) {
+      updateData.quotedAreas = lead.cpqAreas;
+      updateData.estimatedSqft = lead.cpqAreas.reduce((sum: number, a: any) => sum + (Number(a.squareFeet) || 0), 0);
+    }
+    if (lead.cpqRisks) {
+      // Ensure risks is stored as an array
+      updateData.quotedRisks = Array.isArray(lead.cpqRisks) ? lead.cpqRisks : [];
+    }
+    if (lead.cpqTravel) updateData.quotedTravel = lead.cpqTravel;
+    if (lead.cpqServices) updateData.quotedServices = lead.cpqServices;
+    if (lead.siteReadiness) updateData.siteReadiness = lead.siteReadiness;
+    if (lead.clientName) updateData.clientName = lead.clientName;
+    if (lead.contactName) updateData.clientContact = lead.contactName;
+    if (lead.contactEmail) updateData.clientEmail = lead.contactEmail;
+    if (lead.contactPhone) updateData.clientPhone = lead.contactPhone;
+    if (lead.projectAddress) updateData.projectAddress = lead.projectAddress;
+    if (lead.dispatchLocation) updateData.dispatchLocation = lead.dispatchLocation;
+    if (lead.distance) updateData.distance = Number(lead.distance);
+    
+    const updatedProject = await storage.updateProject(projectId, updateData);
+    
+    log(`[Sync Scope] Synced scope from lead ${lead.id} to project ${projectId}`);
+    
+    res.json(updatedProject);
+  }));
+
   app.post("/api/projects/:id/recalculate-margin", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
