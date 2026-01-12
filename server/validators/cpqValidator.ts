@@ -41,7 +41,10 @@ const quoteInputSchema = z.object({
   
   totalClientPrice: z.number().positive("Total client price must be positive"),
   totalUpteamCost: z.number().positive("Total upteam cost must be positive"),
-  marginTarget: z.number().min(0.35).max(0.60).optional(),
+  marginTarget: z.number().optional().transform(v => {
+    if (v === undefined) return undefined;
+    return v > 1 ? v / 100 : v;
+  }),
   
   dispatchLocation: z.string().transform(v => v.toUpperCase()),
   projectName: z.string().min(1, "Project name is required"),
@@ -210,8 +213,15 @@ export function normalizeQuoteForValidation(data: any): any {
   if (!normalized.totalUpteamCost && pricingBreakdown.totalCost) {
     normalized.totalUpteamCost = Number(pricingBreakdown.totalCost);
   }
-  if (!normalized.marginTarget && pricingBreakdown.marginPercentage) {
-    normalized.marginTarget = Number(pricingBreakdown.marginPercentage);
+  if (!normalized.marginTarget && pricingBreakdown.marginTarget) {
+    normalized.marginTarget = Number(pricingBreakdown.marginTarget);
+  }
+  
+  if (normalized.requestData?.overrideApproved !== undefined) {
+    normalized.overrideApproved = normalized.requestData.overrideApproved;
+  }
+  if (normalized.requestData?.overrideApprovedBy !== undefined) {
+    normalized.overrideApprovedBy = normalized.requestData.overrideApprovedBy;
   }
   
   return normalized;
