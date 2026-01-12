@@ -409,7 +409,34 @@ The Scan2Plan Team
 Scan2Plan | Brooklyn, NY | info@scan2plan.io`;
 }
 
-const upload = multer({ dest: "/tmp/uploads/" });
+const DRIVE_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+  "text/csv",
+];
+
+const upload = multer({
+  dest: "/tmp/uploads/",
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB max for Drive uploads
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (DRIVE_ALLOWED_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} is not allowed for Drive upload`));
+    }
+  },
+});
 
 export async function registerGoogleRoutes(app: Express): Promise<void> {
   app.get("/api/google/gmail/messages", isAuthenticated, asyncHandler(async (req, res) => {

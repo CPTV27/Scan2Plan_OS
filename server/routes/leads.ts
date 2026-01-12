@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { asyncHandler } from "../middleware/errorHandler";
+import { validateBody } from "../middleware/validation";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { generateUniversalProjectId, generateClientCode, generateUPID } from "@shared/utils/projectId";
@@ -10,7 +11,26 @@ import { isGoogleDriveConnected, createProjectFolder, uploadFileToDrive } from "
 import path from "path";
 import { log } from "../lib/logger";
 import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
-import { TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, projectEmbeddings } from "@shared/schema";
+import { TIER_A_THRESHOLD, CPQ_BUILDING_TYPES, projectEmbeddings, TOUCHPOINT_OPTIONS } from "@shared/schema";
+
+const DEAL_STAGES = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"] as const;
+
+const attributionSchema = z.object({
+  touchpoint: z.enum(TOUCHPOINT_OPTIONS.map(t => t.value) as [string, ...string[]]),
+});
+
+const bulkUpdateStageSchema = z.object({
+  leadIds: z.array(z.number().int().positive()).min(1).max(100),
+  dealStage: z.enum(DEAL_STAGES),
+});
+
+const stageUpdateSchema = z.object({
+  dealStage: z.enum(DEAL_STAGES),
+});
+
+const personaUpdateSchema = z.object({
+  personaCode: z.string().min(1).max(50),
+});
 import multer from "multer";
 import fs from "fs";
 import { db } from "../db";
@@ -51,7 +71,27 @@ async function precomputeEmbedding(lead: any) {
   }
 }
 
-const upload = multer({ dest: "/tmp/uploads/" });
+const ALLOWED_UPLOAD_TYPES = [
+  "text/csv",
+  "application/pdf",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
+
+const upload = multer({
+  dest: "/tmp/uploads/",
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max for imports
+    files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_UPLOAD_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} is not allowed. Allowed: CSV, PDF, Excel`));
+    }
+  },
+});
 
 function generateScopeSummary(lead: any): string {
   const areas = lead.cpqAreas || [];
@@ -189,7 +229,7 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     res.json(attributions);
   }));
 
-  app.post("/api/leads/:id/attributions", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+  app.post("/api/leads/:id/attributions", isAuthenticated, requireRole("ceo", "sales"), validateBody(attributionSchema), asyncHandler(async (req, res) => {
     const leadId = Number(req.params.id);
     const { touchpoint } = req.body;
     const attribution = await storage.createDealAttribution({
@@ -537,17 +577,8 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
   }));
 
   // Bulk update stage for multiple leads
-  app.post("/api/leads/bulk-update-stage", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+  app.post("/api/leads/bulk-update-stage", isAuthenticated, requireRole("ceo", "sales"), validateBody(bulkUpdateStageSchema), asyncHandler(async (req, res) => {
     const { leadIds, dealStage } = req.body;
-    
-    if (!Array.isArray(leadIds) || !dealStage) {
-      return res.status(400).json({ error: "leadIds array and dealStage required" });
-    }
-    
-    const validStages = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"];
-    if (!validStages.includes(dealStage)) {
-      return res.status(400).json({ error: "Invalid deal stage" });
-    }
     
     // Map stage to probability
     const stageProbability: Record<string, number> = {
@@ -583,14 +614,10 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     });
   }));
 
-  app.patch("/api/leads/:id/stage", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+  app.patch("/api/leads/:id/stage", isAuthenticated, requireRole("ceo", "sales"), validateBody(stageUpdateSchema), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.id);
       const { dealStage } = req.body;
-      
-      if (!dealStage) {
-        return res.status(400).json({ message: "dealStage is required" });
-      }
       
       const previousLead = await storage.getLead(leadId);
       if (!previousLead) {
