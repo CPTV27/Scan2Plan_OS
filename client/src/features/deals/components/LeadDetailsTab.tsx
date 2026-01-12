@@ -850,10 +850,15 @@ export function LeadDetailsTab({
                     </span>
                   )}
                 </div>
-                <Button type="submit" disabled={isPending} className="w-full" data-testid="button-submit-lead">
-                  <Save className="w-4 h-4 mr-2" />
-                  {isPending ? "Saving..." : "Save & Sync"}
-                </Button>
+                <div className="space-y-1">
+                  <Button type="submit" disabled={isPending} className="w-full" data-testid="button-submit-lead">
+                    <Save className="w-4 h-4 mr-2" />
+                    {isPending ? "Saving..." : "Force Sync"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Changes autosave. Use this for a full sync.
+                  </p>
+                </div>
               </div>
             </form>
           </Form>
