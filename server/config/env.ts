@@ -123,6 +123,11 @@ export const features = {
         const config = getEnv();
         return !!(config.AIRTABLE_API_KEY && config.AIRTABLE_BASE_ID);
     },
+    hasGCS: () => {
+        const config = getEnv();
+        // Support both env var names for backward compatibility
+        return !!(config.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.GCS_SERVICE_ACCOUNT_JSON);
+    },
     isProduction: () => {
         const config = getEnv();
         return config.NODE_ENV === "production";

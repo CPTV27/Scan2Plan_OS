@@ -17,10 +17,11 @@ export async function getGcsClient(): Promise<Storage | null> {
 
   try {
     const config = await dbStorage.getSettingValue<GcsStorageConfig>("gcsStorage");
-    const credentials = process.env.GCS_SERVICE_ACCOUNT_JSON;
+    // Support both env var names for backward compatibility
+    const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.GCS_SERVICE_ACCOUNT_JSON;
 
     if (!credentials) {
-      log("No GCS credentials found in environment");
+      log("No GCS credentials found in environment (expected GOOGLE_APPLICATION_CREDENTIALS_JSON)");
       return null;
     }
 

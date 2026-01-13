@@ -86,7 +86,7 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/projects/:id',
-      input: insertProjectSchema.partial(),
+      input: insertProjectSchema, // Already partial in definition
       responses: {
         200: z.custom<typeof projects.$inferSelect>(),
         404: errorSchemas.notFound,
