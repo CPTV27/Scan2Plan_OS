@@ -2,6 +2,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertLead } from "@shared/routes";
 import { ZodError } from "zod";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf-token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function getHeaders(includeContentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["x-csrf-token"] = csrfToken;
+  }
+  return headers;
+}
+
 export function useLeads() {
   return useQuery({
     queryKey: [api.leads.list.path],
@@ -44,7 +61,7 @@ export function useCreateLead() {
       
       const res = await fetch(api.leads.create.path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(validated),
         credentials: "include",
       });
@@ -83,7 +100,7 @@ export function useUpdateLead() {
       const url = buildUrl(api.leads.update.path, { id });
       const res = await fetch(url, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(validated),
         credentials: "include",
       });
@@ -121,6 +138,7 @@ export function useDeleteLead() {
       const url = buildUrl(api.leads.delete.path, { id });
       const res = await fetch(url, { 
         method: "DELETE",
+        headers: getHeaders(false),
         credentials: "include" 
       });
       if (!res.ok) throw new Error("Failed to delete lead");
