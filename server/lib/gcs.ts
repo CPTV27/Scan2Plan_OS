@@ -141,6 +141,20 @@ export async function generatePotreeViewerUrl(
   potreePath: string,
   bucketName?: string
 ): Promise<string | null> {
-  const metadataPath = `${potreePath}/metadata.json`;
-  return generateSignedReadUrl(metadataPath, bucketName, 24 * 60);
+  try {
+    const bucket = await getBucket(bucketName);
+    if (!bucket) return null;
+
+    const config = await dbStorage.getSettingValue<GcsStorageConfig>("gcsStorage");
+    const actualBucket = bucketName || config?.defaultBucket || DELIVERABLES_BUCKET;
+    
+    return `https://storage.googleapis.com/${actualBucket}/${potreePath}`;
+  } catch (error) {
+    log(`ERROR: Failed to generate Potree viewer URL - ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+export function getPublicGcsUrl(bucketName: string, path: string): string {
+  return `https://storage.googleapis.com/${bucketName}/${path}`;
 }

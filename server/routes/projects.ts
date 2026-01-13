@@ -304,14 +304,26 @@ export function registerProjectRoutes(app: Express): void {
             ? `https://drive.google.com/drive/folders/${lead.driveFolderId}`
             : undefined);
 
+      const scanDateObj = new Date(scanDate);
+      const [startHour, startMin] = startTime.split(":").map(Number);
+      const [endHour, endMin] = endTime.split(":").map(Number);
+      
+      const startDateTime = new Date(scanDateObj);
+      startDateTime.setHours(startHour, startMin, 0, 0);
+      
+      const endDateTime = new Date(scanDateObj);
+      endDateTime.setHours(endHour, endMin, 0, 0);
+      if (endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+      }
+
       const eventResult = await createScanCalendarEvent({
         projectId: project.id,
         projectName: project.name,
         projectAddress: lead?.projectAddress || "Address not available",
         universalProjectId: project.universalProjectId || undefined,
-        scanDate: new Date(scanDate),
-        startTime,
-        endTime,
+        startDateTime,
+        endDateTime,
         technicianEmail,
         travelInfo: travelInfo || undefined,
         notes,

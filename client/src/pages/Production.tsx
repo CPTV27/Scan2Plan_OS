@@ -28,6 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProjectFinancials } from "@/components/ProjectFinancials";
+import { DeliveryPortal } from "@/components/delivery/DeliveryPortal";
 
 const COLUMNS = [
   { id: "Scheduling", title: "Scheduling", icon: CalendarClock },
@@ -533,13 +534,14 @@ function ProjectDialog({
         
         {project && projectAddress ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
               <TabsTrigger value="quoted" data-testid="tab-project-quoted">Quoted Scope</TabsTrigger>
               <TabsTrigger value="equipment" data-testid="tab-project-equipment">Equipment</TabsTrigger>
               <TabsTrigger value="scheduling" data-testid="tab-project-scheduling">Scheduling</TabsTrigger>
               <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
               <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
+              <TabsTrigger value="delivery" data-testid="tab-project-delivery">Delivery</TabsTrigger>
             </TabsList>
             
             <TabsContent value="details" className="mt-4">
@@ -700,6 +702,15 @@ function ProjectDialog({
                   address={projectAddress} 
                   companyName={linkedLead?.clientName}
                   buildingType={linkedLead?.buildingType || undefined}
+                />
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="delivery" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <DeliveryPortal 
+                  projectId={project.id} 
+                  universalProjectId={project.universalProjectId || undefined}
                 />
               </ScrollArea>
             </TabsContent>

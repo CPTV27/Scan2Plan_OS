@@ -42,6 +42,7 @@ import { registerProposalRoutes } from "./routes/proposals";
 import { emailsRouter } from "./routes/emails";
 import { personasRouter } from "./routes/personas";
 import { registerStorageRoutes } from "./routes/storage";
+import { registerDeliveryRoutes } from "./routes/delivery";
 
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -306,6 +307,7 @@ export async function registerRoutes(
   app.use("/api/personas", personasRouter);
   registerProposalRoutes(app);
   registerStorageRoutes(app);
+  registerDeliveryRoutes(app);
 
   app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req: Request, res: Response) => {
     try {

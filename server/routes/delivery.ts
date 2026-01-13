@@ -52,7 +52,7 @@ export function registerDeliveryRoutes(app: Express) {
     res.json({ url, filePath });
   }));
 
-  app.post("/api/delivery/sign-read", isAuthenticated, validateBody(signReadSchema), asyncHandler(async (req, res) => {
+  app.post("/api/delivery/sign-read", isAuthenticated, requireRole("ceo", "production"), validateBody(signReadSchema), asyncHandler(async (req, res) => {
     const { filePath } = req.body;
 
     const url = await generateSignedReadUrl(filePath);
@@ -64,7 +64,7 @@ export function registerDeliveryRoutes(app: Express) {
     res.json({ url });
   }));
 
-  app.get("/api/delivery/files/:projectId", isAuthenticated, asyncHandler(async (req, res) => {
+  app.get("/api/delivery/files/:projectId", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     if (isNaN(projectId)) {
       return res.status(400).json({ error: "Invalid project ID" });
