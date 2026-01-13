@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle } from "lucide-react";
+import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle, HelpCircle } from "lucide-react";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 
 export default function HelpCenter() {
@@ -23,7 +23,7 @@ export default function HelpCenter() {
             </div>
 
             <Tabs defaultValue="ai-tools" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-8">
+              <TabsList className="grid w-full grid-cols-5 mb-8">
                 <TabsTrigger value="ai-tools" data-testid="tab-ai-tools" className="gap-1">
                   <Brain className="h-4 w-4" />
                   AI & Tools
@@ -31,6 +31,10 @@ export default function HelpCenter() {
                 <TabsTrigger value="sales" data-testid="tab-sales">Growth & Sales</TabsTrigger>
                 <TabsTrigger value="ops" data-testid="tab-ops">Operations</TabsTrigger>
                 <TabsTrigger value="strategy" data-testid="tab-strategy">The Strategy</TabsTrigger>
+                <TabsTrigger value="faq" data-testid="tab-faq" className="gap-1">
+                  <HelpCircle className="h-4 w-4" />
+                  FAQ
+                </TabsTrigger>
               </TabsList>
 
               {/* AI & Tools Tab - New comprehensive documentation */}
@@ -772,6 +776,255 @@ export default function HelpCenter() {
                         <p className="text-sm text-muted-foreground">ROI, long-term value</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* FAQ Tab */}
+              <TabsContent value="faq" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <HelpCircle className="h-5 w-5 text-blue-500" />
+                      Frequently Asked Questions
+                    </CardTitle>
+                    <CardDescription>Quick answers to common questions about Scan2Plan OS.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="multiple" className="w-full">
+                      {/* Getting Started */}
+                      <AccordionItem value="faq-getting-started">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          Getting Started
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-1">
+                              <AccordionTrigger className="text-left">How do I log in to Scan2Plan OS?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Use your Replit account to log in. Click "Log in with Replit" on the login page. If you're a new team member, ask your CEO to verify your email address in the Settings page before you can access the system.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-2">
+                              <AccordionTrigger className="text-left">What are the different user roles?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                <ul className="list-disc pl-5 space-y-1">
+                                  <li><strong>CEO:</strong> Full access to all modules including financial data, settings, and analytics.</li>
+                                  <li><strong>Sales:</strong> Access to sales pipeline, CPQ calculator, deal workspace, and proposals.</li>
+                                  <li><strong>Production:</strong> Access to FieldHub, project management, and production tracking.</li>
+                                  <li><strong>Accounting:</strong> Access to financial modules and QuickBooks integration.</li>
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-3">
+                              <AccordionTrigger className="text-left">How do I navigate between modules?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Use the sidebar on the left to navigate between modules. On mobile, tap the menu icon in the header. Each module is organized by business function: Sales, Production, Financial, Marketing, and Settings.
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* CPQ Calculator */}
+                      <AccordionItem value="faq-cpq">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          CPQ Calculator & Pricing
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-cpq-1">
+                              <AccordionTrigger className="text-left">What is the CPQ Calculator?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                CPQ stands for Configure, Price, Quote. It's our intelligent pricing engine that calculates project costs based on square footage, scope of work, travel distance, and equipment requirements. It ensures consistent pricing across all proposals.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-cpq-2">
+                              <AccordionTrigger className="text-left">What's the difference between Standard and Tier A pricing?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                <ul className="list-disc pl-5 space-y-1">
+                                  <li><strong>Standard Mode:</strong> Uses our default per-sqft rates. Best for projects under 50,000 sqft.</li>
+                                  <li><strong>Tier A Mode:</strong> Enables custom estimator inputs and detailed task breakdowns. Recommended for large or complex projects (50,000+ sqft).</li>
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-cpq-3">
+                              <AccordionTrigger className="text-left">Why is my margin showing below 40%?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                The 40% gross margin floor is a profitability protection. If your quote falls below this, you'll see a warning banner. You can still proceed (CEO has override authority), but consider adjusting scope or pricing. Check your travel costs, equipment costs, and per-sqft rates.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-cpq-4">
+                              <AccordionTrigger className="text-left">How is travel cost calculated?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Travel costs are calculated based on distance from your home base. Projects within 50 miles typically have no travel charge. Beyond that, costs increase based on mileage, potential hotel stays, and per diem for technicians. The system uses Google Maps API for accurate distance calculations.
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* Sales Pipeline */}
+                      <AccordionItem value="faq-sales">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          Sales Pipeline & Deals
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-sales-1">
+                              <AccordionTrigger className="text-left">What are the deal stages?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                <ol className="list-decimal pl-5 space-y-1">
+                                  <li><strong>Leads:</strong> New inquiries and opportunities</li>
+                                  <li><strong>Qualifying:</strong> Gathering project requirements and fit assessment</li>
+                                  <li><strong>Quoting:</strong> Building and refining the proposal</li>
+                                  <li><strong>Proposal Sent:</strong> Waiting for client response</li>
+                                  <li><strong>Negotiating:</strong> Discussing terms and adjustments</li>
+                                  <li><strong>Closed Won / Closed Lost:</strong> Final outcome</li>
+                                </ol>
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-sales-2">
+                              <AccordionTrigger className="text-left">How do I create a new lead?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Go to Sales Pipeline and click "Add Lead" button. Fill in the client name, project name, and address. The system will automatically generate a Universal Project ID (UPID) once the lead progresses past the Leads stage.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-sales-3">
+                              <AccordionTrigger className="text-left">What is the Deal Workspace?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                The Deal Workspace is your command center for each opportunity. It consolidates all deal information, quote history, client communications, documents, and action items in one place. Access it by clicking on any deal card in the pipeline.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-sales-4">
+                              <AccordionTrigger className="text-left">How do I send a proposal?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                From the Deal Workspace, complete your quote in the CPQ Calculator, then use the Proposal Builder to generate a professional proposal. You can send it via PandaDoc for e-signatures. The deal stage will automatically update to "Proposal Sent" when you send it.
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* Production & FieldHub */}
+                      <AccordionItem value="faq-production">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          Production & FieldHub
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-prod-1">
+                              <AccordionTrigger className="text-left">How does a deal become a project?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                When a deal is marked as "Closed Won", it automatically triggers the project handoff process. A new project is created in the Production module, and the project appears in FieldHub for field technicians. The UPID carries over for traceability.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-prod-2">
+                              <AccordionTrigger className="text-left">What is a Mission Brief?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                A Mission Brief is a one-page summary for field technicians containing project scope, site access information, equipment requirements, deliverables checklist, and special instructions. It's generated automatically from deal data and can be accessed from the FieldHub or printed.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-prod-3">
+                              <AccordionTrigger className="text-left">How do I log time and expenses?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                In FieldHub, select your project and use the Time Log tab to record hours. For expenses (parking, tolls, meals), use the Expenses tab and attach receipt photos. All entries sync to the project for accurate job costing.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-prod-4">
+                              <AccordionTrigger className="text-left">What are the production stages?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                <ol className="list-decimal pl-5 space-y-1">
+                                  <li><strong>Scheduling:</strong> Coordinating site visit dates</li>
+                                  <li><strong>Field Capture:</strong> On-site scanning</li>
+                                  <li><strong>Registration:</strong> Processing point cloud data</li>
+                                  <li><strong>Modeling:</strong> Creating BIM deliverables</li>
+                                  <li><strong>QC Review:</strong> Quality assurance checks</li>
+                                  <li><strong>Client Review:</strong> Deliverable approval</li>
+                                  <li><strong>Complete:</strong> Project delivered</li>
+                                </ol>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* Integrations */}
+                      <AccordionItem value="faq-integrations">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          Integrations
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-int-1">
+                              <AccordionTrigger className="text-left">How do I connect QuickBooks?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Go to Settings → Integrations and click "Connect QuickBooks". You'll be redirected to authorize the connection. Once connected, you can sync customers, create estimates, and view financial data directly in Scan2Plan OS.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-int-2">
+                              <AccordionTrigger className="text-left">How does PandaDoc integration work?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                PandaDoc is used for creating professional proposals with e-signature capability. From the Proposal Builder, generate a document using our template. Clients can sign electronically, and the system automatically updates the deal status when signed.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-int-3">
+                              <AccordionTrigger className="text-left">What files are stored in Google Drive?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Each project gets a dedicated folder structure in Google Drive: Field Capture (raw scans), Registration (processed data), Modeling (BIM files), and Deliverables (final client files). Links appear in the project's Mission Brief and Deal Workspace.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-int-4">
+                              <AccordionTrigger className="text-left">How do I sync customers from QuickBooks?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Navigate to the Customer Database (CRM) and click "Sync from QuickBooks". This imports all active customers with their contact information and balance data. You can then enrich records with AI to add industry and company details.
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      {/* Troubleshooting */}
+                      <AccordionItem value="faq-troubleshooting">
+                        <AccordionTrigger className="text-left font-semibold text-lg">
+                          Troubleshooting
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <Accordion type="single" collapsible className="w-full pl-4">
+                            <AccordionItem value="faq-trouble-1">
+                              <AccordionTrigger className="text-left">I can't log in - "Too many requests" error</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                This is a rate limiting protection. Wait 1-2 minutes and try again. If the problem persists, contact your administrator to check if there are any system issues.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-trouble-2">
+                              <AccordionTrigger className="text-left">My changes aren't saving</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Check your internet connection and refresh the page. If using the CPQ Calculator, make sure to click "Save Quote" before navigating away. Look for any error messages in red that might indicate validation issues.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-trouble-3">
+                              <AccordionTrigger className="text-left">QuickBooks shows "Not Connected"</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                QuickBooks connections expire periodically. Go to Settings → Integrations and click "Reconnect QuickBooks" to refresh the authorization. This is a normal security measure.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-trouble-4">
+                              <AccordionTrigger className="text-left">Google Calendar events aren't showing</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                Verify that Google Calendar integration is connected in Settings. Events may take a few moments to sync. If the issue persists, try disconnecting and reconnecting the Google integration.
+                              </AccordionContent>
+                            </AccordionItem>
+                            <AccordionItem value="faq-trouble-5">
+                              <AccordionTrigger className="text-left">Where can I get more help?</AccordionTrigger>
+                              <AccordionContent className="text-muted-foreground">
+                                For additional support, contact your system administrator or reach out to the Scan2Plan team. This S2P Academy contains comprehensive documentation in the other tabs covering AI & Tools, Sales, Operations, and Strategy.
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </CardContent>
                 </Card>
               </TabsContent>
