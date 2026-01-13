@@ -603,3 +603,19 @@ export const regulatoryRiskSchema = z.object({
   source: z.string().optional(),
 });
 export type RegulatoryRisk = z.infer<typeof regulatoryRiskSchema>;
+
+export const PRODUCT_CATEGORIES = [
+  "S2P", // Core Product (e.g., S2P COM 300)
+  "Added Disciplines", // e.g., MEPF, Structural
+  "Add Ons", // e.g., CAD Packages, BOMA
+  "Conditions", // e.g., Occupied, Expedited
+  "Travel", // Travel-related products
+  "Other",
+] as const;
+
+export const PRICING_MODELS = [
+  "Fixed", // Flat rate (e.g., $150)
+  "PerSqFt", // Multiplied by project sqft (e.g., $0.10/sqft)
+  "Percentage", // Percentage of total (e.g., 10%)
+  "Dynamic", // Uses complex logic (e.g., Vendor Rates)
+] as const;

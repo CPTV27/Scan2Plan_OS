@@ -481,6 +481,46 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === PRODUCTS (CPQ Catalog) ===
+import { PRODUCT_CATEGORIES, PRICING_MODELS } from "./constants";
+
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  sku: text("sku").notNull().unique(), // e.g., "S2P COM 300"
+  name: text("name").notNull(), // e.g., "Scan2Plan Commercial - LoD 300"
+  description: text("description"),
+  category: text("category").notNull(), // S2P, Added Disciplines, Add Ons, etc.
+  type: text("type").default("Service"), // Service, Non-Inventory
+
+  // Pricing Configuration
+  price: decimal("price", { precision: 12, scale: 2 }).default("0"),
+  pricingModel: text("pricing_model").default("Fixed"), // Fixed, PerSqFt, Percentage, Dynamic
+
+  // Configurator Attributes (The "Lookup Engine" Logic)
+  attributes: jsonb("attributes").$type<{
+    propertyType?: "Residential" | "Commercial" | "Industrial" | string;
+    scope?: "Interior" | "Exterior" | "Both" | string;
+    lod?: "200" | "300" | "350" | string;
+    discipline?: "Architecture" | "MEP" | "Structure" | string;
+  }>(),
+
+  // QuickBooks Integration
+  qboItemId: text("qbo_item_id"), // Synced QB Item ID
+  qboAccountName: text("qbo_account_name"), // Income Account
+
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+
 // === VENDOR RATES (Margin Tracking) ===
 export const vendorRates = pgTable("vendor_rates", {
   id: serial("id").primaryKey(),
@@ -1768,24 +1808,4 @@ export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
 export type EmailMessage = typeof emailMessages.$inferSelect;
 
 // Products / Services catalog (synced from QuickBooks)
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  sku: text("sku").notNull().unique(),
-  category: text("category").notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  productType: text("product_type").notNull().default("Service"),
-  basePrice: decimal("base_price", { precision: 12, scale: 2 }).default("0"),
-  qboItemId: text("qbo_item_id"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
 
-export const insertProductSchema = createInsertSchema(products).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type InsertProduct = z.infer<typeof insertProductSchema>;
-export type Product = typeof products.$inferSelect;

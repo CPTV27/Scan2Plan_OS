@@ -72,8 +72,8 @@ export function registerAnalyticsRoutes(app: Express): void {
     res.json({ success: true, message: "Performance stats cleared" });
   }));
 
-  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
-    try {
+  const getCachedDailySummary = cacheAsync(
+    async () => {
       const leads = await storage.getLeads();
       const projects = await storage.getProjects();
 
@@ -92,7 +92,7 @@ export function registerAnalyticsRoutes(app: Express): void {
         p.status !== "Complete" && p.status !== "Cancelled"
       ).length;
 
-      res.json({
+      return {
         pipelineValue,
         weightedValue,
         activeLeads: leads.filter(l => l.dealStage !== "Closed Won" && l.dealStage !== "Closed Lost").length,
@@ -103,7 +103,15 @@ export function registerAnalyticsRoutes(app: Express): void {
           return daysSince > 14;
         }).length,
         generatedAt: new Date().toISOString(),
-      });
+      };
+    },
+    { maxAge: CacheDuration.FIVE_MINUTES }
+  );
+
+  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    try {
+      const summary = await getCachedDailySummary();
+      res.json(summary);
     } catch (error: any) {
       log("ERROR: Daily summary error - " + (error?.message || error));
       res.status(500).json({ message: error.message });

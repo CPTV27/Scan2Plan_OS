@@ -73,7 +73,7 @@ Once your numbers look right in the Preview Panel:
 
 ---
 
-## 3. Production & Field Operations
+## 4. Production & Field Operations
 
 Once a deal is "Closed Won", it transforms into a **Project**.
 
@@ -95,7 +95,7 @@ Technicians use the mobile view of Scan2Plan OS.
 
 ---
 
-## 4. Financial Module (Profit First)
+## 5. Financial Module (Profit First)
 
 We run our business on **Profit First** principles. Scan2Plan OS helps us stick to them.
 
@@ -114,7 +114,7 @@ Money isn't just one big pile. When revenue comes in, the **Financial Dashboard*
 
 ---
 
-## 5. Troubleshooting & FAQs
+## 6. Troubleshooting & FAQs
 
 ### Why can't I save my quote?
 Look at the **Integrity Audit** panel in the quote sidebar.

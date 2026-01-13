@@ -44,6 +44,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { BoundaryDrawer } from "@/components/BoundaryDrawer";
 import type { Lead, CpqQuote } from "@shared/schema";
 import { CPQ_PAYMENT_TERMS, CPQ_PAYMENT_TERMS_DISPLAY } from "@shared/schema";
+import { enrichAreaWithProducts, generateQuoteSkus } from "@/lib/productResolver";
+import { LineItemEditor, type QuoteLineItem } from "./LineItemEditor";
+import { generateEditableLineItems, lineItemsToSkuManifest } from "./lineItemUtils";
 import {
   calculatePricing,
   calculateTravelCost,
@@ -92,7 +95,12 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Pricing mode (standard areas, landscape areas, or Tier A)
   const [pricingMode, setPricingMode] = useState<PricingMode>("standard");
-  
+
+  // Line Item Editor state
+  const [showLineItemEditor, setShowLineItemEditor] = useState(false);
+  const [customLineItems, setCustomLineItems] = useState<QuoteLineItem[] | null>(null);
+  const [hasCustomizedPricing, setHasCustomizedPricing] = useState(false);
+
   // Form state - areas use buildingType (14-15 = landscape, others = building)
   const [areas, setAreas] = useState<Area[]>([
     {
@@ -110,7 +118,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   const [risks, setRisks] = useState<string[]>([]);
   const [paymentTerms, setPaymentTerms] = useState("standard");
   const [projectNotes, setProjectNotes] = useState("");
-  
+
   // Filter areas by type for display - uses buildingType to determine landscape (14-15)
   const standardAreas = useMemo(() => areas.filter(a => !isLandscapeBuildingType(a.buildingType)), [areas]);
   const landscapeAreas = useMemo(() => areas.filter(a => isLandscapeBuildingType(a.buildingType)), [areas]);
@@ -125,22 +133,22 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
 
   // Scanning & Registration Only
   const [scanningOnly, setScanningOnly] = useState<"none" | "full_day" | "half_day" | "ask_client">("none");
-  
+
   // Site status (for RFI)
   const [siteStatus, setSiteStatus] = useState<"vacant" | "occupied" | "construction" | "ask_client">("vacant");
-  
+
   // MEP scope (for RFI)
   const [mepScope, setMepScope] = useState<"full" | "partial" | "none" | "ask_client">("full");
 
   // Custom travel cost override
   const [customTravelCost, setCustomTravelCost] = useState<string>("");
-  
+
   // Distance calculation loading state
   const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
-  
+
   // Boundary drawing state for landscape areas
   const [boundaryDrawerAreaId, setBoundaryDrawerAreaId] = useState<string | null>(null);
-  
+
   // Price adjustment for margin gate compliance
   const [priceAdjustmentPercent, setPriceAdjustmentPercent] = useState<number>(0);
 
@@ -171,7 +179,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   const [customTemplateOther, setCustomTemplateOther] = useState("");
 
   // === ACT CEILING (enhanced) ===
-  const [aboveBelowACT, setAboveBelowACT] = useState<"above" | "below" | "both" | "other" | "">(""); 
+  const [aboveBelowACT, setAboveBelowACT] = useState<"above" | "below" | "both" | "other" | "">("");
   const [aboveBelowACTOther, setAboveBelowACTOther] = useState("");
   const [actSqft, setActSqft] = useState("");
 
@@ -194,16 +202,16 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // === TIMELINE (quote-specific - CRM fields like lead source, probability are in DealWorkspace) ===
   const [estimatedTimeline, setEstimatedTimeline] = useState("");
   const [timelineNotes, setTimelineNotes] = useState("");
-  
+
   // Calculate total sqft for Tier A detection (uses new helper function)
   const totalSqft = useMemo(() => calculateTotalSqft(areas), [areas]);
-  
+
   // Detect if project qualifies for Tier A pricing (auto-suggest)
   const qualifiesForTierA = isTierAProject(totalSqft);
-  
+
   // Actual Tier A mode is either manually selected OR auto-detected
   const isTierA = pricingMode === "tierA";
-  
+
   // Calculate Tier A pricing when enabled
   const tierAPricingResult = useMemo(() => {
     if (!isTierA) return null;
@@ -249,7 +257,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
           distance: lead.distance,
         });
       }
-      
+
       // Auto-populate from Google Intel if available (only when NOT editing existing quote)
       // When editing an existing quote, preserve user-edited values
       if (!quoteId) {
@@ -290,9 +298,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         const travelData = existingQuote.travel as TravelConfig & { customCost?: number; miles?: number };
         // Handle both "distance" (new format) and "miles" (legacy database format)
         const distanceValue = travelData.distance ?? travelData.miles ?? 0;
-        setTravel({ 
-          dispatchLocation: travelData.dispatchLocation?.toLowerCase() || "woodstock", 
-          distance: distanceValue 
+        setTravel({
+          dispatchLocation: travelData.dispatchLocation?.toLowerCase() || "woodstock",
+          distance: distanceValue
         });
         if (travelData.customCost) {
           setCustomTravelCost(travelData.customCost.toString());
@@ -343,7 +351,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       if (quote.priceAdjustmentPercent != null) {
         setPriceAdjustmentPercent(quote.priceAdjustmentPercent);
       }
-      
+
       // Load scoping data
       if (quote.scopingData) {
         const sd = quote.scopingData;
@@ -390,27 +398,27 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       brooklyn: "176 Borinquen Place, Brooklyn, NY 11211",
       troy: "188 1st St, Troy, NY 12180",
     };
-    
+
     // Only run if we have a lead with address, travel dispatch but no distance
     if (!lead?.projectAddress) return;
     // Case-insensitive fly_out check for backwards compatibility
     if (!travel?.dispatchLocation || isDispatchLocation(travel.dispatchLocation, "fly_out")) return;
     if (travel.distance && travel.distance > 0) return;
     if (isCalculatingDistance) return;
-    
+
     const calculateMissingDistance = async () => {
       // Normalize to lowercase for lookup
       const normalizedLocation = normalizeDispatchLocation(travel.dispatchLocation);
       const originAddress = dispatchAddresses[normalizedLocation];
       if (!originAddress) return;
-      
+
       setIsCalculatingDistance(true);
       try {
         const response = await apiRequest("POST", "/api/travel/calculate", {
           destination: lead.projectAddress,
           origin: originAddress,
         });
-        
+
         const distanceResult = await response.json() as { distanceMiles?: number; durationText?: string };
         if (distanceResult.distanceMiles) {
           setTravel({
@@ -425,7 +433,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         setIsCalculatingDistance(false);
       }
     };
-    
+
     calculateMissingDistance();
   }, [lead?.projectAddress, travel?.dispatchLocation, travel?.distance, isCalculatingDistance]);
 
@@ -440,21 +448,21 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       "https://scan2planos.com",
       "https://crm.scan2plan.io",
     ];
-    
+
     const handleMessage = (event: MessageEvent) => {
       // Validate origin for security
       if (!ALLOWED_ORIGINS.includes(event.origin)) {
         console.warn("[CPQ] Blocked postMessage from untrusted origin:", event.origin);
         return;
       }
-      
+
       // Validate message type
       if (event.data?.type !== "CPQ_SCOPING_PAYLOAD") return;
-      
+
       console.log("[CPQ] Received scoping payload from CRM:", event.data);
       const payload = event.data.payload;
       if (!payload || typeof payload !== "object") return;
-      
+
       // Populate scoping fields from CRM payload
       if (payload.specificBuilding) setSpecificBuilding(payload.specificBuilding);
       if (payload.typeOfBuilding) setTypeOfBuilding(payload.typeOfBuilding);
@@ -482,23 +490,23 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       // CRM fields (source, probability, projectStatus) are managed in DealWorkspace
       if (payload.estimatedTimeline) setEstimatedTimeline(payload.estimatedTimeline);
       if (payload.timelineNotes) setTimelineNotes(payload.timelineNotes);
-      
+
       // Handle areas if provided
       if (payload.areas && Array.isArray(payload.areas)) {
         setAreas(payload.areas);
       }
-      
+
       // Handle travel if provided
       if (payload.travel) {
         setTravel(payload.travel);
       }
-      
+
       toast({
         title: "Scoping data received",
         description: "Project details have been populated from CRM.",
       });
     };
-    
+
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [toast]);
@@ -521,9 +529,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       });
       return;
     }
-    
+
     setTravel({ dispatchLocation: locationCode, distance: travel?.distance || 0 });
-    
+
     // Only calculate if we have a project address
     if (!lead?.projectAddress) {
       return;
@@ -540,7 +548,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         destination: lead.projectAddress,
         origin: originAddress,
       });
-      
+
       const distanceResult = await response.json() as { distanceMiles?: number; durationText?: string; message?: string };
       if (distanceResult.distanceMiles) {
         setTravel({
@@ -562,7 +570,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
       console.error("Failed to calculate distance:", error);
       toast({
         title: "Distance calculation failed",
-        description: error?.message?.includes("400") 
+        description: error?.message?.includes("400")
           ? "Could not find a route. Please enter the distance manually."
           : "Could not calculate distance. You can enter it manually.",
         variant: "destructive",
@@ -580,18 +588,18 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // Calculate adjusted pricing with markup percentage
   const pricing: PricingResult = useMemo(() => {
     if (priceAdjustmentPercent === 0) return basePricing;
-    
+
     const adjustmentAmount = Math.round(basePricing.totalClientPrice * (priceAdjustmentPercent / 100) * 100) / 100;
     const adjustedTotal = Math.round((basePricing.totalClientPrice + adjustmentAmount) * 100) / 100;
     const adjustedProfit = Math.round((adjustedTotal - basePricing.totalUpteamCost) * 100) / 100;
-    
+
     // Add adjustment as a visible line item
     const adjustmentLineItem = {
       label: `Price Adjustment (+${priceAdjustmentPercent}%)`,
       value: adjustmentAmount,
       upteamCost: 0, // Adjustment is pure margin
     };
-    
+
     return {
       ...basePricing,
       items: [...basePricing.items, adjustmentLineItem],
@@ -610,7 +618,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
     return calculateMarginPercent(pricing);
   }, [pricing, isTierA, tierAPricingResult]);
-  
+
   const marginGateError = useMemo(() => {
     if (isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0) {
       const tierAMarginPercent = ((tierAPricingResult.clientPrice - tierAPricingResult.subtotal) / tierAPricingResult.clientPrice) * 100;
@@ -619,7 +627,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
     return getMarginGateError(pricing);
   }, [pricing, isTierA, tierAPricingResult]);
-  
+
   const isMarginBelowGate = useMemo(() => {
     if (isTierA && tierAPricingResult && tierAPricingResult.clientPrice > 0) {
       // Tier A: check if margin >= 40%
@@ -628,7 +636,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
     return !passesMarginGate(pricing);
   }, [pricing, isTierA, tierAPricingResult]);
-  
+
   // Calculate the minimum adjustment needed to reach 40% margin
   const requiredAdjustmentPercent = useMemo(() => {
     if (!isMarginBelowGate || priceAdjustmentPercent > 0) return 0;
@@ -658,7 +666,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // RFI (Request for Information) detection - "I don't know" selections
   const rfiFields = useMemo(() => {
     const fields: { key: string; label: string; question: string }[] = [];
-    
+
     if (actScanning === "ask_client") {
       fields.push({
         key: "actScanning",
@@ -687,7 +695,7 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
         question: "Do you need MEP (Mechanical/Electrical/Plumbing) modeled, or just the architecture?",
       });
     }
-    
+
     return fields;
   }, [actScanning, scanningOnly, siteStatus, mepScope]);
 
@@ -726,9 +734,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     }
 
     // Check for CAD deliverables - either through includeCadDeliverable or bimDeliverable
-    const hasCadDeliverable = areas.some((area) => area.includeCadDeliverable) || 
-                              bimDeliverable.length > 0 ||
-                              interiorCadElevations;
+    const hasCadDeliverable = areas.some((area) => area.includeCadDeliverable) ||
+      bimDeliverable.length > 0 ||
+      interiorCadElevations;
     if (hasCadDeliverable) {
       items.push({ name: "CAD Deliverables", testId: "service-included-cad" });
     }
@@ -756,9 +764,9 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
     Object.entries(services).forEach(([serviceId, value]) => {
       if (value && value > 0) {
         const label = serviceLabels[serviceId] || serviceId;
-        items.push({ 
-          name: label, 
-          testId: `service-included-${serviceId.toLowerCase()}` 
+        items.push({
+          name: label,
+          testId: `service-included-${serviceId.toLowerCase()}`
         });
       }
     });
@@ -769,10 +777,10 @@ export default function CPQCalculator({ leadId, quoteId, onClose }: CalculatorPr
   // Generate RFI email body
   const rfiEmailBody = useMemo(() => {
     if (!hasRfiItems) return "";
-    
+
     const leadName = lead?.contactName || "[Client Name]";
     const projectName = lead?.projectName || "your project";
-    
+
     return `Hi ${leadName},
 
 I'm working on your quote for the ${projectName} scanning project. To ensure we give you the most accurate price, could you clarify a few details?
@@ -793,7 +801,7 @@ Thanks!`.trim();
       if (marginGateError) {
         throw new Error(marginGateError);
       }
-      
+
       // Safely build travel data with custom cost
       // Convert dispatch location to uppercase for persistence (legacy format for downstream systems)
       let travelData = travel ? {
@@ -808,12 +816,25 @@ Thanks!`.trim();
             : { dispatchLocation: "WOODSTOCK", distance: 0, customCost };
         }
       }
-      
+
       // Ensure areas have kind field for backwards compatibility
       const areasWithKind = areas.map(area => ({
         ...area,
         kind: area.kind || (isLandscapeBuildingType(area.buildingType) ? "landscape" : "standard"),
       }));
+
+      // Enrich areas with product SKUs for QuickBooks sync
+      const areasWithProducts = await Promise.all(
+        areasWithKind.map(area => enrichAreaWithProducts(area))
+      );
+
+      // Generate complete SKU manifest for quote
+      const lineItemSkus = await generateQuoteSkus({
+        areas: areasWithKind,
+        services,
+        risks,
+        paymentTerms
+      });
 
       // Parse Tier A costs - use "other" input value when "other" is selected
       const parseTierACost = (val: string) => {
@@ -829,7 +850,7 @@ Thanks!`.trim();
 
       const quoteData = {
         leadId: leadId || null,
-        areas: areasWithKind,
+        areas: areasWithProducts, // Use enriched areas with SKU data
         services,
         travel: travelData,
         risks,
@@ -861,6 +882,8 @@ Thanks!`.trim();
           profitMargin: pricing.profitMargin,
           disciplineTotals: pricing.disciplineTotals,
         },
+        // SKU manifest for QuickBooks Service Item mapping
+        lineItemSkus,
         // Scoping Data - All new fields
         scopingData: {
           // Project Details
@@ -927,7 +950,7 @@ Thanks!`.trim();
   // Generate client magic link mutation
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
-  
+
   const generateLinkMutation = useMutation({
     mutationFn: async (savedQuoteId: number) => {
       const response = await apiRequest("POST", `/api/cpq-quotes/${savedQuoteId}/generate-link`, {});
@@ -973,9 +996,22 @@ Thanks!`.trim();
         kind: area.kind || (isLandscapeBuildingType(area.buildingType) ? "landscape" : "standard"),
       }));
 
+      // Enrich areas with product SKUs for QuickBooks sync
+      const areasWithProducts = await Promise.all(
+        areasWithKind.map(area => enrichAreaWithProducts(area))
+      );
+
+      // Generate complete SKU manifest for quote
+      const lineItemSkus = await generateQuoteSkus({
+        areas: areasWithKind,
+        services,
+        risks,
+        paymentTerms
+      });
+
       const quoteData = {
         leadId: leadId || null,
-        areas: areasWithKind,
+        areas: areasWithProducts, // Use enriched areas with SKU data
         services,
         travel: travelData,
         risks,
@@ -999,6 +1035,8 @@ Thanks!`.trim();
           profitMargin: pricing.profitMargin,
           disciplineTotals: pricing.disciplineTotals,
         },
+        // SKU manifest for QuickBooks Service Item mapping
+        lineItemSkus,
         // Scoping Data - All new fields
         scopingData: {
           specificBuilding,
@@ -1038,7 +1076,7 @@ Thanks!`.trim();
       } else {
         savedQuote = await apiRequest("POST", "/api/cpq/quotes", quoteData);
       }
-      
+
       const quoteResult = await savedQuote.json();
       return quoteResult;
     },
@@ -1131,15 +1169,15 @@ Thanks!`.trim();
   }, [areas]);
 
   // Get the area being edited for boundary drawing
-  const boundaryDrawerArea = boundaryDrawerAreaId 
+  const boundaryDrawerArea = boundaryDrawerAreaId
     ? areas.find(a => a.id === boundaryDrawerAreaId)
     : null;
 
   // Fetch project coordinates for boundary drawing
-  const locationPreviewUrl = lead?.projectAddress 
+  const locationPreviewUrl = lead?.projectAddress
     ? `/api/location/preview?address=${encodeURIComponent(lead.projectAddress)}`
     : null;
-  
+
   const { data: locationData } = useQuery<{ coordinates?: { lat: number; lng: number } }>({
     queryKey: [locationPreviewUrl],
     enabled: !!locationPreviewUrl,
@@ -1172,6 +1210,24 @@ Thanks!`.trim();
               Margin below 40% gate
             </Badge>
           )}
+          {hasCustomizedPricing && (
+            <Badge variant="secondary" className="text-xs">
+              ✏️ Customized
+            </Badge>
+          )}
+          <Button
+            onClick={async () => {
+              const editableItems = generateEditableLineItems(pricing, await generateQuoteSkus({ areas, services, risks, paymentTerms }));
+              setCustomLineItems(editableItems);
+              setShowLineItemEditor(true);
+            }}
+            variant="outline"
+            disabled={!pricing || pricing.items.length === 0}
+            data-testid="button-customize-line-items"
+          >
+            <PenTool className="h-4 w-4 mr-2" />
+            Customize Line Items
+          </Button>
           <Button
             onClick={() => saveQuoteMutation.mutate()}
             disabled={saveQuoteMutation.isPending || !canSaveQuote}
@@ -1200,8 +1256,8 @@ Thanks!`.trim();
                 </Badge>
               </div>
               <div className="flex gap-2 flex-wrap">
-                <Button 
-                  variant={pricingMode !== "tierA" ? "default" : "outline"} 
+                <Button
+                  variant={pricingMode !== "tierA" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setPricingMode("standard")}
                   data-testid="button-mode-standard"
@@ -1212,8 +1268,8 @@ Thanks!`.trim();
                     <Badge variant="secondary" className="ml-2">{areas.length}</Badge>
                   )}
                 </Button>
-                <Button 
-                  variant={pricingMode === "tierA" ? "default" : "outline"} 
+                <Button
+                  variant={pricingMode === "tierA" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setPricingMode("tierA")}
                   data-testid="button-mode-tier-a"
@@ -1227,7 +1283,7 @@ Thanks!`.trim();
                 </Button>
               </div>
             </div>
-            
+
             <Separator />
 
             {/* Combined Areas Section (Building + Landscape) */}
@@ -1275,280 +1331,280 @@ Thanks!`.trim();
                   // Calculate type-specific index for test IDs - uses buildingType to determine landscape
                   const isLandscape = isLandscapeBuildingType(area.buildingType);
                   const kindIndex = areas.slice(0, index).filter(a => isLandscapeBuildingType(a.buildingType) === isLandscape).length;
-                  
+
                   return (
-                  <Card key={area.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={area.name}
-                            onChange={(e) => updateArea(area.id, "name", e.target.value)}
-                            className="font-medium max-w-[200px]"
-                            data-testid={isLandscape ? `input-landscape-name-${kindIndex}` : `input-area-name-${kindIndex}`}
-                          />
-                          <Badge variant={isLandscape ? "secondary" : "outline"}>
-                            {isLandscape ? (
-                              <><MapPin className="h-3 w-3 mr-1" />Landscape</>
-                            ) : (
-                              <><Building2 className="h-3 w-3 mr-1" />Building</>
-                            )}
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeArea(area.id)}
-                          data-testid={isLandscape ? `button-remove-landscape-${kindIndex}` : `button-remove-area-${kindIndex}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Building-specific fields */}
-                      {!isLandscape && (
-                        <>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Building Type</Label>
-                              <Select
-                                value={area.buildingType}
-                                onValueChange={(v) => updateArea(area.id, "buildingType", v)}
-                              >
-                                <SelectTrigger data-testid={`select-building-type-${kindIndex}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {BUILDING_TYPES.filter(bt => bt.id !== "14" && bt.id !== "15").map((bt) => (
-                                    <SelectItem key={bt.id} value={bt.id}>
-                                      {bt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Square Footage</Label>
-                              <Input
-                                type="number"
-                                value={area.squareFeet}
-                                onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
-                                placeholder="e.g., 50000"
-                                data-testid={`input-sqft-${kindIndex}`}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Level of Detail</Label>
-                              <Select value={area.lod} onValueChange={(v) => updateArea(area.id, "lod", v)}>
-                                <SelectTrigger data-testid={`select-lod-${kindIndex}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {LOD_OPTIONS.map((lod) => (
-                                    <SelectItem key={lod.id} value={lod.id}>
-                                      {lod.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Scope</Label>
-                              <Select
-                                value={area.scope || "full"}
-                                onValueChange={(v) => updateArea(area.id, "scope", v)}
-                              >
-                                <SelectTrigger data-testid={`select-scope-${kindIndex}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {SCOPE_OPTIONS.map((s) => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                      {s.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          {/* Mixed LOD option - appears for Full scope only */}
-                          {(area.scope === "full" || !area.scope) && (
-                            <Collapsible>
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground" data-testid={`toggle-mixed-lod-${kindIndex}`}>
-                                  <span className="text-sm">Mixed LOD (Int/Ext)</span>
-                                  <ChevronDown className="h-4 w-4" />
-                                </Button>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent className="pt-2">
-                                <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-muted/50">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs">Interior LOD</Label>
-                                    <Select 
-                                      value={area.mixedInteriorLod || area.lod || "200"} 
-                                      onValueChange={(v) => updateArea(area.id, "mixedInteriorLod", v)}
-                                    >
-                                      <SelectTrigger data-testid={`select-interior-lod-${kindIndex}`}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {LOD_OPTIONS.map((lod) => (
-                                          <SelectItem key={lod.id} value={lod.id}>
-                                            {lod.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs">Exterior LOD</Label>
-                                    <Select 
-                                      value={area.mixedExteriorLod || area.lod || "200"} 
-                                      onValueChange={(v) => updateArea(area.id, "mixedExteriorLod", v)}
-                                    >
-                                      <SelectTrigger data-testid={`select-exterior-lod-${kindIndex}`}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {LOD_OPTIONS.map((lod) => (
-                                          <SelectItem key={lod.id} value={lod.id}>
-                                            {lod.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <p className="col-span-2 text-xs text-muted-foreground">
-                                    Set different LODs for interior (65%) and exterior (35%) portions
-                                  </p>
-                                </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          )}
-
-                          <div className="space-y-2">
-                            <Label>Disciplines</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {DISCIPLINES.map((d) => (
-                                <Badge
-                                  key={d.id}
-                                  variant={area.disciplines?.includes(d.id) ? "default" : "outline"}
-                                  className="cursor-pointer toggle-elevate"
-                                  onClick={() => toggleDiscipline(area.id, d.id)}
-                                  data-testid={`badge-discipline-${d.id}-${kindIndex}`}
-                                >
-                                  {d.label}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-
+                    <Card key={area.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <Checkbox
-                              id={`cad-${area.id}`}
-                              checked={area.includeCadDeliverable || false}
-                              onCheckedChange={(checked) =>
-                                updateArea(area.id, "includeCadDeliverable", checked)
-                              }
-                              data-testid={`checkbox-cad-${kindIndex}`}
+                            <Input
+                              value={area.name}
+                              onChange={(e) => updateArea(area.id, "name", e.target.value)}
+                              className="font-medium max-w-[200px]"
+                              data-testid={isLandscape ? `input-landscape-name-${kindIndex}` : `input-area-name-${kindIndex}`}
                             />
-                            <Label htmlFor={`cad-${area.id}`} className="text-sm">
-                              Include CAD Deliverable
-                            </Label>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Landscape-specific fields */}
-                      {isLandscape && (
-                        <>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Landscape Type</Label>
-                              <Select
-                                value={area.buildingType}
-                                onValueChange={(v) => updateArea(area.id, "buildingType", v)}
-                              >
-                                <SelectTrigger data-testid={`select-landscape-type-${kindIndex}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {LANDSCAPE_TYPES.map((lt) => (
-                                    <SelectItem key={lt.id} value={lt.id}>
-                                      {lt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Acres</Label>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                value={area.squareFeet}
-                                onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
-                                placeholder="e.g., 5"
-                                data-testid={`input-acres-${kindIndex}`}
-                              />
-                              {area.squareFeet && (
-                                <p className="text-xs text-muted-foreground">
-                                  = {getAreaSqft(area).toLocaleString()} sqft
-                                </p>
+                            <Badge variant={isLandscape ? "secondary" : "outline"}>
+                              {isLandscape ? (
+                                <><MapPin className="h-3 w-3 mr-1" />Landscape</>
+                              ) : (
+                                <><Building2 className="h-3 w-3 mr-1" />Building</>
                               )}
-                            </div>
+                            </Badge>
                           </div>
-                          {/* Boundary Preview and Controls */}
-                          {area.boundaryImageUrl && area.boundary && area.boundary.length >= 3 && (
-                            <div className="rounded-md overflow-hidden border bg-muted aspect-square max-w-sm mx-auto">
-                              <img
-                                src={area.boundaryImageUrl}
-                                alt="Boundary preview"
-                                className="w-full h-full object-cover"
-                                data-testid={`img-boundary-preview-${kindIndex}`}
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">Site Discipline</Badge>
-                              <span className="text-xs text-muted-foreground">
-                                Landscape areas use site discipline only
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {area.boundary && area.boundary.length >= 3 && (
-                                <Badge variant="outline" className="text-xs">
-                                  <MapPin className="w-3 h-3 mr-1" />
-                                  {area.boundary.length} points
-                                </Badge>
-                              )}
-                              {projectCoordinates && (
-                                <Button
-                                  type="button"
-                                  variant={area.boundary && area.boundary.length >= 3 ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setBoundaryDrawerAreaId(area.id)}
-                                  data-testid={`button-draw-boundary-${kindIndex}`}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeArea(area.id)}
+                            data-testid={isLandscape ? `button-remove-landscape-${kindIndex}` : `button-remove-area-${kindIndex}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Building-specific fields */}
+                        {!isLandscape && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Building Type</Label>
+                                <Select
+                                  value={area.buildingType}
+                                  onValueChange={(v) => updateArea(area.id, "buildingType", v)}
                                 >
-                                  <PenTool className="w-3 h-3 mr-1" />
-                                  {area.boundary && area.boundary.length >= 3 ? "Edit Boundary" : "Draw Boundary"}
-                                </Button>
-                              )}
+                                  <SelectTrigger data-testid={`select-building-type-${kindIndex}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {BUILDING_TYPES.filter(bt => bt.id !== "14" && bt.id !== "15").map((bt) => (
+                                      <SelectItem key={bt.id} value={bt.id}>
+                                        {bt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Square Footage</Label>
+                                <Input
+                                  type="number"
+                                  value={area.squareFeet}
+                                  onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
+                                  placeholder="e.g., 50000"
+                                  data-testid={`input-sqft-${kindIndex}`}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Level of Detail</Label>
+                                <Select value={area.lod} onValueChange={(v) => updateArea(area.id, "lod", v)}>
+                                  <SelectTrigger data-testid={`select-lod-${kindIndex}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {LOD_OPTIONS.map((lod) => (
+                                      <SelectItem key={lod.id} value={lod.id}>
+                                        {lod.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Scope</Label>
+                                <Select
+                                  value={area.scope || "full"}
+                                  onValueChange={(v) => updateArea(area.id, "scope", v)}
+                                >
+                                  <SelectTrigger data-testid={`select-scope-${kindIndex}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SCOPE_OPTIONS.map((s) => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        {s.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Mixed LOD option - appears for Full scope only */}
+                            {(area.scope === "full" || !area.scope) && (
+                              <Collapsible>
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground" data-testid={`toggle-mixed-lod-${kindIndex}`}>
+                                    <span className="text-sm">Mixed LOD (Int/Ext)</span>
+                                    <ChevronDown className="h-4 w-4" />
+                                  </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="pt-2">
+                                  <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-muted/50">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Interior LOD</Label>
+                                      <Select
+                                        value={area.mixedInteriorLod || area.lod || "200"}
+                                        onValueChange={(v) => updateArea(area.id, "mixedInteriorLod", v)}
+                                      >
+                                        <SelectTrigger data-testid={`select-interior-lod-${kindIndex}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {LOD_OPTIONS.map((lod) => (
+                                            <SelectItem key={lod.id} value={lod.id}>
+                                              {lod.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Exterior LOD</Label>
+                                      <Select
+                                        value={area.mixedExteriorLod || area.lod || "200"}
+                                        onValueChange={(v) => updateArea(area.id, "mixedExteriorLod", v)}
+                                      >
+                                        <SelectTrigger data-testid={`select-exterior-lod-${kindIndex}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {LOD_OPTIONS.map((lod) => (
+                                            <SelectItem key={lod.id} value={lod.id}>
+                                              {lod.label}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <p className="col-span-2 text-xs text-muted-foreground">
+                                      Set different LODs for interior (65%) and exterior (35%) portions
+                                    </p>
+                                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            )}
+
+                            <div className="space-y-2">
+                              <Label>Disciplines</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {DISCIPLINES.map((d) => (
+                                  <Badge
+                                    key={d.id}
+                                    variant={area.disciplines?.includes(d.id) ? "default" : "outline"}
+                                    className="cursor-pointer toggle-elevate"
+                                    onClick={() => toggleDiscipline(area.id, d.id)}
+                                    data-testid={`badge-discipline-${d.id}-${kindIndex}`}
+                                  >
+                                    {d.label}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id={`cad-${area.id}`}
+                                checked={area.includeCadDeliverable || false}
+                                onCheckedChange={(checked) =>
+                                  updateArea(area.id, "includeCadDeliverable", checked)
+                                }
+                                data-testid={`checkbox-cad-${kindIndex}`}
+                              />
+                              <Label htmlFor={`cad-${area.id}`} className="text-sm">
+                                Include CAD Deliverable
+                              </Label>
+                            </div>
+                          </>
+                        )}
+
+                        {/* Landscape-specific fields */}
+                        {isLandscape && (
+                          <>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Landscape Type</Label>
+                                <Select
+                                  value={area.buildingType}
+                                  onValueChange={(v) => updateArea(area.id, "buildingType", v)}
+                                >
+                                  <SelectTrigger data-testid={`select-landscape-type-${kindIndex}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {LANDSCAPE_TYPES.map((lt) => (
+                                      <SelectItem key={lt.id} value={lt.id}>
+                                        {lt.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Acres</Label>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  value={area.squareFeet}
+                                  onChange={(e) => updateArea(area.id, "squareFeet", e.target.value)}
+                                  placeholder="e.g., 5"
+                                  data-testid={`input-acres-${kindIndex}`}
+                                />
+                                {area.squareFeet && (
+                                  <p className="text-xs text-muted-foreground">
+                                    = {getAreaSqft(area).toLocaleString()} sqft
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {/* Boundary Preview and Controls */}
+                            {area.boundaryImageUrl && area.boundary && area.boundary.length >= 3 && (
+                              <div className="rounded-md overflow-hidden border bg-muted aspect-square max-w-sm mx-auto">
+                                <img
+                                  src={area.boundaryImageUrl}
+                                  alt="Boundary preview"
+                                  className="w-full h-full object-cover"
+                                  data-testid={`img-boundary-preview-${kindIndex}`}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                  }}
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary">Site Discipline</Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  Landscape areas use site discipline only
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {area.boundary && area.boundary.length >= 3 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <MapPin className="w-3 h-3 mr-1" />
+                                    {area.boundary.length} points
+                                  </Badge>
+                                )}
+                                {projectCoordinates && (
+                                  <Button
+                                    type="button"
+                                    variant={area.boundary && area.boundary.length >= 3 ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setBoundaryDrawerAreaId(area.id)}
+                                    data-testid={`button-draw-boundary-${kindIndex}`}
+                                  >
+                                    <PenTool className="w-3 h-3 mr-1" />
+                                    {area.boundary && area.boundary.length >= 3 ? "Edit Boundary" : "Draw Boundary"}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
@@ -1625,7 +1681,7 @@ Thanks!`.trim();
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     {tierAPricingResult && tierAPricingResult.clientPrice > 0 && (
                       <Card className="bg-muted/50">
                         <CardContent className="pt-4 space-y-2 text-sm">
@@ -1742,7 +1798,7 @@ Thanks!`.trim();
                       data-testid="input-custom-travel-cost"
                     />
                     <p className="text-xs text-muted-foreground">
-                      {isDispatchLocation(travel?.dispatchLocation || "", "fly_out") 
+                      {isDispatchLocation(travel?.dispatchLocation || "", "fly_out")
                         ? "Include airfare, lodging, rental car, and per diem"
                         : "Override the calculated mileage-based travel cost"
                       }
@@ -1762,8 +1818,8 @@ Thanks!`.trim();
                         </div>
                         {travel?.dispatchLocation?.toLowerCase().includes("brooklyn") && (travel?.distance || 0) > 0 && (
                           <Badge variant="secondary" className="text-xs">
-                            {calculateTotalSqft(areas) >= 50000 ? "Tier A (No base)" : 
-                             calculateTotalSqft(areas) >= 10000 ? "Tier B ($300 base)" : "Tier C ($150 base)"}
+                            {calculateTotalSqft(areas) >= 50000 ? "Tier A (No base)" :
+                              calculateTotalSqft(areas) >= 10000 ? "Tier B ($300 base)" : "Tier C ($150 base)"}
                           </Badge>
                         )}
                       </div>
@@ -2034,8 +2090,8 @@ Thanks!`.trim();
                           variant={bimDeliverable.includes(format) ? "default" : "outline"}
                           className="cursor-pointer toggle-elevate"
                           onClick={() => {
-                            setBimDeliverable(prev => 
-                              prev.includes(format) 
+                            setBimDeliverable(prev =>
+                              prev.includes(format)
                                 ? prev.filter(f => f !== format)
                                 : [...prev, format]
                             );
@@ -2231,7 +2287,7 @@ Thanks!`.trim();
           <div className="p-4 border-b">
             <h2 className="font-semibold">Pricing Summary</h2>
           </div>
-          
+
           {/* RFI Assistant - Shows when "I don't know" is selected */}
           {hasRfiItems && (
             <div className="p-4 border-b">
@@ -2244,14 +2300,14 @@ Thanks!`.trim();
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-xs text-orange-700 dark:text-orange-300">
-                    You selected "I don't know" for {rfiFields.length} {rfiFields.length === 1 ? "item" : "items"}. 
+                    You selected "I don't know" for {rfiFields.length} {rfiFields.length === 1 ? "item" : "items"}.
                     Send this RFI email to the client:
                   </p>
                   <div className="space-y-1">
                     {rfiFields.map((field) => (
-                      <Badge 
-                        key={field.key} 
-                        variant="outline" 
+                      <Badge
+                        key={field.key}
+                        variant="outline"
                         className="text-xs mr-1 mb-1 border-orange-300 dark:border-orange-700"
                       >
                         {field.label}
@@ -2313,7 +2369,7 @@ Thanks!`.trim();
               </Card>
             </div>
           )}
-          
+
           {/* Margin Target Slider - Always Visible */}
           <div className="p-4 border-b">
             <div className="space-y-3">
@@ -2344,39 +2400,36 @@ Thanks!`.trim();
           {pricing.marginWarnings && pricing.marginWarnings.length > 0 && (
             <div className="p-4 border-b space-y-2">
               {pricing.marginWarnings.map((warning, index) => (
-                <div 
+                <div
                   key={index}
                   data-testid={`margin-warning-${warning.code.toLowerCase().replace(/_/g, "-")}`}
                   className={
-                    warning.code === "BELOW_FLOOR" 
+                    warning.code === "BELOW_FLOOR"
                       ? "p-3 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
                       : "p-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
                   }
                 >
                   <div className="flex items-start gap-2">
-                    <AlertCircle 
-                      className={`h-4 w-4 mt-0.5 flex-shrink-0 ${
-                        warning.code === "BELOW_FLOOR" 
-                          ? "text-red-600 dark:text-red-400" 
-                          : "text-amber-600 dark:text-amber-400"
-                      }`}
+                    <AlertCircle
+                      className={`h-4 w-4 mt-0.5 flex-shrink-0 ${warning.code === "BELOW_FLOOR"
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-amber-600 dark:text-amber-400"
+                        }`}
                     />
                     <div className="flex-1">
-                      <p 
-                        className={`text-xs font-medium ${
-                          warning.code === "BELOW_FLOOR" 
-                            ? "text-red-800 dark:text-red-200" 
-                            : "text-amber-800 dark:text-amber-200"
-                        }`}
+                      <p
+                        className={`text-xs font-medium ${warning.code === "BELOW_FLOOR"
+                          ? "text-red-800 dark:text-red-200"
+                          : "text-amber-800 dark:text-amber-200"
+                          }`}
                       >
                         {warning.code === "BELOW_FLOOR" ? "Critical Margin Warning" : "Margin Warning"}
                       </p>
-                      <p 
-                        className={`text-xs mt-1 ${
-                          warning.code === "BELOW_FLOOR" 
-                            ? "text-red-700 dark:text-red-300" 
-                            : "text-amber-700 dark:text-amber-300"
-                        }`}
+                      <p
+                        className={`text-xs mt-1 ${warning.code === "BELOW_FLOOR"
+                          ? "text-red-700 dark:text-red-300"
+                          : "text-amber-700 dark:text-amber-300"
+                          }`}
                       >
                         {warning.message}
                       </p>
@@ -2386,7 +2439,7 @@ Thanks!`.trim();
               ))}
             </div>
           )}
-          
+
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-2">
               {/* Show Tier A pricing items when in Tier A mode */}
@@ -2417,32 +2470,31 @@ Thanks!`.trim();
                   .filter((item) => !item.isTotal)
                   .map((item, index) => {
                     // Determine if this is an area-based item that should show per-sqft pricing
-                    const isAreaBased = 
+                    const isAreaBased =
                       // Area discipline items (contain " LOD " and area info)
                       item.label.includes(" LOD ") ||
                       // Area-related services (CAD, Elevations, Facades)
                       item.label.includes("CAD Deliverable") ||
                       item.label.includes("Additional Elevations") ||
                       item.label.includes("Facade:");
-                    
+
                     // Exclude travel, risk premiums, and other non-area items
-                    const isExcluded = 
+                    const isExcluded =
                       item.label.includes("Travel (") ||
                       item.label.includes("Risk Premium:") ||
                       item.label.includes("Price Adjustment");
-                    
+
                     const shouldShowPerSqft = isAreaBased && !isExcluded && totalSqft > 0;
-                    
-                    const perSqftRate = shouldShowPerSqft 
-                      ? Math.abs(item.value) / totalSqft 
+
+                    const perSqftRate = shouldShowPerSqft
+                      ? Math.abs(item.value) / totalSqft
                       : 0;
-                    
+
                     return (
                       <div
                         key={index}
-                        className={`space-y-0.5 ${
-                          item.isDiscount ? "text-green-600" : ""
-                        }`}
+                        className={`space-y-0.5 ${item.isDiscount ? "text-green-600" : ""
+                          }`}
                       >
                         {/* Main price line */}
                         <div className="flex justify-between text-sm">
@@ -2451,10 +2503,10 @@ Thanks!`.trim();
                             {item.isDiscount ? "-" : ""}${Math.abs(item.value).toLocaleString()}
                           </span>
                         </div>
-                        
+
                         {/* Per-sqft pricing line (if applicable) */}
                         {shouldShowPerSqft && (
-                          <div 
+                          <div
                             className="flex justify-end text-xs text-muted-foreground pr-1"
                             data-testid={`text-per-sqft-${index}`}
                           >
@@ -2493,7 +2545,7 @@ Thanks!`.trim();
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-3 space-y-2">
                   {includedServices.map((service, index) => (
-                    <div 
+                    <div
                       key={index}
                       className="flex items-start gap-2 text-sm text-muted-foreground"
                       data-testid={service.testId}
@@ -2641,7 +2693,7 @@ Thanks!`.trim();
             <div className="mt-4 p-3 border rounded-md bg-card" data-testid="integrity-check-status">
               <div className="flex items-center justify-between gap-2 mb-3">
                 <span className="text-sm font-medium">Integrity Check</span>
-                <Badge 
+                <Badge
                   variant={isMarginBelowGate ? "destructive" : "default"}
                   className={!isMarginBelowGate ? "bg-green-600 hover:bg-green-700 text-white" : ""}
                   data-testid={isMarginBelowGate ? "badge-integrity-failed" : "badge-integrity-passed"}
@@ -2718,6 +2770,24 @@ Thanks!`.trim();
           address={lead?.projectAddress || ""}
           initialBoundary={boundaryDrawerArea.boundary}
           onSave={(boundary, acres, imageUrl) => updateAreaBoundary(boundaryDrawerAreaId!, boundary, acres, imageUrl)}
+        />
+      )}
+
+      {/* Line Item Editor - Full Screen Overlay */}
+      {showLineItemEditor && customLineItems && (
+        <LineItemEditor
+          initialLineItems={customLineItems}
+          calculatedPricing={pricing}
+          onSave={(items, total) => {
+            setCustomLineItems(items);
+            setHasCustomizedPricing(true);
+            setShowLineItemEditor(false);
+            toast({
+              title: "Line items customized",
+              description: `Custom total: $${total.toLocaleString()}`,
+            });
+          }}
+          onCancel={() => setShowLineItemEditor(false)}
         />
       )}
     </div>
