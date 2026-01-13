@@ -31,6 +31,7 @@ import { personasRouter } from "./routes/personas";
 import { registerStorageRoutes } from "./routes/storage";
 import { registerDeliveryRoutes } from "./routes/delivery";
 import { registerFieldOpsRoutes } from "./routes/fieldOps";
+import { registerGHLRoutes } from "./routes/ghl";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -110,6 +111,7 @@ export async function registerRoutes(
   registerStorageRoutes(app);
   registerDeliveryRoutes(app);
   registerFieldOpsRoutes(app);
+  registerGHLRoutes(app);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

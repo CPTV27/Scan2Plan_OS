@@ -34,6 +34,26 @@ interface QuickBooksStatus {
   error?: string;
 }
 
+interface GHLStatus {
+  configured: boolean;
+  hasApiKey: boolean;
+  hasLocationId: boolean;
+}
+
+interface GHLTestResult {
+  connected: boolean;
+  message: string;
+  contactCount?: number;
+  opportunityCount?: number;
+}
+
+interface GHLSyncResult {
+  success: boolean;
+  synced: number;
+  errors: string[];
+  opportunities: any[];
+}
+
 interface QBAccount {
   id: string;
   name: string;
@@ -154,6 +174,71 @@ export default function Settings() {
     onError: (error: any) => {
       toast({ 
         title: "Pipeline sync failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Fetch GoHighLevel status
+  const { data: ghlStatus, refetch: refetchGHL } = useQuery<GHLStatus>({
+    queryKey: ["/api/ghl/status"],
+  });
+
+  // GoHighLevel test connection mutation
+  const ghlTestMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/ghl/test");
+      return response.json();
+    },
+    onSuccess: (data: GHLTestResult) => {
+      if (data.connected) {
+        toast({ 
+          title: "GoHighLevel connected", 
+          description: `Found ${data.contactCount || 0} contacts and ${data.opportunityCount || 0} opportunities` 
+        });
+      } else {
+        toast({ 
+          title: "Connection test failed", 
+          description: data.message,
+          variant: "destructive" 
+        });
+      }
+      refetchGHL();
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Connection test failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // GoHighLevel sync mutation
+  const ghlSyncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/ghl/sync");
+      return response.json();
+    },
+    onSuccess: (data: GHLSyncResult) => {
+      if (data.success) {
+        toast({ 
+          title: "GoHighLevel synced", 
+          description: `${data.synced} opportunities imported` 
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
+      } else {
+        toast({ 
+          title: "Sync completed with errors", 
+          description: data.errors.join(", "),
+          variant: "destructive" 
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Sync failed", 
         description: error.message,
         variant: "destructive" 
       });
@@ -340,6 +425,72 @@ export default function Settings() {
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       Please add the QuickBooks credentials to secrets to enable connection.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* GoHighLevel Integration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="h-5 w-5" />
+                  GoHighLevel (GHL)
+                </CardTitle>
+                <CardDescription>Sync contacts and opportunities from GHL CRM</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Connection Status</p>
+                    <p className="text-xs text-muted-foreground">
+                      {ghlStatus?.configured 
+                        ? "Credentials configured - click Test to verify connection" 
+                        : `Missing: ${!ghlStatus?.hasApiKey ? 'GHL_API_KEY' : ''} ${!ghlStatus?.hasLocationId ? 'GHL_LOCATION_ID' : ''}`.trim()}
+                    </p>
+                  </div>
+                  <Badge variant={ghlStatus?.configured ? "default" : "secondary"}>
+                    {ghlStatus?.configured ? "Ready" : "Not Configured"}
+                  </Badge>
+                </div>
+                
+                <Separator />
+                
+                <div className="flex flex-wrap gap-2">
+                  {ghlStatus?.configured ? (
+                    <>
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        onClick={() => ghlTestMutation.mutate()}
+                        disabled={ghlTestMutation.isPending}
+                        data-testid="button-ghl-test"
+                      >
+                        {ghlTestMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Check className="h-4 w-4 mr-2" />
+                        )}
+                        Test Connection
+                      </Button>
+                      <Button 
+                        size="sm"
+                        onClick={() => ghlSyncMutation.mutate()}
+                        disabled={ghlSyncMutation.isPending}
+                        data-testid="button-ghl-sync"
+                      >
+                        {ghlSyncMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Sync Opportunities
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Please add GHL_API_KEY and GHL_LOCATION_ID to secrets to enable connection.
                     </p>
                   )}
                 </div>
