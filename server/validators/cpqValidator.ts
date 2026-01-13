@@ -207,12 +207,25 @@ export function normalizeQuoteForValidation(data: any): any {
   }
   
   const pricingBreakdown = normalized.pricingBreakdown || {};
-  if (!normalized.totalClientPrice && pricingBreakdown.totalClientPrice) {
-    normalized.totalClientPrice = Number(pricingBreakdown.totalClientPrice);
+  
+  // Map totalPrice -> totalClientPrice (client sends totalPrice, validator expects totalClientPrice)
+  if (!normalized.totalClientPrice) {
+    if (normalized.totalPrice) {
+      normalized.totalClientPrice = Number(normalized.totalPrice);
+    } else if (pricingBreakdown.totalClientPrice) {
+      normalized.totalClientPrice = Number(pricingBreakdown.totalClientPrice);
+    }
   }
-  if (!normalized.totalUpteamCost && pricingBreakdown.totalCost) {
-    normalized.totalUpteamCost = Number(pricingBreakdown.totalCost);
+  
+  // Map totalCost -> totalUpteamCost (client sends totalCost, validator expects totalUpteamCost)
+  if (!normalized.totalUpteamCost) {
+    if (normalized.totalCost) {
+      normalized.totalUpteamCost = Number(normalized.totalCost);
+    } else if (pricingBreakdown.totalCost) {
+      normalized.totalUpteamCost = Number(pricingBreakdown.totalCost);
+    }
   }
+  
   if (!normalized.marginTarget && pricingBreakdown.marginTarget) {
     normalized.marginTarget = Number(pricingBreakdown.marginTarget);
   }
