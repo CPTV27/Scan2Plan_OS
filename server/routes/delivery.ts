@@ -1,66 +1,174 @@
-import { Router } from "express";
+import { Express } from "express";
+import { z } from "zod";
 import { storage } from "../storage";
-import { generateUploadUrl, generateReadUrl, listFiles } from "../gcs";
-import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { validateBody } from "../middleware/validation";
 import { asyncHandler } from "../middleware/errorHandler";
-import { log } from "../lib/logger";
+import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import {
+  generateSignedUploadUrl,
+  generateSignedReadUrl,
+  listProjectFiles,
+  generatePotreeViewerUrl,
+} from "../lib/gcs";
 
-export const deliveryRouter = Router();
+function log(message: string) {
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`${timestamp} [delivery] ${message}`);
+}
 
-// Get Signed Upload URL for GCS
-// POST /api/delivery/sign-upload
-deliveryRouter.post("/sign-upload", isAuthenticated, requireRole("production", "ceo"), asyncHandler(async (req, res) => {
-    const { filePath, contentType } = req.body;
+const signUploadSchema = z.object({
+  projectId: z.number(),
+  fileName: z.string().min(1).max(255),
+  contentType: z.string().optional(),
+});
 
-    if (!filePath || !contentType) {
-        return res.status(400).json({ message: "filePath and contentType are required" });
+const signReadSchema = z.object({
+  filePath: z.string().min(1),
+});
+
+const potreeConfigSchema = z.object({
+  projectId: z.number(),
+  potreePath: z.string().min(1),
+});
+
+export function registerDeliveryRoutes(app: Express) {
+  app.post("/api/delivery/sign-upload", isAuthenticated, requireRole("ceo", "production"), validateBody(signUploadSchema), asyncHandler(async (req, res) => {
+    const { projectId, fileName, contentType } = req.body;
+
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
     }
 
-    const result = await generateUploadUrl(filePath, contentType);
-    res.json(result);
-}));
+    const upid = project.universalProjectId || `project-${projectId}`;
+    const filePath = `${upid}/deliverables/${fileName}`;
 
-// Save Potree Config/Path for a Project
-// POST /api/delivery/potree/config
-deliveryRouter.post("/potree/config", isAuthenticated, requireRole("production", "ceo"), asyncHandler(async (req, res) => {
-    const { projectId, gcsPath, gcsBucket } = req.body;
-
-    if (!projectId || !gcsPath) {
-        return res.status(400).json({ message: "projectId and gcsPath are required" });
+    const url = await generateSignedUploadUrl(filePath, contentType || "application/octet-stream");
+    if (!url) {
+      return res.status(500).json({ error: "Failed to generate upload URL. Check GCS configuration." });
     }
 
-    // Update project with GCS info
-    const project = await storage.updateProject(projectId, {
-        gcsPath,
-        gcsBucket: gcsBucket || "scan2plan-deliverables"
+    log(`Generated upload URL for project ${projectId}: ${fileName}`);
+    res.json({ url, filePath });
+  }));
+
+  app.post("/api/delivery/sign-read", isAuthenticated, requireRole("ceo", "production"), validateBody(signReadSchema), asyncHandler(async (req, res) => {
+    const { filePath } = req.body;
+
+    const url = await generateSignedReadUrl(filePath);
+    if (!url) {
+      return res.status(500).json({ error: "Failed to generate download URL" });
+    }
+
+    log(`Generated read URL for ${filePath}`);
+    res.json({ url });
+  }));
+
+  app.get("/api/delivery/files/:projectId", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: "Invalid project ID" });
+    }
+
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const upid = project.universalProjectId || `project-${projectId}`;
+    const files = await listProjectFiles(`${upid}/deliverables/`);
+
+    res.json({ 
+      projectId, 
+      upid,
+      files,
+      potreePath: project.potreePath,
+      viewerUrl: project.viewerUrl,
+      deliveryStatus: project.deliveryStatus,
+    });
+  }));
+
+  app.post("/api/delivery/potree/config", isAuthenticated, requireRole("ceo", "production"), validateBody(potreeConfigSchema), asyncHandler(async (req, res) => {
+    const { projectId, potreePath } = req.body;
+
+    const project = await storage.getProject(projectId);
+    if (!project) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const viewerUrl = await generatePotreeViewerUrl(potreePath);
+
+    await storage.updateProject(projectId, {
+      potreePath,
+      viewerUrl: viewerUrl || undefined,
+      deliveryStatus: viewerUrl ? "ready" : "pending",
     });
 
-    res.json(project);
-}));
+    log(`Updated Potree config for project ${projectId}: ${potreePath}`);
+    res.json({ 
+      success: true, 
+      potreePath,
+      viewerUrl,
+      deliveryStatus: viewerUrl ? "ready" : "pending",
+    });
+  }));
 
-// List Files in Project Folder
-// GET /api/delivery/files/:projectId
-deliveryRouter.get("/files/:projectId", isAuthenticated, asyncHandler(async (req, res) => {
+  app.post("/api/delivery/status/:projectId", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
     const projectId = parseInt(req.params.projectId);
+    const { status } = req.body;
+
+    if (!["pending", "processing", "ready", "failed"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    await storage.updateProject(projectId, { deliveryStatus: status });
+    
+    log(`Updated delivery status for project ${projectId}: ${status}`);
+    res.json({ success: true, status });
+  }));
+
+  app.get("/api/delivery/potree/proxy/:projectId/*", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: "Invalid project ID" });
+    }
+
     const project = await storage.getProject(projectId);
-
-    if (!project) {
-        return res.status(404).json({ message: "Project not found" });
+    if (!project || !project.potreePath) {
+      return res.status(404).json({ error: "Potree data not configured for this project" });
     }
 
-    // Assuming a standard structure or using the saved gcsPath
-    const prefix = project.gcsPath || `projects/${project.universalProjectId}/`;
-    const files = await listFiles(prefix);
-    res.json({ files });
-}));
-
-// Get Signed Read URL for a specific file
-// POST /api/delivery/sign-read
-deliveryRouter.post("/sign-read", isAuthenticated, asyncHandler(async (req, res) => {
-    const { filePath } = req.body;
+    const filePath = req.params[0];
     if (!filePath) {
-        return res.status(400).json({ message: "filePath is required" });
+      return res.status(400).json({ error: "File path required" });
     }
-    const url = await generateReadUrl(filePath);
-    res.json({ url });
-}));
+
+    const gcsPath = `${project.potreePath}/${filePath}`;
+
+    try {
+      const { streamGcsFile } = await import("../lib/gcs.js");
+      const stream = await streamGcsFile(gcsPath);
+      
+      if (!stream) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      const ext = filePath.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'json': 'application/json',
+        'bin': 'application/octet-stream',
+        'las': 'application/octet-stream',
+        'laz': 'application/octet-stream',
+      };
+      res.setHeader('Content-Type', contentTypes[ext || ''] || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      
+      stream.pipe(res);
+    } catch (err) {
+      log(`ERROR: Potree proxy stream error - ${err instanceof Error ? err.message : String(err)}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to stream file" });
+      }
+    }
+  }));
+}

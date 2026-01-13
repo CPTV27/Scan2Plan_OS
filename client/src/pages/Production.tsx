@@ -28,7 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ProjectFinancials } from "@/components/ProjectFinancials";
-import { ChatButton } from "@/features/communication/ChatButton";
+import { DeliveryPortal } from "@/components/delivery/DeliveryPortal";
 
 const COLUMNS = [
   { id: "Scheduling", title: "Scheduling", icon: CalendarClock },
@@ -64,104 +64,104 @@ export default function Production() {
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       <Sidebar />
-
+      
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
         <main className="flex-1 flex flex-col h-full overflow-hidden">
           <header className="p-4 md:p-8 border-b border-border bg-card/50 backdrop-blur-sm shrink-0">
-            <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
-              <div>
-                <h2 className="text-2xl md:text-3xl font-display font-bold">Production Tracker</h2>
-                <p className="text-muted-foreground mt-1 text-sm md:text-base">Monitor project status from scanning to delivery.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" data-testid="button-production-help">
-                      <HelpCircle className="w-5 h-5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80" align="end">
-                    <div className="space-y-3">
-                      <h4 className="font-semibold">Digital Twin Viewer</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Projects in QC, Modeling, or Delivered stages can generate a Digital Twin view from point cloud data.
-                      </p>
-                      <div className="text-sm space-y-2">
-                        <p className="font-medium">How to use:</p>
-                        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                          <li>Find a project in QC, Modeling, or Delivered</li>
-                          <li>Look for the "Digital Twin Viewer" section</li>
-                          <li>Click "Generate Point Cloud" to start</li>
-                          <li>Wait for processing (button shows status)</li>
-                          <li>Click "View Digital Twin" when ready</li>
-                        </ol>
-                      </div>
-                      <p className="text-xs text-muted-foreground border-t pt-2">
-                        Note: Project must have storage configured (Drive folder or GCS path) before conversion.
-                      </p>
+          <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-display font-bold">Production Tracker</h2>
+              <p className="text-muted-foreground mt-1 text-sm md:text-base">Monitor project status from scanning to delivery.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid="button-production-help">
+                    <HelpCircle className="w-5 h-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-3">
+                    <h4 className="font-semibold">Digital Twin Viewer</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Projects in QC, Modeling, or Delivered stages can generate a Digital Twin view from point cloud data.
+                    </p>
+                    <div className="text-sm space-y-2">
+                      <p className="font-medium">How to use:</p>
+                      <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                        <li>Find a project in QC, Modeling, or Delivered</li>
+                        <li>Look for the "Digital Twin Viewer" section</li>
+                        <li>Click "Generate Point Cloud" to start</li>
+                        <li>Wait for processing (button shows status)</li>
+                        <li>Click "View Digital Twin" when ready</li>
+                      </ol>
                     </div>
-                  </PopoverContent>
-                </Popover>
-                <Button onClick={() => setIsCreateOpen(true)} className="shadow-lg shadow-primary/25" data-testid="button-new-project">
-                  <Plus className="w-5 h-5 mr-2" /> New Project
-                </Button>
-              </div>
+                    <p className="text-xs text-muted-foreground border-t pt-2">
+                      Note: Project must have storage configured (Drive folder or GCS path) before conversion.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button onClick={() => setIsCreateOpen(true)} className="shadow-lg shadow-primary/25" data-testid="button-new-project">
+                <Plus className="w-5 h-5 mr-2" /> New Project
+              </Button>
             </div>
-          </header>
-
-          {/* Mobile Field Mode - List View */}
-          <div className="md:hidden flex-1 overflow-y-auto p-4">
-            <MobileFieldView
-              projects={projects || []}
-              isLoading={isLoading}
-              onEdit={setEditingProject}
-            />
           </div>
+        </header>
 
-          {/* Desktop Kanban View */}
-          <div className="hidden md:flex flex-1 overflow-x-auto p-8">
-            <div className="flex gap-6 h-full min-w-[1200px]">
-              {COLUMNS.map(col => (
-                <div key={col.id} className="flex-1 flex flex-col min-w-[280px]">
-                  <div className="flex items-center justify-between mb-4 px-1">
-                    <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
-                      {col.title}
-                    </h3>
-                    <span className="bg-secondary text-secondary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
-                      {groupedProjects[col.id]?.length || 0}
-                    </span>
-                  </div>
+        {/* Mobile Field Mode - List View */}
+        <div className="md:hidden flex-1 overflow-y-auto p-4">
+          <MobileFieldView 
+            projects={projects || []} 
+            isLoading={isLoading}
+            onEdit={setEditingProject}
+          />
+        </div>
 
-                  <div className="flex-1 bg-secondary/20 rounded-xl p-3 border border-border/50 space-y-3 overflow-y-auto custom-scrollbar">
-                    {isLoading ? (
-                      <div className="h-20 bg-card/50 animate-pulse rounded-lg" />
-                    ) : (
-                      groupedProjects[col.id]?.map(project => (
-                        <ProjectCard
-                          key={project.id}
-                          project={project}
-                          onEdit={setEditingProject}
-                        />
-                      ))
-                    )}
-                  </div>
+        {/* Desktop Kanban View */}
+        <div className="hidden md:flex flex-1 overflow-x-auto p-8">
+          <div className="flex gap-6 h-full min-w-[1200px]">
+            {COLUMNS.map(col => (
+              <div key={col.id} className="flex-1 flex flex-col min-w-[280px]">
+                <div className="flex items-center justify-between mb-4 px-1">
+                  <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
+                    {col.title}
+                  </h3>
+                  <span className="bg-secondary text-secondary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
+                    {groupedProjects[col.id]?.length || 0}
+                  </span>
                 </div>
-              ))}
-            </div>
+                
+                <div className="flex-1 bg-secondary/20 rounded-xl p-3 border border-border/50 space-y-3 overflow-y-auto custom-scrollbar">
+                  {isLoading ? (
+                    <div className="h-20 bg-card/50 animate-pulse rounded-lg" />
+                  ) : (
+                    groupedProjects[col.id]?.map(project => (
+                      <ProjectCard 
+                        key={project.id} 
+                        project={project} 
+                        onEdit={setEditingProject}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
           </div>
         </main>
 
-        <ProjectDialog
-          open={isCreateOpen}
-          onOpenChange={setIsCreateOpen}
+        <ProjectDialog 
+          open={isCreateOpen} 
+          onOpenChange={setIsCreateOpen} 
           onSuccess={() => setIsCreateOpen(false)}
         />
 
-        <ProjectDialog
-          project={editingProject}
-          open={!!editingProject}
-          onOpenChange={(open) => !open && setEditingProject(null)}
+        <ProjectDialog 
+          project={editingProject} 
+          open={!!editingProject} 
+          onOpenChange={(open) => !open && setEditingProject(null)} 
           onSuccess={() => setEditingProject(null)}
         />
       </div>
@@ -170,16 +170,16 @@ export default function Production() {
 }
 
 // Reusable Project Form Dialog
-function ProjectDialog({
-  project,
-  open,
+function ProjectDialog({ 
+  project, 
+  open, 
   onOpenChange,
-  onSuccess
-}: {
-  project?: Project | null,
-  open: boolean,
+  onSuccess 
+}: { 
+  project?: Project | null, 
+  open: boolean, 
   onOpenChange: (open: boolean) => void,
-  onSuccess?: () => void
+  onSuccess?: () => void 
 }) {
   const { toast } = useToast();
   const createMutation = useCreateProject();
@@ -257,7 +257,7 @@ function ProjectDialog({
       const gateType = error?.gateType;
       let title = "Error";
       let description = error?.message || "Failed to save project";
-
+      
       if (gateType === "RETAINER_REQUIRED") {
         title = "Retainer Payment Required";
       } else if (gateType === "QC_VALIDATION_REQUIRED") {
@@ -269,11 +269,11 @@ function ProjectDialog({
       } else if (gateType === "PAYMENT_REQUIRED") {
         title = "Payment Required";
       }
-
-      toast({
-        title,
-        description,
-        variant: "destructive"
+      
+      toast({ 
+        title, 
+        description, 
+        variant: "destructive" 
       });
     }
   }
@@ -351,8 +351,8 @@ function ProjectDialog({
         render={({ field }) => (
           <FormItem>
             <FormLabel>Assigned ScanTech</FormLabel>
-            <Select
-              onValueChange={(val) => field.onChange(val === "unassigned" ? null : parseInt(val))}
+            <Select 
+              onValueChange={(val) => field.onChange(val === "unassigned" ? null : parseInt(val))} 
               value={field.value?.toString() || "unassigned"}
             >
               <FormControl>
@@ -519,33 +519,31 @@ function ProjectDialog({
               )}
             </div>
             {project && (
-              <div className="flex gap-2">
-                <ChatButton projectId={project.id} spaceUrl={project.chatSpaceUrl || undefined} />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(`/projects/${project.id}/mission-brief`, '_blank')}
-                  data-testid={`button-mission-brief-${project.id}`}
-                >
-                  <ScrollText className="w-4 h-4 mr-2" />
-                  Mission Brief
-                </Button>
-              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(`/projects/${project.id}/mission-brief`, '_blank')}
+                data-testid={`button-mission-brief-${project.id}`}
+              >
+                <ScrollText className="w-4 h-4 mr-2" />
+                Mission Brief
+              </Button>
             )}
           </div>
         </DialogHeader>
-
+        
         {project && projectAddress ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6">
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="details" data-testid="tab-project-details">Details</TabsTrigger>
               <TabsTrigger value="quoted" data-testid="tab-project-quoted">Quoted Scope</TabsTrigger>
               <TabsTrigger value="equipment" data-testid="tab-project-equipment">Equipment</TabsTrigger>
               <TabsTrigger value="scheduling" data-testid="tab-project-scheduling">Scheduling</TabsTrigger>
               <TabsTrigger value="financials" data-testid="tab-project-financials">Financials</TabsTrigger>
               <TabsTrigger value="location" data-testid="tab-project-location">Location</TabsTrigger>
+              <TabsTrigger value="delivery" data-testid="tab-project-delivery">Delivery</TabsTrigger>
             </TabsList>
-
+            
             <TabsContent value="details" className="mt-4">
               <ScrollArea className="max-h-[60vh]">
                 <Form {...form}>
@@ -697,13 +695,22 @@ function ProjectDialog({
                 <ProjectFinancials projectId={project.id} />
               </ScrollArea>
             </TabsContent>
-
+            
             <TabsContent value="location" className="mt-4">
               <ScrollArea className="max-h-[60vh]">
-                <LocationPreview
-                  address={projectAddress}
+                <LocationPreview 
+                  address={projectAddress} 
                   companyName={linkedLead?.clientName}
                   buildingType={linkedLead?.buildingType || undefined}
+                />
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="delivery" className="mt-4">
+              <ScrollArea className="max-h-[60vh]">
+                <DeliveryPortal 
+                  projectId={project.id} 
+                  universalProjectId={project.universalProjectId || undefined}
                 />
               </ScrollArea>
             </TabsContent>
@@ -776,13 +783,13 @@ const SITE_READINESS_LABELS: Record<string, string> = {
 // Quoted Scope Details Component - Shows snapshot of what was sold at close
 function QuotedScopeDetails({ project }: { project: Project }) {
   const { toast } = useToast();
-
+  
   // Fetch linked lead for fallback scope data
   const { data: linkedLead, isLoading: leadLoading } = useQuery<Lead>({
     queryKey: [`/api/leads/${project.leadId}`],
     enabled: !!project.leadId,
   });
-
+  
   // Sync scope mutation
   const syncScopeMutation = useMutation({
     mutationFn: async () => {
@@ -797,19 +804,19 @@ function QuotedScopeDetails({ project }: { project: Project }) {
       toast({ title: "Error", description: error.message || "Failed to sync scope", variant: "destructive" });
     },
   });
-
+  
   // Use project data first, fall back to linked lead data
   const projectAreas = (project.quotedAreas as any[]) || [];
   const leadAreas = (linkedLead?.cpqAreas as any[]) || [];
   const areas = projectAreas.length > 0 ? projectAreas : leadAreas;
-
+  
   const risksRaw = project.quotedRisks || linkedLead?.cpqRisks;
   const risks: string[] = Array.isArray(risksRaw) ? risksRaw : [];
-
+  
   const travel = (project.quotedTravel as CpqTravel | null) || (linkedLead?.cpqTravel as CpqTravel | null) || null;
   const services = (project.quotedServices as Record<string, number> | null) || (linkedLead?.cpqServices as Record<string, number> | null) || null;
   const siteReadiness = (project.siteReadiness as Record<string, any>) || (linkedLead?.siteReadiness as Record<string, any>) || {};
-
+  
   // Use linked lead values as fallback for price/margin
   const quotedPrice = project.quotedPrice || linkedLead?.value?.toString();
   const quotedMargin = project.quotedMargin;
@@ -835,9 +842,9 @@ function QuotedScopeDetails({ project }: { project: Project }) {
         <p>No quoted scope data available.</p>
         <p className="text-sm mt-1">This project was created before quote inheritance was enabled.</p>
         {project.leadId && (
-          <Button
-            variant="outline"
-            size="sm"
+          <Button 
+            variant="outline" 
+            size="sm" 
             className="mt-4"
             onClick={() => syncScopeMutation.mutate()}
             disabled={syncScopeMutation.isPending}
@@ -859,8 +866,8 @@ function QuotedScopeDetails({ project }: { project: Project }) {
               <AlertTriangle className="w-4 h-4" />
               <span className="text-sm">Showing scope from linked deal. Click to save permanently.</span>
             </div>
-            <Button
-              variant="outline"
+            <Button 
+              variant="outline" 
               size="sm"
               onClick={() => syncScopeMutation.mutate()}
               disabled={syncScopeMutation.isPending}
@@ -1100,13 +1107,13 @@ function SchedulingPanel({ project, technicianId, projectAddress }: { project: P
   );
   const [selectedTime, setSelectedTime] = useState<string>("09:00");
   const [duration, setDuration] = useState<string>("4");
-
+  
   const { data: scantechs } = useQuery<Scantech[]>({
     queryKey: ['/api/scantechs'],
   });
 
   const technician = scantechs?.find(t => t.id === technicianId);
-
+  
   const scheduleMutation = useMutation({
     mutationFn: async (data: { scheduledStart: string; duration: number }) => {
       const res = await apiRequest("POST", `/api/projects/${project.id}/schedule`, data);
@@ -1144,7 +1151,7 @@ function SchedulingPanel({ project, technicianId, projectAddress }: { project: P
       duration: parseInt(duration),
     });
   };
-
+  
   const canSchedule = Boolean(projectAddress && technicianId && selectedDate);
 
   return (
@@ -1255,8 +1262,8 @@ function SchedulingPanel({ project, technicianId, projectAddress }: { project: P
                 </div>
               )}
 
-              <Button
-                onClick={handleSchedule}
+              <Button 
+                onClick={handleSchedule} 
                 className="w-full"
                 disabled={scheduleMutation.isPending || !canSchedule}
                 data-testid="button-schedule-scan"
@@ -1570,12 +1577,12 @@ function ScopingDetails({ lead }: { lead: Lead | undefined }) {
 }
 
 // Mobile Field Mode - Large Touch Targets for Technicians
-function MobileFieldView({
-  projects,
+function MobileFieldView({ 
+  projects, 
   isLoading,
-  onEdit
-}: {
-  projects: Project[];
+  onEdit 
+}: { 
+  projects: Project[]; 
   isLoading: boolean;
   onEdit: (project: Project) => void;
 }) {
@@ -1586,11 +1593,11 @@ function MobileFieldView({
   async function advanceStatus(project: Project) {
     const nextStatus = getNextStatus(project.status);
     if (!nextStatus) return;
-
+    
     setAdvancing(project.id);
     try {
-      await updateMutation.mutateAsync({
-        id: project.id,
+      await updateMutation.mutateAsync({ 
+        id: project.id, 
         name: project.name,
         status: nextStatus,
         priority: project.priority,
@@ -1601,7 +1608,7 @@ function MobileFieldView({
       const gateType = err?.gateType;
       let title = "Cannot Advance Project";
       let description = err?.message || "Failed to update status";
-
+      
       // Provide specific gate feedback
       if (gateType === "RETAINER_REQUIRED") {
         title = "Retainer Payment Required";
@@ -1614,7 +1621,7 @@ function MobileFieldView({
       } else if (gateType === "PAYMENT_REQUIRED") {
         title = "Payment Required";
       }
-
+      
       toast({ title, description, variant: "destructive" });
     } finally {
       setAdvancing(null);
@@ -1637,8 +1644,8 @@ function MobileFieldView({
     const bIdx = COLUMN_ORDER.indexOf(b.status);
     if (aIdx !== bIdx) return aIdx - bIdx;
     const priorityOrder = { High: 0, Medium: 1, Low: 2 };
-    return (priorityOrder[a.priority as keyof typeof priorityOrder] || 1) -
-      (priorityOrder[b.priority as keyof typeof priorityOrder] || 1);
+    return (priorityOrder[a.priority as keyof typeof priorityOrder] || 1) - 
+           (priorityOrder[b.priority as keyof typeof priorityOrder] || 1);
   });
 
   return (
@@ -1650,8 +1657,8 @@ function MobileFieldView({
         const isAdvancing = advancing === project.id;
 
         return (
-          <div
-            key={project.id}
+          <div 
+            key={project.id} 
             className="bg-card rounded-xl border border-border p-4 active:bg-secondary/50 transition-colors"
             data-testid={`mobile-project-${project.id}`}
           >
@@ -1659,18 +1666,18 @@ function MobileFieldView({
               <div className="bg-accent/10 rounded-lg p-3 shrink-0">
                 <Icon className="w-6 h-6 text-accent" />
               </div>
-
+              
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1">
                   <h3 className="font-semibold text-base truncate">{project.name}</h3>
-                  <Badge
+                  <Badge 
                     variant={project.priority === "High" ? "destructive" : "secondary"}
                     className="text-xs"
                   >
                     {project.priority}
                   </Badge>
                 </div>
-
+                
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                   <span className="font-medium">{col?.title}</span>
                   {(project.progress ?? 0) > 0 && (
@@ -1680,24 +1687,24 @@ function MobileFieldView({
                     </>
                   )}
                 </div>
-
+                
                 <Progress value={project.progress || 0} className="h-2" />
               </div>
             </div>
-
+            
             {/* Large Touch Action Buttons */}
             <div className="flex gap-2 mt-4">
-              <Button
-                variant="outline"
+              <Button 
+                variant="outline" 
                 className="flex-1 h-12 text-base"
                 onClick={() => onEdit(project)}
                 data-testid={`button-edit-project-${project.id}`}
               >
                 Edit
               </Button>
-
+              
               {nextStatus && (
-                <Button
+                <Button 
                   className="flex-1 h-12 text-base bg-accent"
                   onClick={() => advanceStatus(project)}
                   disabled={isAdvancing}
@@ -1717,7 +1724,7 @@ function MobileFieldView({
           </div>
         );
       })}
-
+      
       {projects.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />

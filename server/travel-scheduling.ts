@@ -270,9 +270,8 @@ export interface CreateScanEventParams {
   projectName: string;
   projectAddress: string;
   universalProjectId?: string;
-  scanDate: Date;
-  startTime: string;
-  endTime: string;
+  startDateTime: Date;
+  endDateTime: Date;
   technicianEmail?: string;
   travelInfo?: DistanceResult;
   notes?: string;
@@ -284,14 +283,8 @@ export async function createScanCalendarEvent(params: CreateScanEventParams): Pr
   try {
     const calendar = await getCalendarClient();
 
-    const [startHour, startMinute] = params.startTime.split(":").map(Number);
-    const [endHour, endMinute] = params.endTime.split(":").map(Number);
-
-    const startDateTime = new Date(params.scanDate);
-    startDateTime.setHours(startHour, startMinute, 0, 0);
-
-    const endDateTime = new Date(params.scanDate);
-    endDateTime.setHours(endHour, endMinute, 0, 0);
+    const startDateTime = params.startDateTime;
+    const endDateTime = params.endDateTime;
 
     let description = `Scan2Plan Field Scan\n\n`;
     if (params.universalProjectId) {

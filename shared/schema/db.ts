@@ -267,14 +267,14 @@ export const leadDocuments = pgTable("lead_documents", {
   filename: text("filename").notNull(),
   originalName: text("original_name").notNull(),
   mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(), // File size in bytes
-  storageKey: text("storage_key").notNull(), // Path in local storage or GCS
-  uploadedBy: text("uploaded_by"), // User ID who uploaded
+  size: integer("size").notNull(),
+  storageKey: text("storage_key").notNull(),
+  uploadedBy: text("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
-  // Google Drive migration fields
-  movedToDriveAt: timestamp("moved_to_drive_at"), // When file was moved to Drive
-  driveFileId: text("drive_file_id"), // Google Drive file ID after migration
-  driveFileUrl: text("drive_file_url"), // Direct URL to file in Drive
+  movedToDriveAt: timestamp("moved_to_drive_at"),
+  driveFileId: text("drive_file_id"),
+  driveFileUrl: text("drive_file_url"),
+  metadata: jsonb("metadata"),
 });
 
 export const insertLeadDocumentSchema = createInsertSchema(leadDocuments).omit({
@@ -283,6 +283,7 @@ export const insertLeadDocumentSchema = createInsertSchema(leadDocuments).omit({
   movedToDriveAt: true,
   driveFileId: true,
   driveFileUrl: true,
+  metadata: true,
 });
 export type InsertLeadDocument = z.infer<typeof insertLeadDocumentSchema>;
 export type LeadDocument = typeof leadDocuments.$inferSelect;

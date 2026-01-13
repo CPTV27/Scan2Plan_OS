@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertProject } from "@shared/routes";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf-token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
 export function useProjects() {
   return useQuery({
     queryKey: [api.projects.list.path],
@@ -31,9 +36,13 @@ export function useCreateProject() {
   return useMutation({
     mutationFn: async (data: InsertProject) => {
       const validated = api.projects.create.input.parse(data);
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+      
       const res = await fetch(api.projects.create.path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(validated),
         credentials: "include",
       });
@@ -52,9 +61,13 @@ export function useUpdateProject() {
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertProject>) => {
       const validated = api.projects.update.input.parse(updates);
       const url = buildUrl(api.projects.update.path, { id });
+      const csrfToken = getCsrfToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (csrfToken) headers["x-csrf-token"] = csrfToken;
+      
       const res = await fetch(url, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(validated),
         credentials: "include",
       });

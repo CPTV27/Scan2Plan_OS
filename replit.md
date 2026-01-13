@@ -27,6 +27,7 @@ Key architectural components and features include:
 - **Security:** Features multi-layer authentication with Replit Auth, domain restriction, bcrypt password verification, rate limiting, and global API middleware for authentication enforcement.
 - **Field Technician Module (FieldHub):** Comprehensive technician portal with time logging, expense tracking, mission briefs, scope checklists, and file uploads to Google Drive. Calendar events include quick links to mission briefs and Drive folders.
 - **Google Drive Organization:** Projects are organized under a shared "Scan2Plan OS Projects" parent folder with standardized subfolders (01_Field_Capture, 02_Registration, etc.).
+- **Client Delivery Portal:** Secure file delivery system with Google Cloud Storage integration. Features include file browser for deliverables (PDFs, CAD files), Potree 3D point cloud viewer for scan data visualization, and role-based access control (CEO/production only). Uses authenticated streaming proxy for secure GCS file access without exposing signed URLs to browsers.
 
 ## External Dependencies
 - **QuickBooks Online:** Used for accounting, estimates, and financial reporting.

@@ -64,7 +64,8 @@ export function registerProjectRoutes(app: Express): void {
     }
   }));
 
-  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+  // Handle both PUT and PATCH for project updates (client uses PUT, PATCH is also valid)
+  const updateProjectHandler = asyncHandler(async (req: any, res: any) => {
     const projectId = Number(req.params.id);
     const input = req.body;
     
@@ -100,7 +101,10 @@ export function registerProjectRoutes(app: Express): void {
     }
     
     res.json(responseProject);
-  }));
+  });
+
+  app.put("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), updateProjectHandler);
+  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), updateProjectHandler);
 
   // Sync scope data from linked lead to project
   app.post("/api/projects/:id/sync-scope", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
@@ -300,14 +304,26 @@ export function registerProjectRoutes(app: Express): void {
             ? `https://drive.google.com/drive/folders/${lead.driveFolderId}`
             : undefined);
 
+      const scanDateObj = new Date(scanDate);
+      const [startHour, startMin] = startTime.split(":").map(Number);
+      const [endHour, endMin] = endTime.split(":").map(Number);
+      
+      const startDateTime = new Date(scanDateObj);
+      startDateTime.setHours(startHour, startMin, 0, 0);
+      
+      const endDateTime = new Date(scanDateObj);
+      endDateTime.setHours(endHour, endMin, 0, 0);
+      if (endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+      }
+
       const eventResult = await createScanCalendarEvent({
         projectId: project.id,
         projectName: project.name,
         projectAddress: lead?.projectAddress || "Address not available",
         universalProjectId: project.universalProjectId || undefined,
-        scanDate: new Date(scanDate),
-        startTime,
-        endTime,
+        startDateTime,
+        endDateTime,
         technicianEmail,
         travelInfo: travelInfo || undefined,
         notes,
@@ -494,18 +510,12 @@ export function registerProjectRoutes(app: Express): void {
       ? `https://drive.google.com/drive/folders/${project.driveFolderId}` 
       : undefined;
 
-    const startHour = startDate.getHours();
-    const startMinute = startDate.getMinutes();
-    const endHour = endDate.getHours();
-    const endMinute = endDate.getMinutes();
-
     const result = await createScanCalendarEvent({
       projectId: projectId,
       projectName: project.name,
       projectAddress,
-      scanDate: startDate,
-      startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
-      endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`,
+      startDateTime: startDate,
+      endDateTime: endDate,
       universalProjectId: project.universalProjectId || undefined,
       technicianEmail: technician.email || undefined,
       missionBriefUrl,
