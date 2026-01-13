@@ -2,17 +2,17 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import {
-    Building2, Globe, Linkedin, Users, Mail, Phone, MapPin,
+    Building2, Globe, Users, Mail, Phone, MapPin,
     DollarSign, Briefcase, FileText, ArrowLeft, Loader2, Save, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { Sidebar, MobileHeader } from "@/components/Sidebar";
 
 export function CustomerDetail() {
     const [, params] = useRoute("/customers/:id");
@@ -71,8 +71,28 @@ export function CustomerDetail() {
         },
     });
 
-    if (isLoading) return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>;
-    if (error || !data) return <div className="p-8 text-red-500">Error loading customer.</div>;
+    if (isLoading) return (
+        <div className="flex min-h-screen bg-background text-foreground">
+            <Sidebar />
+            <div className="flex-1 flex flex-col min-w-0">
+                <MobileHeader />
+                <main className="flex-1 p-4 md:p-8 overflow-auto">
+                    <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+                </main>
+            </div>
+        </div>
+    );
+    if (error || !data) return (
+        <div className="flex min-h-screen bg-background text-foreground">
+            <Sidebar />
+            <div className="flex-1 flex flex-col min-w-0">
+                <MobileHeader />
+                <main className="flex-1 p-4 md:p-8 overflow-auto">
+                    <div className="p-8 text-red-500">Error loading customer.</div>
+                </main>
+            </div>
+        </div>
+    );
 
     const { customer, leads, stats } = data;
 
@@ -92,12 +112,17 @@ export function CustomerDetail() {
     };
 
     return (
-        <div className="container mx-auto p-6 max-w-7xl animate-in fade-in duration-500">
-            <Link href="/customers" className="inline-flex items-center text-muted-foreground hover:text-blue-600 mb-6 transition-colors">
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back to Customers
-            </Link>
+        <div className="flex min-h-screen bg-background text-foreground">
+            <Sidebar />
+            <div className="flex-1 flex flex-col min-w-0">
+                <MobileHeader />
+                <main className="flex-1 p-4 md:p-8 overflow-auto">
+                    <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
+                        <Link href="/customers" className="inline-flex items-center text-muted-foreground hover:text-blue-600 mb-6 transition-colors">
+                            <ArrowLeft className="w-4 h-4 mr-1" /> Back to Customers
+                        </Link>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Left Column: Profile Card */}
                 <div className="md:col-span-1 space-y-6">
                     <Card className="border-t-4 border-t-indigo-500 shadow-md">
@@ -264,6 +289,9 @@ export function CustomerDetail() {
                         </CardContent>
                     </Card>
                 </div>
+                        </div>
+                    </div>
+                </main>
             </div>
         </div>
     );
