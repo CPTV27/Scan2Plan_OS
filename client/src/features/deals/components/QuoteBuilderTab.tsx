@@ -97,8 +97,8 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
     }
   }]);
   
-  const [dispatchLocation, setDispatchLocation] = useState<string>("brooklyn");
-  const [distance, setDistance] = useState<string>("25");
+  const [dispatchLocation, setDispatchLocation] = useState<string>((lead as any).dispatchLocation?.toLowerCase() || "woodstock");
+  const [distance, setDistance] = useState<string>("");
   const [risks, setRisks] = useState<string[]>([]);
   const [risksAffirmed, setRisksAffirmed] = useState(false);
   const [matterport, setMatterport] = useState(false);
@@ -351,6 +351,27 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       setRisks(risks.filter(r => r !== risk));
     } else {
       setRisks([...risks, risk]);
+    }
+  };
+
+  const handleDispatchLocationChange = async (newLocation: string) => {
+    setDispatchLocation(newLocation);
+    
+    // Recalculate distance from new dispatch location
+    const projectAddress = lead?.projectAddress;
+    if (!projectAddress) return;
+    
+    try {
+      const response = await fetch(
+        `/api/location/travel-distance?destination=${encodeURIComponent(projectAddress)}&dispatchLocation=${encodeURIComponent(newLocation)}`
+      );
+      const data = await response.json();
+      
+      if (data.available && data.distanceMiles) {
+        setDistance(data.distanceMiles.toString());
+      }
+    } catch (error) {
+      console.error("Failed to recalculate travel distance:", error);
     }
   };
 
@@ -930,7 +951,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Dispatch Location</Label>
-                    <Select value={dispatchLocation} onValueChange={setDispatchLocation}>
+                    <Select value={dispatchLocation} onValueChange={handleDispatchLocationChange}>
                       <SelectTrigger 
                         className={getHungryFieldClass("dispatchLocation")}
                         data-testid="select-dispatch-location"

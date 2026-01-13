@@ -558,3 +558,82 @@ googleMapsRouter.post(
         }
     })
 );
+
+// Dispatch location addresses mapping
+const DISPATCH_LOCATION_ADDRESSES: Record<string, string> = {
+    woodstock: "3272 Rt 212, Bearsville, NY 12409",
+    brooklyn: "176 Borinquen Place, Brooklyn, NY 11211",
+    troy: "188 1st St, Troy, NY 12180",
+};
+
+// GET /api/location/travel-distance - Calculate distance from dispatch location to destination
+googleMapsRouter.get(
+    "/api/location/travel-distance",
+    asyncHandler(async (req, res) => {
+        try {
+            const destination = req.query.destination as string;
+            const dispatchLocation = (req.query.dispatchLocation as string)?.toLowerCase() || "woodstock";
+
+            if (!destination || destination.trim().length < 5) {
+                return res.status(400).json({ error: "Destination address is required" });
+            }
+
+            const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+                return res.status(503).json({
+                    available: false,
+                    error: "Google Maps API key not configured"
+                });
+            }
+
+            const origin = DISPATCH_LOCATION_ADDRESSES[dispatchLocation] || DISPATCH_LOCATION_ADDRESSES.woodstock;
+
+            log(`[Distance Matrix] Calculating: from=${origin} destination=${destination}`);
+
+            const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
+            url.searchParams.set("origins", origin);
+            url.searchParams.set("destinations", destination);
+            url.searchParams.set("units", "imperial");
+            url.searchParams.set("key", apiKey);
+
+            const response = await fetch(url.toString());
+            const data = await response.json() as any;
+
+            if (data.status !== "OK" || !data.rows?.[0]?.elements?.[0]) {
+                return res.json({
+                    available: false,
+                    error: "Could not calculate distance"
+                });
+            }
+
+            const element = data.rows[0].elements[0];
+            if (element.status !== "OK") {
+                return res.json({
+                    available: false,
+                    error: element.status
+                });
+            }
+
+            const distanceMeters = element.distance?.value || 0;
+            const durationSeconds = element.duration?.value || 0;
+            const distanceMiles = Math.round(distanceMeters / 1609.34);
+            const durationMinutes = Math.round(durationSeconds / 60);
+
+            res.json({
+                available: true,
+                distanceMiles,
+                durationMinutes,
+                distanceText: element.distance?.text,
+                durationText: element.duration?.text,
+                origin,
+                destination
+            });
+        } catch (error) {
+            log("ERROR: Travel distance calculation error - " + (error as any)?.message);
+            res.status(500).json({
+                available: false,
+                error: "Failed to calculate distance"
+            });
+        }
+    })
+);
