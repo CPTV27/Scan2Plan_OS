@@ -63,7 +63,7 @@ export function CustomerList() {
         queryFn: async () => {
             const params = new URLSearchParams();
             if (search) params.append("q", search);
-            const res = await fetch(`/api/crm/customers?${params}`);
+            const res = await fetch(`/api/crm/customers?${params}`, { credentials: "include" });
             if (!res.ok) throw new Error("Failed to fetch customers");
             return res.json();
         },

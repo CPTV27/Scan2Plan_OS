@@ -14,6 +14,23 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 
+function getCsrfToken(): string | null {
+    const match = document.cookie.match(/csrf-token=([^;]+)/);
+    return match ? match[1] : null;
+}
+
+function getHeaders(includeContentType = true): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (includeContentType) {
+        headers["Content-Type"] = "application/json";
+    }
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+        headers["x-csrf-token"] = csrfToken;
+    }
+    return headers;
+}
+
 export function CustomerDetail() {
     const [, params] = useRoute("/customers/:id");
     const id = params?.id;
@@ -25,7 +42,7 @@ export function CustomerDetail() {
     const { data, isLoading, error } = useQuery({
         queryKey: ["customer", id],
         queryFn: async () => {
-            const res = await fetch(`/api/crm/customers/${id}`);
+            const res = await fetch(`/api/crm/customers/${id}`, { credentials: "include" });
             if (!res.ok) throw new Error("Failed to fetch customer");
             return res.json();
         },
@@ -35,8 +52,9 @@ export function CustomerDetail() {
         mutationFn: async (newData: any) => {
             const res = await fetch(`/api/crm/customers/${id}`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: getHeaders(),
                 body: JSON.stringify(newData),
+                credentials: "include",
             });
             if (!res.ok) throw new Error("Failed to update customer");
             return res.json();
@@ -55,6 +73,8 @@ export function CustomerDetail() {
         mutationFn: async () => {
             const res = await fetch(`/api/crm/customers/${id}/enrich`, {
                 method: "POST",
+                headers: getHeaders(false),
+                credentials: "include",
             });
             if (!res.ok) {
                 const err = await res.json();

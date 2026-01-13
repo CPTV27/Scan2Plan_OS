@@ -1,6 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertFieldNote } from "@shared/routes";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf-token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function getHeaders(includeContentType = true): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (includeContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["x-csrf-token"] = csrfToken;
+  }
+  return headers;
+}
+
 export function useFieldNotes() {
   return useQuery({
     queryKey: [api.fieldNotes.list.path],
@@ -19,7 +36,7 @@ export function useCreateFieldNote() {
       const validated = api.fieldNotes.create.input.parse(data);
       const res = await fetch(api.fieldNotes.create.path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(validated),
         credentials: "include",
       });
@@ -39,6 +56,7 @@ export function useProcessFieldNote() {
       const url = buildUrl(api.fieldNotes.process.path, { id });
       const res = await fetch(url, { 
         method: "POST",
+        headers: getHeaders(false),
         credentials: "include" 
       });
       if (!res.ok) throw new Error("Failed to process field note");

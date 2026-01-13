@@ -10,6 +10,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf-token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function getHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["x-csrf-token"] = csrfToken;
+  }
+  return headers;
+}
+
 type ResearchType = "client" | "property" | "competitor" | "regulatory" | "expansion" | "vault";
 
 interface QuickResearchButtonsProps {
@@ -26,7 +40,7 @@ export function QuickResearchButtons({ lead }: QuickResearchButtonsProps) {
       setActiveResearch(researchType);
       const res = await fetch(`/api/leads/${lead.id}/research`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         credentials: 'include',
         body: JSON.stringify({ researchType }),
       });

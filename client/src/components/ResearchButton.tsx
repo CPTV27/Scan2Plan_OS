@@ -9,6 +9,20 @@ import { Search, Building2, Users, Loader2, RefreshCw, Shield, TrendingUp, Brief
 import type { Lead, LeadResearch } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/csrf-token=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function getHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const csrfToken = getCsrfToken();
+  if (csrfToken) {
+    headers["x-csrf-token"] = csrfToken;
+  }
+  return headers;
+}
+
 interface ResearchButtonProps {
   lead: Lead;
 }
@@ -43,7 +57,7 @@ export function ResearchButton({ lead }: ResearchButtonProps) {
     mutationFn: async (researchType: ResearchType) => {
       const res = await fetch(`/api/leads/${lead.id}/research`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders(),
         credentials: 'include',
         body: JSON.stringify({ researchType }),
       });
