@@ -1044,12 +1044,36 @@ export class QuickBooksClient {
     return null;
   }
 
+  // Find service item by SKU (Name field in QB = SKU in our system)
+  private async findServiceItemBySku(accessToken: string, realmId: string, sku: string): Promise<{ id: string; name: string } | null> {
+    // QB uses "Name" field for what we call SKU, search for it
+    const query = `SELECT * FROM Item WHERE Name = '${sku.replace(/'/g, "\\'")}'`;
+    const response = await fetch(
+      `${QB_BASE_URL}/v3/company/${realmId}/query?query=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json",
+        },
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const item = data.QueryResponse?.Item?.[0];
+      if (item) {
+        return { id: item.Id, name: item.FullyQualifiedName || item.Name };
+      }
+    }
+    return null;
+  }
+
   // Create an estimate from proposal pricing data
   async createEstimateFromQuote(
     leadId: number,
     clientName: string,
     projectName: string,
-    lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number; discipline?: string }>,
+    lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number; discipline?: string; sku?: string }>,
     email?: string
   ): Promise<{ estimateId: string; estimateNumber: string; customerId: string }> {
     const token = await this.getValidToken();
@@ -1063,8 +1087,16 @@ export class QuickBooksClient {
       lineItems.map(async (item, index) => {
         let itemRef: { value: string; name?: string } | undefined;
         
-        // First try to map using the discipline field directly
-        if (item.discipline && this.SERVICE_MAPPING[item.discipline]) {
+        // Priority 1: Use official SKU from our product catalog
+        if (item.sku) {
+          const skuItem = await this.findServiceItemBySku(token.accessToken, token.realmId, item.sku);
+          if (skuItem) {
+            itemRef = { value: skuItem.id, name: skuItem.name };
+          }
+        }
+        
+        // Priority 2: Try to map using the discipline field directly
+        if (!itemRef && item.discipline && this.SERVICE_MAPPING[item.discipline]) {
           const serviceName = this.SERVICE_MAPPING[item.discipline];
           const itemId = await this.findServiceItem(token.accessToken, token.realmId, serviceName);
           if (itemId) {

@@ -34,6 +34,7 @@ import { registerFieldOpsRoutes } from "./routes/fieldOps";
 import { registerGHLRoutes } from "./routes/ghl";
 import { registerHealthRoutes } from "./routes/health";
 import { customersRouter } from "./routes/customers";
+import { productsRouter } from "./routes/products";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -118,6 +119,7 @@ export async function registerRoutes(
   registerFieldOpsRoutes(app);
   registerGHLRoutes(app);
   app.use(customersRouter);
+  app.use(productsRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

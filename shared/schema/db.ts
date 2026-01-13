@@ -1766,3 +1766,26 @@ export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({
 });
 export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
 export type EmailMessage = typeof emailMessages.$inferSelect;
+
+// Products / Services catalog (synced from QuickBooks)
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  sku: text("sku").notNull().unique(),
+  category: text("category").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  productType: text("product_type").notNull().default("Service"),
+  basePrice: decimal("base_price", { precision: 12, scale: 2 }).default("0"),
+  qboItemId: text("qbo_item_id"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;

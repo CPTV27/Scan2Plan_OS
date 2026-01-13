@@ -5,6 +5,7 @@ import { quickbooksClient } from "../../quickbooks-client";
 import { storage } from "../../storage";
 import { log } from "../../lib/logger";
 import { z } from "zod";
+import skuMapper from "../../lib/skuMapper";
 
 export const quickbooksQuotesRouter = Router();
 
@@ -156,8 +157,8 @@ quickbooksQuotesRouter.post(
                 return res.status(401).json({ message: "QuickBooks not connected", needsReauth: true });
             }
 
-            // Transform CPQ quote pricing_breakdown into line items
-            const lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number; discipline?: string }> = [];
+            // Transform CPQ quote pricing_breakdown into line items with official SKUs
+            const lineItems: Array<{ description: string; quantity: number; unitPrice: number; amount: number; discipline?: string; sku?: string }> = [];
             const pricingBreakdown = quote.pricingBreakdown as any;
             const areas = quote.areas as any[];
 
@@ -170,6 +171,12 @@ quickbooksQuotesRouter.post(
                     const areaConfig = areas?.find(a => a.name === area.name || a.id === area.id);
                     const disciplines = areaConfig?.disciplines as string[] || [];
                     const primaryDiscipline = disciplines[0];
+                    const buildingType = areaConfig?.buildingType || "1";
+                    const primaryLod = areaConfig?.disciplineLods?.architecture?.lod || areaConfig?.lod || "300";
+                    const scope = areaConfig?.disciplineLods?.architecture?.scope || areaConfig?.scope || "full";
+
+                    // Get official SKU for primary service
+                    const primarySku = skuMapper.getPrimaryServiceSku(buildingType, primaryLod, scope);
 
                     if (price > 0 && !isNaN(price)) {
                         lineItems.push({
@@ -178,6 +185,25 @@ quickbooksQuotesRouter.post(
                             unitPrice: price,
                             amount: price,
                             discipline: primaryDiscipline,
+                            sku: primarySku,
+                        });
+                    }
+
+                    // Add added discipline line items (MEPF, Structure, etc.)
+                    // Price is bundled in area total, so these are $0 tracking line items with official SKUs
+                    for (const disc of disciplines) {
+                        if (disc === 'architecture' || disc === 'arch') continue;
+                        const discLod = areaConfig?.disciplineLods?.[disc]?.lod || primaryLod;
+                        const discSku = skuMapper.getAddedDisciplineSku(disc, discLod);
+                        
+                        // Add as $0 line item for QB SKU tracking (included in area price above)
+                        lineItems.push({
+                            description: `${areaName} - ${disc.toUpperCase()} (Included)`,
+                            quantity: 1,
+                            unitPrice: 0,
+                            amount: 0,
+                            discipline: disc,
+                            sku: discSku,
                         });
                     }
                 }
@@ -192,6 +218,44 @@ quickbooksQuotesRouter.post(
                     unitPrice: travelCost,
                     amount: travelCost,
                 });
+            }
+
+            // Add services (Matterport, etc.) with SKUs
+            const services = quote.services as Record<string, number> | null;
+            if (services) {
+                for (const [service, qty] of Object.entries(services)) {
+                    if (qty && qty > 0) {
+                        const serviceSku = skuMapper.getServiceSku(service);
+                        const serviceCost = Number(pricingBreakdown?.serviceCosts?.[service] || 0);
+                        if (serviceCost > 0) {
+                            lineItems.push({
+                                description: `${service.charAt(0).toUpperCase() + service.slice(1)} Service`,
+                                quantity: qty,
+                                unitPrice: serviceCost / qty,
+                                amount: serviceCost,
+                                sku: serviceSku,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Add risk modifiers with SKUs
+            const risks = quote.risks as string[] | null;
+            if (risks && Array.isArray(risks)) {
+                for (const risk of risks) {
+                    const riskSku = skuMapper.getPriceModSku(risk);
+                    const riskCost = Number(pricingBreakdown?.riskPremiums?.[risk] || 0);
+                    if (riskCost > 0) {
+                        lineItems.push({
+                            description: `Risk Premium: ${risk.charAt(0).toUpperCase() + risk.slice(1)}`,
+                            quantity: 1,
+                            unitPrice: riskCost,
+                            amount: riskCost,
+                            sku: riskSku,
+                        });
+                    }
+                }
             }
 
             // Add adjustments/reconciliation logic (omitted for brevity, essentially the same as original)
