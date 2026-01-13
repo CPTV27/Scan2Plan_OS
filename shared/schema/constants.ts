@@ -112,6 +112,7 @@ export const SOURCE_OPTIONS = [
 export const REFERRAL_SOURCES = ["referral_client", "referral_partner"] as const;
 
 export const TOUCHPOINT_OPTIONS = [
+  { value: "existing_customer", label: "Existing Customer" },
   { value: "proof_vault", label: "Proof Vault" },
   { value: "spec_standards", label: "Spec Standards" },
   { value: "castle", label: "Castle (Digital Twin)" },
