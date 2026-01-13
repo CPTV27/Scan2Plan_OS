@@ -12,6 +12,8 @@ import path from "path";
 import { log } from "../lib/logger";
 import { getAutoTierAUpdate, checkAttributionGate } from "../lib/profitabilityGates";
 import { TIER_A_THRESHOLD, TOUCHPOINT_OPTIONS } from "@shared/schema";
+import { applyStalenessPenalties, getStalenessStatus } from "../staleness";
+import { calculateProbability, recalculateAllProbabilities, getStageSpecificStaleness } from "../probability";
 
 const DEAL_STAGES = ["Leads", "Contacted", "Proposal", "Negotiation", "On Hold", "Closed Won", "Closed Lost"] as const;
 
@@ -1015,6 +1017,44 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     res.json({ 
       success: true, 
       message: "Thank you! Your answers have been submitted." 
+    });
+  }));
+
+  app.get("/api/staleness/status", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leads = await storage.getLeads();
+    const statusList = leads.map(lead => ({
+      leadId: lead.id,
+      clientName: lead.clientName,
+      ...getStalenessStatus(lead.lastContactDate)
+    }));
+    res.json(statusList);
+  }));
+
+  app.post("/api/staleness/apply", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    const results = await applyStalenessPenalties();
+    res.json(results);
+  }));
+
+  app.post("/api/probability/recalculate", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+    const results = await recalculateAllProbabilities();
+    res.json(results);
+  }));
+
+  app.get("/api/leads/:id/probability-factors", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const leadId = Number(req.params.id);
+    const lead = await storage.getLead(leadId);
+    if (!lead) return res.status(404).json({ message: "Lead not found" });
+    
+    const factors = calculateProbability(lead);
+    const staleness = getStageSpecificStaleness(lead.dealStage, lead.lastContactDate);
+    
+    res.json({
+      currentProbability: lead.probability,
+      calculatedProbability: factors.finalScore,
+      factors,
+      staleness,
+      lastContactDate: lead.lastContactDate,
+      dealStage: lead.dealStage,
     });
   }));
 }
