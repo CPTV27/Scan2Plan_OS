@@ -107,7 +107,7 @@ leadsCoreRouter.post(
 
             // Google Intel enrichment
             if (lead.projectAddress && process.env.GOOGLE_MAPS_API_KEY) {
-                enrichLeadWithGoogleIntel(lead.projectAddress)
+                enrichLeadWithGoogleIntel(lead.projectAddress, lead.dispatchLocation || undefined)
                     .then(async (googleIntel) => {
                         if (googleIntel.buildingInsights?.available || googleIntel.travelInsights?.available) {
                             await storage.updateLead(lead.id, { googleIntel } as any);
@@ -230,7 +230,7 @@ leadsCoreRouter.put(
 
             // Google Intel refresh
             if (addressChanged && process.env.GOOGLE_MAPS_API_KEY) {
-                enrichLeadWithGoogleIntel(input.projectAddress!)
+                enrichLeadWithGoogleIntel(input.projectAddress!, lead.dispatchLocation || undefined)
                     .then(async (googleIntel) => {
                         if (googleIntel.buildingInsights?.available || googleIntel.travelInsights?.available) {
                             await storage.updateLead(leadId, { googleIntel } as any);

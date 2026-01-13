@@ -9,8 +9,23 @@ import type { GoogleIntel, GoogleBuildingInsights, GoogleTravelInsights } from "
 import { calculateTravelDistance, type DistanceResult } from "./travel-scheduling";
 import { log } from "./lib/logger";
 
-// Note: Read env vars at runtime, not module initialization, to ensure secrets are loaded
-const DEFAULT_OFFICE_ADDRESS = process.env.OFFICE_ADDRESS || "101 Merrick Road, Rockville Centre, NY 11570";
+// Dispatch location addresses mapping
+const DISPATCH_LOCATION_ADDRESSES: Record<string, string> = {
+  woodstock: "3272 Rt 212, Bearsville, NY 12409",
+  brooklyn: "176 Borinquen Place, Brooklyn, NY 11211",
+  troy: "188 1st St, Troy, NY 12180",
+};
+
+// Default to Woodstock if no dispatch location specified
+const DEFAULT_DISPATCH_LOCATION = "woodstock";
+
+function getDispatchAddress(dispatchLocation?: string): string {
+  if (!dispatchLocation) {
+    return DISPATCH_LOCATION_ADDRESSES[DEFAULT_DISPATCH_LOCATION];
+  }
+  const normalized = dispatchLocation.toLowerCase().trim();
+  return DISPATCH_LOCATION_ADDRESSES[normalized] || DISPATCH_LOCATION_ADDRESSES[DEFAULT_DISPATCH_LOCATION];
+}
 
 function getGoogleMapsApiKey(): string | undefined {
   return process.env.GOOGLE_MAPS_API_KEY;
@@ -141,7 +156,7 @@ export async function enrichLeadWithGoogleIntel(
     intel.buildingInsights = { available: false, error: "Could not geocode address" };
   }
 
-  const origin = dispatchLocation || DEFAULT_OFFICE_ADDRESS;
+  const origin = getDispatchAddress(dispatchLocation);
   const distanceResult = await calculateTravelDistance(projectAddress, origin);
   
   if (distanceResult) {
