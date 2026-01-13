@@ -22,7 +22,7 @@ let pdfParse: any;
 async function getPdfParse() {
   if (!pdfParse) {
     // Dynamic import with interop for CJS default export
-    const mod = await import("pdf-parse");
+    const mod = await import("pdf-parse") as any;
     pdfParse = mod.default || mod;
   }
   return pdfParse;
@@ -135,11 +135,13 @@ interface ExtractedQuoteData {
     price?: number;
     quantity?: number;
     rate?: number;
+    unit?: string;
+    confidence?: number;
   }>;
   lineItems?: ExtractedLineItem[];
   contacts?: Array<{
     name: string;
-    email: string;
+    email?: string;
     company?: string;
   }>;
   variables?: Record<string, string>;
@@ -148,6 +150,10 @@ interface ExtractedQuoteData {
   rawPdfText?: string;
   estimateNumber?: string;
   estimateDate?: string;
+  extractionNotes?: string[];
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
 }
 
 export class PandaDocClient {

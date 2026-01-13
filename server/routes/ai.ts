@@ -229,8 +229,10 @@ export function registerAIRoutes(app: Express) {
     // Create quote from extracted data
     const quoteData = {
       leadId: conversation.leadId,
+      quoteNumber: `Q-${Date.now()}`,
       projectName: extractedData.projectName || "Untitled Quote",
-      projectAddress: extractedData.projectAddress || null,
+      projectAddress: extractedData.projectAddress || "Address TBD",
+      typeOfBuilding: buildingType,
       areas: [{
         id: "1",
         name: "Area 1",
@@ -240,10 +242,9 @@ export function registerAIRoutes(app: Express) {
         lod: extractedData.lod || "300",
         scope: extractedData.scope || "full",
         disciplines,
-      }],
+      }] as any,
       dispatchLocation,
       notes: extractedData.notes || "",
-      status: "draft" as const,
     };
 
     const quote = await storage.createCpqQuote(quoteData);

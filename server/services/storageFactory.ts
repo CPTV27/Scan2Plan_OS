@@ -79,7 +79,7 @@ export async function initializeHybridStorage(
         log("WARN: [StorageFactory] Google Drive not connected");
         return null;
       }
-      return createProjectFolder(universalProjectId, projectName, clientName);
+      return createProjectFolder(universalProjectId);
     })(),
     useHybridMode ? initializeGCSStructure(universalProjectId) : Promise.resolve(null),
   ]);

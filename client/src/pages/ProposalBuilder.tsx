@@ -532,15 +532,15 @@ export default function ProposalBuilder() {
                               <div key={study.id} className="p-4 border rounded-md">
                                 <h3 className="font-semibold">{study.title}</h3>
                                 <p className="text-sm text-muted-foreground mt-1">{study.blurb}</p>
-                                {study.stats && (
+                                {study.stats && typeof study.stats === 'object' ? (
                                   <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
                                     {Object.entries(study.stats as Record<string, string>).map(([key, val]) => (
                                       <span key={key}>
-                                        {key}: <strong>{val}</strong>
+                                        {key}: <strong>{String(val)}</strong>
                                       </span>
                                     ))}
                                   </div>
-                                )}
+                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -638,17 +638,17 @@ function CaseStudyCard({
           ))}
         </div>
       </div>
-      {study.stats && (
+      {study.stats && typeof study.stats === 'object' ? (
         <div className="text-right text-sm text-muted-foreground shrink-0">
           {Object.entries(study.stats as Record<string, string>)
             .slice(0, 2)
             .map(([key, val]) => (
               <div key={key}>
-                <span className="text-xs">{key}:</span> <strong>{val}</strong>
+                <span className="text-xs">{key}:</span> <strong>{String(val)}</strong>
               </div>
             ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

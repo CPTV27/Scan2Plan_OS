@@ -43,7 +43,7 @@ router.post("/documents", isAuthenticated, async (req: Request, res: Response) =
       });
     }
     
-    const recipientEmail = lead.contactEmail || lead.billingContactEmail;
+    const recipientEmail = lead.contactEmail || lead.billingContactEmail || "";
     const recipientName = lead.contactName || lead.billingContactName || lead.clientName;
     
     // Parse line items from quote's pricingBreakdown

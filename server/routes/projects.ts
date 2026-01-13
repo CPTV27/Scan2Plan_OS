@@ -500,6 +500,7 @@ export function registerProjectRoutes(app: Express): void {
     const endMinute = endDate.getMinutes();
 
     const result = await createScanCalendarEvent({
+      projectId: projectId,
       projectName: project.name,
       projectAddress,
       scanDate: startDate,

@@ -9,7 +9,7 @@ interface PandaDocTabProps {
   quoteId?: number;
   queryClient: QueryClient;
   onOpenSendDialog?: () => void;
-  proposalEmails?: Array<{ openCount: number | null; sentAt: Date | null }>;
+  proposalEmails?: Array<{ openCount: number | null; sentAt: Date | string | null }>;
 }
 
 export function PandaDocTab({

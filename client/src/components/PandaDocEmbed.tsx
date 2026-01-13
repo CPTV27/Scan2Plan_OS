@@ -17,8 +17,8 @@ interface PandaDocEmbedProps {
   leadId?: number;
   quoteId?: number;
   proposalEmails?: Array<{
-    openCount: number;
-    sentAt: string;
+    openCount: number | null;
+    sentAt: string | Date | null;
   }>;
 }
 
@@ -242,21 +242,23 @@ export function PandaDocEmbed({
             </div>
           </div>
 
-          {proposalEmails && proposalEmails.length > 0 && (
+          {proposalEmails && proposalEmails.length > 0 && proposalEmails[0] && (
             <div className="p-4 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-muted-foreground" />
                 <div className="flex-1">
                   <p className="font-medium text-sm">Email Activity</p>
                   <p className="text-sm text-muted-foreground">
-                    {proposalEmails[0].openCount > 0 ? (
-                      <>Opened {proposalEmails[0].openCount} time{proposalEmails[0].openCount > 1 ? "s" : ""}</>
-                    ) : (
+                    {(proposalEmails[0].openCount ?? 0) > 0 ? (
+                      <>Opened {proposalEmails[0].openCount} time{(proposalEmails[0].openCount ?? 0) > 1 ? "s" : ""}</>
+                    ) : proposalEmails[0].sentAt ? (
                       <>Sent {format(new Date(proposalEmails[0].sentAt), "MMM d, yyyy")}</>
+                    ) : (
+                      <>Pending</>
                     )}
                   </p>
                 </div>
-                {proposalEmails[0].openCount > 0 ? (
+                {(proposalEmails[0].openCount ?? 0) > 0 ? (
                   <Badge variant="default" className="bg-green-600">
                     <Eye className="w-3 h-3 mr-1" />
                     Viewed

@@ -106,12 +106,8 @@ export interface LeadDetailsTabProps {
   onSubmit: (data: LeadFormData) => Promise<void>;
   isPending: boolean;
   queryClient: QueryClient;
-  updateMutation: UseMutationResult<Lead, Error, Partial<Lead>, unknown>;
-  toast: (opts: { 
-    title: string; 
-    description?: string; 
-    variant?: "default" | "destructive";
-  }) => void;
+  updateMutation: UseMutationResult<any, Error, any, unknown>;
+  toast: any;
   documents?: LeadDocument[];
   uploadDocumentMutation: UseMutationResult<LeadDocument, Error, File, unknown>;
 }

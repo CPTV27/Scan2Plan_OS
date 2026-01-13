@@ -55,7 +55,12 @@ export function registerAirtableRoutes(app: Express): void {
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
-      const result = await syncProjectToAirtable(project);
+      const result = await syncProjectToAirtable({
+        name: project.name,
+        status: project.status,
+        clientName: project.clientName || undefined,
+        projectAddress: project.projectAddress || undefined,
+      });
       res.json(result);
     } catch (err: any) {
       log("ERROR: Airtable sync error - " + (err?.message || err));

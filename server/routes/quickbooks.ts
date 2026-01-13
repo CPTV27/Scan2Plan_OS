@@ -598,8 +598,7 @@ export function registerQuickbooksRoutes(app: Express): void {
         amount: amount.toString(),
         description: description || null,
         vendorName: vendorName || null,
-        source: "field_entry",
-        syncedFromQbo: false,
+        source: "field",
       }).returning();
 
       res.status(201).json(expense[0]);

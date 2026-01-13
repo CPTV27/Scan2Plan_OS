@@ -537,7 +537,7 @@ export function LeadForm({ lead, onSuccess, onOpenCPQ, onOpenResearch, onOpenCom
                 }}
               />
 
-              {lead?.googleIntel && (lead.googleIntel as GoogleIntel).buildingInsights?.available && (
+              {lead?.googleIntel && (lead.googleIntel as GoogleIntel).buildingInsights?.available ? (
                 <div className="bg-muted/50 rounded-md p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium flex items-center gap-1.5">
@@ -590,7 +590,7 @@ export function LeadForm({ lead, onSuccess, onOpenCPQ, onOpenResearch, onOpenCom
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
 
               {lead && !lead.googleIntel && form.watch("projectAddress") && (
                 <div className="bg-muted/30 rounded-md p-3">

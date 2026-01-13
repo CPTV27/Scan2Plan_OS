@@ -128,7 +128,7 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
         ownerId: input.ownerId || (req.user as any)?.id || null,
         leadScore: 0,
         ...(tierAUpdate || {}),
-      };
+      } as any;
       
       if (tierAUpdate) {
         log(`[Auto Tier A] Lead flagged as Tier A (${input.sqft?.toLocaleString()} sqft >= ${TIER_A_THRESHOLD.toLocaleString()})`);
