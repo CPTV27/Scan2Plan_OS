@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { trackingEvents } from "@shared/schema";

@@ -224,6 +224,6 @@ export async function uploadFileToDrive(
     fileId: response.data.id!,
     webViewLink: response.data.webViewLink || '',
     webContentLink: response.data.webContentLink || '',
-    thumbnailLink: response.data.thumbnailLink,
+    thumbnailLink: response.data.thumbnailLink || undefined,
   };
 }

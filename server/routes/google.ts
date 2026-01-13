@@ -87,7 +87,7 @@ function formatDate(dateStr: string | Date | null | undefined): string {
 function generateProposalEmailHtml(lead: any, quote: any): string {
   // Client info - prefer contact name over company
   const clientName = lead.contactName || lead.clientName || lead.company || 'Valued Client';
-  const projectName = lead.projectName || lead.company || 'Your Project';
+  const projectName = lead.projectName || lead.clientName || 'Your Project';
   const projectAddress = quote?.projectAddress || lead.projectAddress || '';
   const quoteNumber = quote?.quoteNumber || '';
   const quoteDate = formatDate(quote?.createdAt) || formatDate(new Date());
@@ -381,7 +381,7 @@ function generateProposalEmailHtml(lead: any, quote: any): string {
 
 function generateProposalEmailText(lead: any, quote: any): string {
   const clientName = lead.contactName || lead.company || 'Valued Client';
-  const projectName = lead.projectName || lead.company || 'Your Project';
+  const projectName = lead.projectName || lead.clientName || 'Your Project';
   const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
   
   return `SCAN2PLAN - Precision 3D Laser Scanning & BIM Services
@@ -562,7 +562,7 @@ export async function registerGoogleRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "No recipient email provided and no contact email on lead or quote" });
       }
 
-      const projectName = lead.projectName || lead.company || 'Your Project';
+      const projectName = lead.projectName || lead.clientName || 'Your Project';
       const subject = customSubject || `Scan2Plan Proposal - ${projectName}`;
 
       // Generate tracking token and save to database

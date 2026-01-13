@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { timeLogs } from "@shared/schema";
 import { isAuthenticated } from "../replit_integrations/auth";
@@ -26,15 +26,15 @@ export function registerTimeLogRoutes(app: Express): void {
         targetDate.setHours(0, 0, 0, 0);
         const nextDate = new Date(targetDate);
         nextDate.setDate(nextDate.getDate() + 1);
-        conditions.push(gte(timeLogs.logDate, targetDate));
-        conditions.push(lt(timeLogs.logDate, nextDate));
+        conditions.push(gte(timeLogs.createdAt, targetDate));
+        conditions.push(lt(timeLogs.createdAt, nextDate));
       }
       
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
       }
       
-      const logs = await query.orderBy(desc(timeLogs.logDate));
+      const logs = await query.orderBy(desc(timeLogs.createdAt));
       res.json(logs);
     } catch (error: any) {
       log("ERROR: Error fetching time logs - " + (error?.message || error));
@@ -54,10 +54,8 @@ export function registerTimeLogRoutes(app: Express): void {
       const [newLog] = await db.insert(timeLogs).values({
         projectId: Number(projectId),
         techId,
-        role,
-        hours: hours.toString(),
+        roleType: role,
         notes: notes || null,
-        logDate: new Date(),
       }).returning();
       
       res.status(201).json(newLog);

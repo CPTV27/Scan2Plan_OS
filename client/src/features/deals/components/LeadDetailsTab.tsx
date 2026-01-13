@@ -134,12 +134,11 @@ export function LeadDetailsTab({
           <PersonaSuggestion
             leadId={leadId}
             clientName={lead.clientName}
-            projectName={lead.projectName}
-            projectType={lead.projectType}
-            contactName={lead.contactName}
-            contactTitle={lead.contactTitle}
-            notes={lead.notes}
-            currentPersonaCode={lead.buyerPersona}
+            projectName={lead.projectName ?? undefined}
+            projectType={lead.buildingType ?? undefined}
+            contactName={lead.contactName ?? undefined}
+            notes={lead.notes ?? undefined}
+            currentPersonaCode={lead.buyerPersona ?? undefined}
             onPersonaAssigned={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
             }}

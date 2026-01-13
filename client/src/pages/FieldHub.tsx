@@ -757,7 +757,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
         question,
         projectId: todaysMission?.id,
         universalProjectId: todaysMission?.universalProjectId,
-        techName: user?.firstName || user?.username || "Technician",
+        techName: user?.firstName || user?.lastName || "Technician",
       });
       return response.json();
     },
@@ -1697,7 +1697,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                   </div>
                   <div>
                     <p className="font-semibold" data-testid="text-user-name">
-                      {user?.firstName || user?.username || "Technician"}
+                      {user?.firstName || user?.lastName || "Technician"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {user?.email || "Field Technician"}

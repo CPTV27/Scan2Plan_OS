@@ -192,7 +192,7 @@ ${lead ? `
 CLIENT INFO:
 - Company: ${lead.clientName}
 - Project: ${lead.projectName || 'N/A'}
-- Industry Context: ${context.clientIndustry || lead.projectType || 'Unknown'}
+- Industry Context: ${context.clientIndustry || lead.buildingType || 'Unknown'}
 ` : ''}
 
 Based on this ${outcomeLabel} outcome, provide analysis in this JSON format:

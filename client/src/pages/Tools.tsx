@@ -156,6 +156,7 @@ export default function Tools() {
           value: 0,
           dealStage: "Leads",
           probability: 10,
+          leadPriority: 3,
         });
         leadId = newLead.id;
         toast({ title: "Deal Created", description: `New deal for ${newClientName} created.` });

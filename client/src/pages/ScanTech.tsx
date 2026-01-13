@@ -562,7 +562,7 @@ export default function ScanTech() {
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                                   <MapPin className="h-3 w-3 flex-shrink-0" />
                                   <span className="truncate">
-                                    {project.siteAddress || "No address"}
+                                    {project.projectAddress || "No address"}
                                   </span>
                                 </div>
                               </div>
@@ -614,7 +614,7 @@ export default function ScanTech() {
                                     <div>
                                       <p className="font-medium">{project.name}</p>
                                       <p className="text-xs text-muted-foreground">
-                                        {log?.totalTravelMinutes || 0} min travel, {log?.totalSiteMinutes || 0} min on-site
+                                        {log?.travelDurationMinutes || 0} min travel, {log?.scanningDurationMinutes || 0} min on-site
                                       </p>
                                     </div>
                                   </div>
@@ -662,14 +662,14 @@ export default function ScanTech() {
                 {selectedProject?.name || "Loading..."}
               </h1>
               <p className="text-xs text-muted-foreground truncate">
-                {selectedProject?.siteAddress || ""}
+                {selectedProject?.projectAddress || ""}
               </p>
             </div>
-            {selectedProject?.siteAddress && (
+            {selectedProject?.projectAddress && (
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => openGoogleMaps(selectedProject.siteAddress!)}
+                onClick={() => openGoogleMaps(selectedProject.projectAddress!)}
                 data-testid="button-navigate"
               >
                 <Navigation className="h-4 w-4 mr-1" />

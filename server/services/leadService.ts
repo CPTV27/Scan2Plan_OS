@@ -10,11 +10,11 @@ export const leadService = {
     if (areas.length === 0) return "No areas configured";
 
     const totalSqft = areas.reduce((sum: number, area: any) => sum + (parseInt(area.squareFeet) || 0), 0);
-    const disciplines = [...new Set(areas.flatMap((a: any) => a.disciplines || []))];
-    const buildingTypes = [...new Set(areas.map((a: any) => {
+    const disciplines = Array.from(new Set(areas.flatMap((a: any) => a.disciplines || [])));
+    const buildingTypes = Array.from(new Set(areas.map((a: any) => {
       const typeId = a.buildingType?.toString();
       return (CPQ_BUILDING_TYPES as any)[typeId] || `Type ${typeId}`;
-    }))];
+    })));
 
     const parts: string[] = [];
     

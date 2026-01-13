@@ -159,12 +159,12 @@ export function generateMissionBrief(project: any): MissionBrief {
     .map((r: string) => RISK_LABELS[r] || r)
     .filter(Boolean);
 
-  // Coerce site readiness booleans with toBool()
+  // Coerce site readiness - some fields are booleans, some are strings per MissionBrief interface
   const siteConditions = {
     occupied: siteReadiness.occupied != null ? toBool(siteReadiness.occupied) : null,
     accessRestrictions: siteReadiness.accessRestrictions || null,
-    dropCeilings: siteReadiness.dropCeilings != null ? toBool(siteReadiness.dropCeilings) : null,
-    hazardousMaterials: siteReadiness.hazardousMaterials != null ? toBool(siteReadiness.hazardousMaterials) : null,
+    dropCeilings: siteReadiness.dropCeilings != null ? String(siteReadiness.dropCeilings) : null,
+    hazardousMaterials: siteReadiness.hazardousMaterials != null ? String(siteReadiness.hazardousMaterials) : null,
     activeConstruction: siteReadiness.activeConstruction != null ? toBool(siteReadiness.activeConstruction) : null,
     parkingAccess: siteReadiness.parkingAccess || null,
     additionalNotes: siteReadiness.additionalNotes || null,
@@ -313,5 +313,5 @@ function deriveSuggestedEquipment(
     equipment.push("GPS receiver");
   }
 
-  return [...new Set(equipment)];
+  return Array.from(new Set(equipment));
 }

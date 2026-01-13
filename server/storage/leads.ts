@@ -170,7 +170,7 @@ export class LeadDocumentRepository {
     return created;
   }
 
-  async updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> {
+  async updateLeadDocument(id: number, updates: Partial<LeadDocument>): Promise<LeadDocument> {
     const [updated] = await db.update(leadDocuments)
       .set(updates)
       .where(eq(leadDocuments.id, id))
@@ -224,7 +224,7 @@ export const leadDocumentStorage = {
   getByLeadId: (leadId: number): Promise<LeadDocument[]> => leadDocumentRepo.getLeadDocuments(leadId),
   getById: (id: number): Promise<LeadDocument | undefined> => leadDocumentRepo.getLeadDocument(id),
   create: (doc: InsertLeadDocument): Promise<LeadDocument> => leadDocumentRepo.createLeadDocument(doc),
-  update: (id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> => leadDocumentRepo.updateLeadDocument(id, updates),
+  update: (id: number, updates: Partial<LeadDocument>): Promise<LeadDocument> => leadDocumentRepo.updateLeadDocument(id, updates),
   delete: (id: number): Promise<void> => leadDocumentRepo.deleteLeadDocument(id),
   getUnmigrated: (leadId: number): Promise<LeadDocument[]> => leadDocumentRepo.getUnmigratedDocuments(leadId),
 };

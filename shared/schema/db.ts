@@ -18,6 +18,15 @@ import {
   QC_VALIDATION_STATUS,
   ATTACHMENT_SOURCE,
   ATTACHMENT_STATUS,
+  WORK_TYPES,
+  ROLE_TYPES,
+  FIELD_EXPENSE_CATEGORIES,
+  ACCOUNT_TYPES,
+  INVOICE_STATUSES,
+  EWS_SCORES,
+  MARKETING_POST_STATUSES,
+  MARKETING_POST_CATEGORIES,
+  MARKETING_PLATFORMS,
   optionalString,
   optionalNumber,
   cpqAreaSchema,
@@ -354,9 +363,6 @@ export const insertLeadSchema = createInsertSchema(leads).omit({
   })).optional(),
 });
 
-// === QC VALIDATION STATUS ENUM ===
-export type QCValidationStatus = typeof QC_VALIDATION_STATUS[number];
-
 // === SCANTECHS (Field Technicians) ===
 export const scantechs = pgTable("scantechs", {
   id: serial("id").primaryKey(),
@@ -575,11 +581,6 @@ export const insertFieldNoteSchema = createInsertSchema(fieldNotes).omit({
 });
 
 // === SCAN TECH TIME LOGS (Automated Clock In/Out) ===
-export type WorkType = typeof WORK_TYPES[number];
-
-// === ROLE TYPES FOR DUAL HAT LABOR TRACKING ===
-export type RoleType = typeof ROLE_TYPES[number];
-
 export const timeLogs = pgTable("time_logs", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id).notNull(),
@@ -640,6 +641,9 @@ export const insertMissionLogSchema = createInsertSchema(missionLogs).omit({
   travelDurationMinutes: true,
   scanningDurationMinutes: true,
 });
+export type MissionLog = typeof missionLogs.$inferSelect;
+export type InsertMissionLog = z.infer<typeof insertMissionLogSchema>;
+
 export const siteIntelligence = pgTable("site_intelligence", {
   id: serial("id").primaryKey(),
   projectId: integer("project_id").references(() => projects.id).notNull(),
@@ -755,9 +759,8 @@ export const insertQbCustomerSchema = createInsertSchema(qbCustomers).omit({
 });
 export type InsertQbCustomer = z.infer<typeof insertQbCustomerSchema>;
 export type QbCustomer = typeof qbCustomers.$inferSelect;
-// === EXPENSES (From QuickBooks or Field Entry) ===
-export type FieldExpenseCategory = typeof FIELD_EXPENSE_CATEGORIES[number];
 
+// === EXPENSES (From QuickBooks or Field Entry) ===
 export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
   qbExpenseId: text("qb_expense_id").unique(), // QuickBooks expense ID (null for field entries)
@@ -784,9 +787,8 @@ export const insertExpenseSchema = createInsertSchema(expenses).omit({
 });
 export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
-// === PROFIT FIRST ACCOUNTS (Virtual/Real Bank Balances) ===
-export type AccountType = typeof ACCOUNT_TYPES[number];
 
+// === PROFIT FIRST ACCOUNTS (Virtual/Real Bank Balances) ===
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   accountType: text("account_type").notNull(), // Operating, Taxes, Debt, Marketing
@@ -809,9 +811,8 @@ export const insertAccountSchema = createInsertSchema(accounts).omit({
 });
 export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;
-// === INVOICES (Accounts Receivable with Interest Tracking) ===
-export type InvoiceStatus = typeof INVOICE_STATUSES[number];
 
+// === INVOICES (Accounts Receivable with Interest Tracking) ===
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").references(() => leads.id),
@@ -1170,7 +1171,7 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 });
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
-export type EwsScore = typeof EWS_SCORES[number];
+
 export const evidenceVault = pgTable("evidence_vault", {
   id: serial("id").primaryKey(),
   personaCode: text("persona_code"), // "BP1", "BP2", etc.
@@ -1188,10 +1189,6 @@ export const insertEvidenceVaultSchema = createInsertSchema(evidenceVault).omit(
 });
 export type EvidenceVaultEntry = typeof evidenceVault.$inferSelect;
 export type InsertEvidenceVaultEntry = z.infer<typeof insertEvidenceVaultSchema>;
-
-export type MarketingPostStatus = typeof MARKETING_POST_STATUSES[number];
-export type MarketingPostCategory = typeof MARKETING_POST_CATEGORIES[number];
-export type MarketingPlatform = typeof MARKETING_PLATFORMS[number];
 
 export const marketingPosts = pgTable("marketing_posts", {
   id: serial("id").primaryKey(),
@@ -1242,33 +1239,6 @@ export type InsertSiteIntelligence = z.infer<typeof insertSiteIntelligenceSchema
 export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingsSchema>;
 
-// Settings value types
-export interface LeadSourcesConfig {
-  sources: string[];
-}
-
-export interface StalenessConfig {
-  warningDays: number;    // Days before showing "stale" warning
-  criticalDays: number;   // Days before showing "critical" status
-  penaltyPercent: number; // Probability reduction per day after warning
-}
-
-export interface BusinessDefaultsConfig {
-  defaultTravelRate: number;
-  dispatchLocations: string[];
-  defaultBimDeliverable: string;
-  defaultBimVersion: string;
-}
-
-// GCS (Google Cloud Storage) Configuration
-export interface GcsStorageConfig {
-  projectId: string;
-  defaultBucket: string;
-  configured: boolean;
-  defaultStorageMode: "legacy_drive" | "hybrid_gcs" | "gcs_native";
-  lastTestedAt?: string;
-}
-
 export const salesReps = pgTable("sales_reps", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().unique(), // Links to Replit Auth user ID (ownerId in leads)
@@ -1297,12 +1267,6 @@ export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omi
 });
 export type SystemSettings = typeof systemSettings.$inferSelect;
 export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
-export const COMPENSATION_TYPES = {
-  commission: "Sales Commission",
-  referral: "Referral Fee",
-  partner: "Partner Share",
-  bonus: "Performance Bonus",
-} as const;
 
 export const compensationSplits = pgTable("compensation_splits", {
   id: serial("id").primaryKey(),

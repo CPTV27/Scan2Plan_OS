@@ -78,6 +78,7 @@ async function ensureProjectForClosedWonLead(leadId: number): Promise<boolean> {
       leadId: lead.id,
       status: "Scheduling",
       priority: "Medium",
+      progress: 0,
       clientName: lead.clientName,
       clientContact: lead.contactName,
       clientEmail: lead.contactEmail,
@@ -88,14 +89,14 @@ async function ensureProjectForClosedWonLead(leadId: number): Promise<boolean> {
       estimatedSqft: latestQuote?.areas ? 
         (latestQuote.areas as any[])?.reduce((sum: number, area: any) => sum + (area.sqft || 0), 0) : undefined,
       // CPQ inheritance
-      quotedPrice: latestQuote?.clientPrice ? String(latestQuote.clientPrice) : lead.value,
-      quotedMargin: latestQuote?.marginPercent ? String(latestQuote.marginPercent) : undefined,
-      quotedAreas: latestQuote?.areas,
-      quotedRisks: latestQuote?.risks,
-      quotedTravel: latestQuote?.travel,
-      quotedServices: latestQuote?.services,
+      quotedPrice: latestQuote?.totalPrice ? String(latestQuote.totalPrice) : lead.value,
+      quotedMargin: undefined,
+      quotedAreas: latestQuote?.areas as any[] | undefined,
+      quotedRisks: latestQuote?.risks as any,
+      quotedTravel: latestQuote?.travel as any,
+      quotedServices: latestQuote?.services as any,
       siteReadiness: lead.siteReadiness as any,
-      scopeSummary: latestQuote?.generatedScope || undefined,
+      scopeSummary: undefined,
     });
     
     log(`[Project Creation] Created project ID ${project.id} from Closed Won lead ${leadId}`);
@@ -712,7 +713,7 @@ export function registerQuickbooksRoutes(app: Express): void {
             const existingNotes = existingLead.notes || "";
             const syncNote = `\n[QB Invoice #${inv.DocNumber || inv.Id} synced: ${new Date().toISOString().split("T")[0]}]`;
             await storage.updateLead(existingLead.id, {
-              value: String(inv.TotalAmt),
+              value: inv.TotalAmt ? Number(inv.TotalAmt) : 0,
               dealStage: "Closed Won",
               probability: 100,
               qboCustomerId: qboCustomerId,
@@ -779,7 +780,7 @@ export function registerQuickbooksRoutes(app: Express): void {
               const multiMatchNote = eligibleLeads.length > 1 ? ` [Best match of ${eligibleLeads.length} candidates by value/address/recency]` : "";
               
               await storage.updateLead(matchedLead.id, {
-                value: String(inv.TotalAmt),
+                value: inv.TotalAmt ? Number(inv.TotalAmt) : 0,
                 dealStage: "Closed Won",
                 probability: 100,
                 qboInvoiceId: inv.Id,
@@ -795,9 +796,10 @@ export function registerQuickbooksRoutes(app: Express): void {
                 clientName: customerName,
                 projectName: projectName,
                 projectAddress: address,
-                value: String(inv.TotalAmt),
+                value: inv.TotalAmt ? Number(inv.TotalAmt) : 0,
                 dealStage: "Closed Won",
                 probability: 100,
+                leadPriority: 3,
                 source: "quickbooks_sync",
                 qboInvoiceId: inv.Id,
                 qboInvoiceNumber: inv.DocNumber || null,
@@ -932,7 +934,7 @@ export function registerQuickbooksRoutes(app: Express): void {
               const shouldUpdateStage = mappedStageIndex > currentStageIndex;
               
               await storage.updateLead(matchedLead.id, {
-                value: String(est.TotalAmt),
+                value: est.TotalAmt ? Number(est.TotalAmt) : 0,
                 // Update stage if QBO status indicates more advanced stage
                 ...(shouldUpdateStage ? { 
                   dealStage: mappedStage, 
@@ -957,9 +959,10 @@ export function registerQuickbooksRoutes(app: Express): void {
                 clientName: customerName,
                 projectName: projectName,
                 projectAddress: address,
-                value: String(est.TotalAmt),
+                value: est.TotalAmt ? Number(est.TotalAmt) : 0,
                 dealStage: mappedStage,
                 probability: getStageProbability(mappedStage),
+                leadPriority: 3,
                 source: "quickbooks_sync",
                 qboEstimateId: est.Id,
                 qboEstimateNumber: est.DocNumber || null,

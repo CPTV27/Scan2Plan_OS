@@ -344,7 +344,7 @@ export function registerProjectRoutes(app: Express): void {
     }
   }));
 
-  app.post("/api/site-audit/:projectId", isAuthenticated, requireRole(["ceo", "production", "sales"]), asyncHandler(async (req, res) => {
+  app.post("/api/site-audit/:projectId", isAuthenticated, requireRole("ceo", "production", "sales"), asyncHandler(async (req, res) => {
     try {
       const projectId = Number(req.params.projectId);
       const project = await storage.getProject(projectId);
@@ -379,7 +379,7 @@ export function registerProjectRoutes(app: Express): void {
     }
   }));
 
-  app.post("/api/site-audit/lead/:leadId", isAuthenticated, requireRole(["ceo", "production", "sales"]), asyncHandler(async (req, res) => {
+  app.post("/api/site-audit/lead/:leadId", isAuthenticated, requireRole("ceo", "production", "sales"), asyncHandler(async (req, res) => {
     try {
       const leadId = Number(req.params.leadId);
       const lead = await storage.getLead(leadId);
@@ -534,7 +534,7 @@ export function registerProjectRoutes(app: Express): void {
   let cashflowCache: { data: any; timestamp: number } | null = null;
   const CASHFLOW_CACHE_TTL = 5 * 60 * 1000;
   
-  app.get("/api/predictive-cashflow", isAuthenticated, requireRole(["ceo"]), asyncHandler(async (req, res) => {
+  app.get("/api/predictive-cashflow", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     try {
       if (cashflowCache && Date.now() - cashflowCache.timestamp < CASHFLOW_CACHE_TTL) {
         return res.json(cashflowCache.data);

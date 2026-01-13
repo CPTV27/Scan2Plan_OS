@@ -189,7 +189,7 @@ export interface IStorage {
   getLeadDocuments(leadId: number): Promise<LeadDocument[]>;
   getLeadDocument(id: number): Promise<LeadDocument | undefined>;
   createLeadDocument(doc: InsertLeadDocument): Promise<LeadDocument>;
-  updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument>;
+  updateLeadDocument(id: number, updates: Partial<LeadDocument>): Promise<LeadDocument>;
   deleteLeadDocument(id: number): Promise<void>;
   getUnmigratedDocuments(leadId: number): Promise<LeadDocument[]>;
 }
@@ -698,7 +698,7 @@ export class DatabaseStorage implements IStorage {
     return leadDocumentRepo.createLeadDocument(doc);
   }
 
-  async updateLeadDocument(id: number, updates: Partial<InsertLeadDocument>): Promise<LeadDocument> {
+  async updateLeadDocument(id: number, updates: Partial<LeadDocument>): Promise<LeadDocument> {
     return leadDocumentRepo.updateLeadDocument(id, updates);
   }
 

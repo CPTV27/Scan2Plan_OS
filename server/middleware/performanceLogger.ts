@@ -92,15 +92,15 @@ function trackSlowEndpoint(routeKey: string, duration: number): void {
 export function getPerformanceStats(): Record<string, any> {
   const stats: Record<string, any> = {};
   
-  for (const [route, durations] of slowEndpoints.entries()) {
+  for (const [route, durations] of Array.from(slowEndpoints.entries())) {
     if (durations.length === 0) continue;
     
-    const sorted = [...durations].sort((a, b) => a - b);
-    const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+    const sorted = [...durations].sort((a: number, b: number) => a - b);
+    const avg = durations.reduce((a: number, b: number) => a + b, 0) / durations.length;
     const p50 = sorted[Math.floor(sorted.length * 0.5)];
     const p95 = sorted[Math.floor(sorted.length * 0.95)];
     const p99 = sorted[Math.floor(sorted.length * 0.99)];
-    const slowCount = durations.filter(d => d >= SLOW_REQUEST_THRESHOLD_MS).length;
+    const slowCount = durations.filter((d: number) => d >= SLOW_REQUEST_THRESHOLD_MS).length;
     
     stats[route] = {
       count: durations.length,

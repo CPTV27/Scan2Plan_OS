@@ -35,7 +35,7 @@ export function TimeTracker({ projectId, onTimeLogged }: TimeTrackerProps) {
   const [roleType, setRoleType] = useState<RoleType>("tech");
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>(projectId);
 
-  const isAdmin = user?.role === "admin" || user?.role === "ceo";
+  const isAdmin = user?.role === "ceo";
 
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -192,7 +192,7 @@ export function TimeTracker({ projectId, onTimeLogged }: TimeTrackerProps) {
               <SelectContent>
                 {activeProjects.map((project) => (
                   <SelectItem key={project.id} value={project.id.toString()}>
-                    {project.projectName || `Project #${project.id}`}
+                    {project.name || `Project #${project.id}`}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -139,7 +139,7 @@ export async function syncLead(lead: Lead, persona: BuyerPersona): Promise<{ suc
             filterGroups: [{
               filters: [{
                 propertyName: 'email',
-                operator: 'EQ',
+                operator: 'EQ' as any,
                 value: lead.contactEmail
               }]
             }],

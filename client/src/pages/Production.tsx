@@ -808,7 +808,7 @@ function QuotedScopeDetails({ project }: { project: Project }) {
   
   // Use linked lead values as fallback for price/margin
   const quotedPrice = project.quotedPrice || linkedLead?.value?.toString();
-  const quotedMargin = project.quotedMargin || linkedLead?.grossMarginPercent?.toString();
+  const quotedMargin = project.quotedMargin;
   const dispatchLocation = project.dispatchLocation || linkedLead?.dispatchLocation;
   const scopeSummary = project.scopeSummary;
 

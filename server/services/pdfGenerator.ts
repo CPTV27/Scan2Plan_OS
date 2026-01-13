@@ -405,10 +405,12 @@ export async function generateProposalPDF(data: ProposalData): Promise<Buffer> {
   if (quote) {
     addSection("Pricing", 15);
     
-    const scanningTotal = Number(quote.scanningTotal) || 0;
-    const bimTotal = Number(quote.bimTotal) || 0;
-    const travelTotal = Number(quote.travelTotal) || 0;
-    const addOnsTotal = Number(quote.addOnsTotal) || 0;
+    // Extract pricing breakdown from JSONB field
+    const pricingBreakdown = quote.pricingBreakdown as { scanningTotal?: number; bimTotal?: number; travelTotal?: number; addOnsTotal?: number } | null;
+    const scanningTotal = Number(pricingBreakdown?.scanningTotal) || 0;
+    const bimTotal = Number(pricingBreakdown?.bimTotal) || 0;
+    const travelTotal = Number(pricingBreakdown?.travelTotal) || 0;
+    const addOnsTotal = Number(pricingBreakdown?.addOnsTotal) || 0;
     const totalPrice = Number(quote.totalPrice) || (scanningTotal + bimTotal + travelTotal + addOnsTotal);
     
     const pricingItems: [string, string][] = [];

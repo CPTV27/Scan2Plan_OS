@@ -26,6 +26,22 @@ import {
 } from "lucide-react";
 import type { Lead, CpqQuote, CaseStudy } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+
+// Type for the pricing breakdown stored in JSONB
+interface PricingBreakdown {
+  scanningTotal?: number;
+  bimTotal?: number;
+  travelTotal?: number;
+  addOnsTotal?: number;
+  [key: string]: number | undefined;
+}
+
+// Helper to safely extract pricing breakdown from quote
+function getPricingBreakdown(quote: CpqQuote | null): PricingBreakdown {
+  if (!quote) return {};
+  const breakdown = quote.pricingBreakdown as PricingBreakdown | null;
+  return breakdown || {};
+}
 import { MARKETING_COPY, SCOPE_TEMPLATES, PAYMENT_TERMS, getScopeDescription } from "@shared/proposalContent";
 
 const BUILDING_TYPE_TAGS: Record<string, string[]> = {
@@ -280,24 +296,29 @@ export default function ProposalBuilder() {
                 {latestQuote ? (
                   <div className="space-y-4">
                     <h3 className="font-semibold">Pricing Breakdown</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-md bg-muted/50">
-                        <p className="text-sm text-muted-foreground">Scanning</p>
-                        <p className="text-lg font-semibold">{formatCurrency(latestQuote.scanningTotal)}</p>
-                      </div>
-                      <div className="p-3 rounded-md bg-muted/50">
-                        <p className="text-sm text-muted-foreground">BIM Modeling</p>
-                        <p className="text-lg font-semibold">{formatCurrency(latestQuote.bimTotal)}</p>
-                      </div>
-                      <div className="p-3 rounded-md bg-muted/50">
-                        <p className="text-sm text-muted-foreground">Travel</p>
-                        <p className="text-lg font-semibold">{formatCurrency(latestQuote.travelTotal)}</p>
-                      </div>
-                      <div className="p-3 rounded-md bg-muted/50">
-                        <p className="text-sm text-muted-foreground">Add-Ons</p>
-                        <p className="text-lg font-semibold">{formatCurrency(latestQuote.addOnsTotal)}</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const breakdown = getPricingBreakdown(latestQuote);
+                      return (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <p className="text-sm text-muted-foreground">Scanning</p>
+                            <p className="text-lg font-semibold">{formatCurrency(breakdown.scanningTotal)}</p>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <p className="text-sm text-muted-foreground">BIM Modeling</p>
+                            <p className="text-lg font-semibold">{formatCurrency(breakdown.bimTotal)}</p>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <p className="text-sm text-muted-foreground">Travel</p>
+                            <p className="text-lg font-semibold">{formatCurrency(breakdown.travelTotal)}</p>
+                          </div>
+                          <div className="p-3 rounded-md bg-muted/50">
+                            <p className="text-sm text-muted-foreground">Add-Ons</p>
+                            <p className="text-lg font-semibold">{formatCurrency(breakdown.addOnsTotal)}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="p-4 rounded-md bg-primary/10 border border-primary/20">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-lg">Total Quote</p>
@@ -451,52 +472,55 @@ export default function ProposalBuilder() {
                     <div className="space-y-4">
                       <h2 className="text-xl font-semibold">Scope of Work</h2>
                       <div className="text-muted-foreground whitespace-pre-line">
-                        {getScopeDescription(lead.scope || "Full Building", lead.lod || "LOD 300")}
+                        {getScopeDescription(lead.scope || "Full Building", "LOD 300")}
                       </div>
                     </div>
 
-                    {latestQuote && (
-                      <>
-                        <Separator />
-                        <div className="space-y-4">
-                          <h2 className="text-xl font-semibold">Pricing</h2>
-                          <div className="border rounded-md overflow-hidden">
-                            <table className="w-full text-sm">
-                              <thead className="bg-muted">
-                                <tr>
-                                  <th className="text-left p-3">Service</th>
-                                  <th className="text-right p-3">Amount</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-t">
-                                  <td className="p-3">Laser Scanning Services</td>
-                                  <td className="text-right p-3">{formatCurrency(latestQuote.scanningTotal)}</td>
-                                </tr>
-                                <tr className="border-t">
-                                  <td className="p-3">BIM Modeling Services</td>
-                                  <td className="text-right p-3">{formatCurrency(latestQuote.bimTotal)}</td>
-                                </tr>
-                                <tr className="border-t">
-                                  <td className="p-3">Travel & Logistics</td>
-                                  <td className="text-right p-3">{formatCurrency(latestQuote.travelTotal)}</td>
-                                </tr>
-                                {Number(latestQuote.addOnsTotal) > 0 && (
-                                  <tr className="border-t">
-                                    <td className="p-3">Additional Services</td>
-                                    <td className="text-right p-3">{formatCurrency(latestQuote.addOnsTotal)}</td>
+                    {latestQuote && (() => {
+                      const breakdown = getPricingBreakdown(latestQuote);
+                      return (
+                        <>
+                          <Separator />
+                          <div className="space-y-4">
+                            <h2 className="text-xl font-semibold">Pricing</h2>
+                            <div className="border rounded-md overflow-hidden">
+                              <table className="w-full text-sm">
+                                <thead className="bg-muted">
+                                  <tr>
+                                    <th className="text-left p-3">Service</th>
+                                    <th className="text-right p-3">Amount</th>
                                   </tr>
-                                )}
-                                <tr className="border-t bg-primary/10 font-semibold">
-                                  <td className="p-3">Total</td>
-                                  <td className="text-right p-3">{formatCurrency(latestQuote.totalPrice)}</td>
-                                </tr>
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody>
+                                  <tr className="border-t">
+                                    <td className="p-3">Laser Scanning Services</td>
+                                    <td className="text-right p-3">{formatCurrency(breakdown.scanningTotal)}</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="p-3">BIM Modeling Services</td>
+                                    <td className="text-right p-3">{formatCurrency(breakdown.bimTotal)}</td>
+                                  </tr>
+                                  <tr className="border-t">
+                                    <td className="p-3">Travel & Logistics</td>
+                                    <td className="text-right p-3">{formatCurrency(breakdown.travelTotal)}</td>
+                                  </tr>
+                                  {Number(breakdown.addOnsTotal) > 0 && (
+                                    <tr className="border-t">
+                                      <td className="p-3">Additional Services</td>
+                                      <td className="text-right p-3">{formatCurrency(breakdown.addOnsTotal)}</td>
+                                    </tr>
+                                  )}
+                                  <tr className="border-t bg-primary/10 font-semibold">
+                                    <td className="p-3">Total</td>
+                                    <td className="text-right p-3">{formatCurrency(latestQuote.totalPrice)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    )}
+                        </>
+                      );
+                    })()}
 
                     {selectedStudies.length > 0 && (
                       <>

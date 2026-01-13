@@ -105,7 +105,6 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
     const attribution = await storage.createDealAttribution({
       leadId,
       touchpoint,
-      recordedAt: new Date(),
     });
     res.status(201).json(attribution);
   }));
@@ -317,7 +316,7 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             driveFolderStatus,
             driveSubfolders,
             quotedPrice: lead.value?.toString(),
-            quotedMargin: lead.grossMarginPercent?.toString(),
+            quotedMargin: undefined, // Margin calculated from quote data
             quotedAreas: lead.cpqAreas || [],
             quotedRisks: lead.cpqRisks || {},
             quotedTravel: lead.cpqTravel || {},
@@ -347,10 +346,10 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             personaCode: lead.buyerPersona,
             buyingMode: undefined, // Could be stored on lead if tracked
             outcome: 'won',
-            dealValue: lead.value || undefined,
+            dealValue: lead.value ? Number(lead.value) : undefined,
             cycleLengthDays: cycleDays,
             stageAtClose: 'Closed Won',
-            projectType: lead.projectType || undefined,
+            projectType: lead.buildingType || undefined,
             notes: lead.notes || undefined,
           }).catch(err => {
             log(`[Persona Learning] Analysis failed for won lead ${leadId}: ${err.message}`);
@@ -369,10 +368,10 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
           leadId: leadId,
           personaCode: lead.buyerPersona,
           outcome: 'lost',
-          dealValue: lead.value || undefined,
+          dealValue: lead.value ? Number(lead.value) : undefined,
           cycleLengthDays: cycleDays,
           stageAtClose: 'Closed Lost',
-          projectType: lead.projectType || undefined,
+          projectType: lead.buildingType || undefined,
           notes: lead.notes || undefined,
         }).catch(err => {
           log(`[Persona Learning] Analysis failed for lost lead ${leadId}: ${err.message}`);
@@ -567,7 +566,7 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
             driveFolderStatus,
             driveSubfolders,
             quotedPrice: lead.value?.toString(),
-            quotedMargin: lead.grossMarginPercent?.toString(),
+            quotedMargin: undefined, // Margin calculated from quote data
             quotedAreas: lead.cpqAreas || [],
             quotedRisks: lead.cpqRisks || {},
             quotedTravel: lead.cpqTravel || {},
@@ -892,7 +891,7 @@ export async function registerLeadRoutes(app: Express): Promise<void> {
       
       const outstandingBalance = leadInvoices.reduce((sum, inv) => {
         if (inv.status !== "Paid" && inv.status !== "Written Off") {
-          return sum + Number(inv.amount || 0);
+          return sum + Number(inv.totalAmount || 0);
         }
         return sum;
       }, 0);

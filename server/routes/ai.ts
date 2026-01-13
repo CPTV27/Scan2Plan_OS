@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { asyncHandler } from "../middleware/errorHandler";
 import { log } from "../lib/logger";

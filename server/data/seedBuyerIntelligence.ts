@@ -10,6 +10,7 @@ export async function seedBuyerPersonas() {
 
   await db.insert(buyerPersonas).values({
     code: 'BP-A',
+    name: 'The Design Principal',
     roleTitle: 'Design Principal / Senior Architect',
     roleVariants: ['Senior Associate', 'Director of Design', 'Studio Director', 'Historic Preservation Specialist'],
     organizationType: 'Architecture Firm',
@@ -54,6 +55,7 @@ export async function seedBuyerPersonas() {
 
   await db.insert(buyerPersonas).values({
     code: 'BP-B',
+    name: 'The Project Architect',
     roleTitle: 'Project Architect',
     roleVariants: ['Job Captain', 'Technical Lead', 'BIM Manager', 'Project Designer'],
     organizationType: 'Architecture Firm',
@@ -98,6 +100,7 @@ export async function seedBuyerPersonas() {
 
   await db.insert(buyerPersonas).values({
     code: 'BP-C',
+    name: 'The Owner Representative',
     roleTitle: 'Owner Representative',
     roleVariants: ['Development Manager', 'Asset Manager', 'Facilities Director', 'Capital Projects Manager', 'VP of Construction'],
     organizationType: 'Developer / Owner / Institution',
@@ -142,6 +145,7 @@ export async function seedBuyerPersonas() {
 
   await db.insert(buyerPersonas).values({
     code: 'BP-D',
+    name: 'The GC Project Manager',
     roleTitle: 'GC Project Manager',
     roleVariants: ['Construction Manager', 'Project Executive', 'Superintendent', 'VDC Manager', 'Preconstruction Manager'],
     organizationType: 'General Contractor / CM',

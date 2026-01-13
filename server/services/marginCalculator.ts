@@ -103,7 +103,7 @@ export async function calculateProjectMargin(projectId: number): Promise<MarginR
   const disciplineCount = vendorDisciplineKeys.size;
   const weightPerDiscipline = 1 / disciplineCount;
 
-  for (const vendorKey of vendorDisciplineKeys) {
+  for (const vendorKey of Array.from(vendorDisciplineKeys)) {
     const rate = rates.find(r => r.discipline === vendorKey);
     if (rate && rate.ratePerSqft) {
       totalVendorCost += sqft * parseFloat(rate.ratePerSqft) * weightPerDiscipline;
