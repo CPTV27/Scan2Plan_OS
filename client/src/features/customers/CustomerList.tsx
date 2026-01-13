@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-    Loader2, Search, Building2, MapPin, DollarSign, ExternalLink,
+    Loader2, Search, Building2, MapPin, DollarSign, RefreshCw,
     Tag as TagIcon, MoreHorizontal, Filter
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
     Card,
     CardContent,
@@ -35,6 +36,28 @@ import {
 export function CustomerList() {
     const [search, setSearch] = useState("");
     const { toast } = useToast();
+    const queryClient = useQueryClient();
+
+    const syncMutation = useMutation({
+        mutationFn: async () => {
+            const res = await apiRequest("POST", "/api/quickbooks/sync-customers");
+            return res.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["customers"] });
+            toast({
+                title: "Customers synced",
+                description: `Successfully synced ${data.synced} customers from QuickBooks.`,
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Sync failed",
+                description: error.message || "Failed to sync customers from QuickBooks",
+                variant: "destructive",
+            });
+        },
+    });
 
     const { data, isLoading, error } = useQuery({
         queryKey: ["customers", search],
@@ -89,9 +112,17 @@ export function CustomerList() {
                         <Filter className="w-4 h-4 mr-2" />
                         Filter
                     </Button>
-                    <Button>
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Sync from QuickBooks
+                    <Button 
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending}
+                        data-testid="button-sync-customers"
+                    >
+                        {syncMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                        )}
+                        {syncMutation.isPending ? "Syncing..." : "Sync from QuickBooks"}
                     </Button>
                 </div>
             </div>
