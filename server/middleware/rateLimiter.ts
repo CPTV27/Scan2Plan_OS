@@ -65,10 +65,10 @@ export const aiLimiter = createRateLimiter(
   "ai"
 );
 
-// Password limiter (10 per 2 minutes)
+// Password limiter (20 per 1 minute)
 export const passwordLimiter = createRateLimiter(
-  2 * 60 * 1000, // 2 minute window
-  10,
+  1 * 60 * 1000, // 1 minute window
+  20,
   "Too many password attempts, please try again later.",
   "password"
 );
