@@ -498,18 +498,12 @@ export function registerProjectRoutes(app: Express): void {
       ? `https://drive.google.com/drive/folders/${project.driveFolderId}` 
       : undefined;
 
-    const startHour = startDate.getHours();
-    const startMinute = startDate.getMinutes();
-    const endHour = endDate.getHours();
-    const endMinute = endDate.getMinutes();
-
     const result = await createScanCalendarEvent({
       projectId: projectId,
       projectName: project.name,
       projectAddress,
-      scanDate: startDate,
-      startTime: `${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`,
-      endTime: `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`,
+      startDateTime: startDate,
+      endDateTime: endDate,
       universalProjectId: project.universalProjectId || undefined,
       technicianEmail: technician.email || undefined,
       missionBriefUrl,
