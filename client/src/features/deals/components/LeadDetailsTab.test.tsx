@@ -28,41 +28,115 @@ const mockLead: Lead = {
   dealStage: "Leads",
   value: "150000",
   probability: 50,
-  projectType: "Commercial",
+  buildingType: "Commercial",
   contactName: "John Doe",
-  contactTitle: "Facilities Manager",
   contactEmail: "john@acme.com",
   contactPhone: "555-1234",
   notes: "Large commercial project",
-  buyerPersona: "BP-D",
-  estimatedSqft: 50000,
+  buyerPersona: "BP2",
+  sqft: 50000,
   leadScore: 75,
-  upid: "UPID-2024-001",
+  projectCode: "UPID-2024-001",
   createdAt: new Date("2024-01-15"),
   updatedAt: new Date("2024-01-20"),
   lastContactDate: new Date("2024-01-18"),
-  nextFollowUp: new Date("2024-01-25"),
   hubspotId: null,
   billingContactName: "Jane Smith",
   billingContactEmail: "billing@acme.com",
   billingContactPhone: "555-5678",
-  source: "Referral",
-  sourceDetail: "From existing client",
-  dealAttribution: null,
+  source: "referral_client",
   pandaDocId: null,
   projectStatus: null,
-  siteReadinessData: null,
+  siteReadiness: null,
+  retainerPaid: false,
+  retainerAmount: null,
+  retainerPaidDate: null,
+  legalJurisdiction: "Welor County",
+  quoteNumber: null,
+  scope: null,
+  disciplines: null,
+  bimDeliverable: null,
+  bimVersion: null,
+  dispatchLocation: null,
+  distance: null,
+  travelRate: null,
+  timeline: null,
+  paymentTerms: null,
+  quoteUrl: null,
+  quoteVersion: null,
+  cpqAreas: null,
+  cpqRisks: null,
+  cpqTravel: null,
+  cpqServices: null,
+  cpqScopingData: null,
+  leadSource: null,
+  referrerCompanyName: null,
+  referrerContactName: null,
+  leadPriority: 3,
+  complexityScore: null,
+  clientTier: null,
+  regulatoryRisks: null,
+  aiInsightsUpdatedAt: null,
+  googleIntel: null,
+  integrityStatus: null,
+  integrityFlags: null,
+  requiresOverride: false,
+  overrideApproved: false,
+  overrideApprovedBy: null,
+  overrideApprovedAt: null,
+  driveFolderId: null,
+  driveFolderUrl: null,
+  storageMode: "legacy_drive",
+  gcsBucket: null,
+  gcsPath: null,
+  qboEstimateId: null,
+  qboEstimateNumber: null,
+  qboEstimateStatus: null,
+  qboInvoiceId: null,
+  qboInvoiceNumber: null,
+  qboCustomerId: null,
+  qboSyncedAt: null,
+  qboHasLinkedInvoice: false,
+  importSource: null,
+  pandaDocStatus: null,
+  pandaDocSentAt: null,
+  ghlContactId: null,
+  ghlOpportunityId: null,
+  ownerId: null,
+  abmTier: "None",
+  firmSize: null,
+  discipline: null,
+  focusSector: null,
+  estimatorCardId: null,
+  estimatorCardUrl: null,
+  proofLinks: null,
+  siteReadinessQuestionsSent: null,
+  siteReadinessStatus: "pending",
+  siteReadinessSentAt: null,
+  siteReadinessCompletedAt: null,
+  clientToken: null,
+  clientTokenExpiresAt: null,
+  fieldAffirmations: null,
+  deletedAt: null,
+  deletedBy: null,
+  projectZipCode: null,
+  missingInfo: null
 };
 
 const mockDocuments: LeadDocument[] = [
   {
     id: 1,
     leadId: 1,
-    fileName: "site_photos.pdf",
-    fileUrl: "/documents/1",
-    fileType: "application/pdf",
-    fileSize: 1024000,
+    filename: "site_photos.pdf",
+    driveFileUrl: "/documents/1",
+    mimeType: "application/pdf",
+    size: 1024000,
     uploadedAt: new Date("2024-01-16"),
+    originalName: "site_photos.pdf",
+    storageKey: "/leads/1/site_photos.pdf",
+    uploadedBy: null,
+    movedToDriveAt: null,
+    driveFileId: null,
   },
 ];
 
@@ -144,7 +218,7 @@ describe("LeadDetailsTab", () => {
 
   it("should render project information section with client name input", () => {
     render(<TestWrapper />);
-    
+
     expect(screen.getByText("Project Information")).toBeInTheDocument();
     const clientNameInput = screen.getByTestId("input-client-name");
     expect(clientNameInput).toBeInTheDocument();
@@ -153,7 +227,7 @@ describe("LeadDetailsTab", () => {
 
   it("should render project address input with correct value", () => {
     render(<TestWrapper />);
-    
+
     const addressInput = screen.getByTestId("input-project-address");
     expect(addressInput).toBeInTheDocument();
     expect(addressInput).toHaveValue("123 Main Street, New York, NY");
@@ -161,7 +235,7 @@ describe("LeadDetailsTab", () => {
 
   it("should show billing contact section with required fields", () => {
     render(<TestWrapper />);
-    
+
     expect(screen.getByText("Billing Contact")).toBeInTheDocument();
     expect(screen.getByTestId("input-billing-contact-name")).toBeInTheDocument();
     expect(screen.getByTestId("input-billing-contact-email")).toBeInTheDocument();
@@ -170,27 +244,27 @@ describe("LeadDetailsTab", () => {
 
   it("should render documents section header", () => {
     render(<TestWrapper />);
-    
+
     expect(screen.getByText("Notes & Documents")).toBeInTheDocument();
   });
 
   it("should render deal stage selector with options", () => {
     render(<TestWrapper />);
-    
+
     const dealStageSelect = screen.getByTestId("select-deal-stage");
     expect(dealStageSelect).toBeInTheDocument();
   });
 
   it("should render deal value input with data-testid", () => {
     render(<TestWrapper />);
-    
+
     const valueInput = screen.getByTestId("input-value");
     expect(valueInput).toBeInTheDocument();
   });
 
   it("should display probability slider with data-testid", () => {
     render(<TestWrapper />);
-    
+
     const probabilitySlider = screen.getByTestId("slider-probability");
     expect(probabilitySlider).toBeInTheDocument();
     expect(screen.getByTestId("text-probability-value")).toBeInTheDocument();
@@ -198,7 +272,7 @@ describe("LeadDetailsTab", () => {
 
   it("should render contact information inputs", () => {
     render(<TestWrapper />);
-    
+
     expect(screen.getByTestId("input-contact-name")).toBeInTheDocument();
     expect(screen.getByTestId("input-contact-email")).toBeInTheDocument();
     expect(screen.getByTestId("input-contact-phone")).toBeInTheDocument();
@@ -206,14 +280,14 @@ describe("LeadDetailsTab", () => {
 
   it("should have notes textarea for project context", () => {
     render(<TestWrapper />);
-    
+
     expect(screen.getByText("Notes & Documents")).toBeInTheDocument();
     expect(screen.getByTestId("input-notes")).toBeInTheDocument();
   });
 
   it("should render submit button for saving lead details", () => {
     render(<TestWrapper />);
-    
+
     const submitButton = screen.getByTestId("button-submit-lead");
     expect(submitButton).toBeInTheDocument();
     expect(submitButton).toHaveTextContent(/save/i);
