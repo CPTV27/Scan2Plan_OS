@@ -4,26 +4,22 @@
 
 import { google } from 'googleapis';
 import { log } from "./lib/logger";
+import { createReplitConnectorHeaders } from "./lib/replitConnector";
 
 let connectionSettings: any;
 
 async function getAccessToken(): Promise<string> {
   // Always refresh if token is expired or about to expire (5 minute buffer)
   const bufferMs = 5 * 60 * 1000;
-  const isExpired = !connectionSettings || 
+  const isExpired = !connectionSettings ||
     !connectionSettings.settings?.expires_at ||
     new Date(connectionSettings.settings.expires_at).getTime() < (Date.now() + bufferMs);
-    
+
   if (!isExpired && connectionSettings.settings.access_token) {
     return connectionSettings.settings.access_token;
   }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+
+  const { hostname, xReplitToken } = createReplitConnectorHeaders();
 
   if (!xReplitToken) {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
@@ -75,12 +71,12 @@ async function getOrCreateParentFolder(drive: any): Promise<string | null> {
       fields: 'files(id, name)',
       spaces: 'drive',
     });
-    
+
     if (response.data.files && response.data.files.length > 0) {
       log(`Found existing parent folder: ${SCAN2PLAN_PARENT_FOLDER_NAME}`);
       return response.data.files[0].id;
     }
-    
+
     const createResponse = await drive.files.create({
       requestBody: {
         name: SCAN2PLAN_PARENT_FOLDER_NAME,
@@ -88,7 +84,7 @@ async function getOrCreateParentFolder(drive: any): Promise<string | null> {
       },
       fields: 'id',
     });
-    
+
     log(`Created parent folder: ${SCAN2PLAN_PARENT_FOLDER_NAME}`);
     return createResponse.data.id;
   } catch (error) {
@@ -99,9 +95,9 @@ async function getOrCreateParentFolder(drive: any): Promise<string | null> {
 
 export async function createProjectFolder(universalProjectId: string): Promise<ProjectFolderResult> {
   const drive = await getGoogleDriveClient();
-  
+
   const parentFolderId = await getOrCreateParentFolder(drive);
-  
+
   const mainFolderResponse = await drive.files.create({
     requestBody: {
       name: universalProjectId,
@@ -138,7 +134,7 @@ export async function createProjectFolder(universalProjectId: string): Promise<P
 
   // Share folder with accounting and production teams
   const shareEmails = ['accounting@scan2plan.dev', 'production@scan2plan.dev'];
-  
+
   for (const email of shareEmails) {
     try {
       await drive.permissions.create({
@@ -194,7 +190,7 @@ export async function uploadFileToDrive(
 ): Promise<UploadFileResult> {
   const drive = await getGoogleDriveClient();
   const { Readable } = await import('stream');
-  
+
   const fileMetadata = {
     name: fileName,
     parents: [folderId],

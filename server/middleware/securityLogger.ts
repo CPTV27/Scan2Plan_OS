@@ -1,7 +1,7 @@
 import { log } from "../lib/logger";
 
 export interface SecurityEvent {
-  type: "rate_limit_exceeded" | "auth_failure" | "csrf_failure" | "role_violation" | "suspicious_activity";
+  type: "rate_limit_exceeded" | "auth_failure" | "csrf_failure" | "role_violation" | "suspicious_activity" | "webhook_verification_failed";
   subtype?: string;
   ip?: string;
   path?: string;

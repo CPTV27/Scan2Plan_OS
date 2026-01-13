@@ -287,10 +287,10 @@ export const insertLeadDocumentSchema = createInsertSchema(leadDocuments).omit({
 export type InsertLeadDocument = z.infer<typeof insertLeadDocumentSchema>;
 export type LeadDocument = typeof leadDocuments.$inferSelect;
 
-export const insertLeadSchema = createInsertSchema(leads).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true 
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 }).extend({
   value: z.coerce.number(), // Handle decimal input
   probability: z.coerce.number().min(0).max(100),
@@ -442,7 +442,7 @@ export const projects = pgTable("projects", {
   potreePath: text("potree_path"), // Internal GCS path to converted point cloud
   viewerUrl: text("viewer_url"), // Public/Signed URL for Potree viewer
   deliveryStatus: text("delivery_status").default("pending"), // pending | processing | ready | failed
-  
+
   // === CPQ Inheritance (from lead at time of Closed Won) ===
   quotedPrice: decimal("quoted_price", { precision: 12, scale: 2 }),
   quotedMargin: decimal("quoted_margin", { precision: 5, scale: 2 }),
@@ -450,33 +450,33 @@ export const projects = pgTable("projects", {
   quotedRisks: jsonb("quoted_risks").$type<any>(), // Snapshot of cpqRisks
   quotedTravel: jsonb("quoted_travel").$type<any>(), // Snapshot of cpqTravel
   quotedServices: jsonb("quoted_services").$type<any>(), // Snapshot of cpqServices
-  
+
   // === Site Readiness Inheritance ===
   siteReadiness: jsonb("site_readiness").$type<Record<string, any>>(),
-  
+
   // === Client Contact (snapshot at close) ===
   clientName: text("client_name"),
   clientContact: text("client_contact"),
   clientEmail: text("client_email"),
   clientPhone: text("client_phone"),
   projectAddress: text("project_address"),
-  
+
   // === Dispatch & Travel ===
   dispatchLocation: text("dispatch_location"),
   distance: integer("distance"),
-  
+
   // === Scope Summary (auto-generated plain English) ===
   scopeSummary: text("scope_summary"),
-  
+
   // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
   fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
-  
+
   // === Field Equipment Configuration ===
   scannerType: text("scanner_type").default("trimble_x7"), // trimble_x7 | navvis_slam
   matterportRequired: boolean("matterport_required").default(false),
   droneRequired: boolean("drone_required").default(false),
   extensionTripodNeeded: boolean("extension_tripod_needed").default(false),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -507,8 +507,8 @@ export const bomItemSchema = z.object({
 
 export type BomItem = z.infer<typeof bomItemSchema>;
 
-export const insertProjectSchema = createInsertSchema(projects).omit({ 
-  id: true, 
+export const insertProjectSchema = createInsertSchema(projects).omit({
+  id: true,
   createdAt: true,
   universalProjectId: true, // Auto-generated on backend
 }).partial().extend({
@@ -560,6 +560,9 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   matterportRequired: z.boolean().optional(),
   droneRequired: z.boolean().optional(),
   extensionTripodNeeded: z.boolean().optional(),
+  // Google Chat
+  chatSpaceId: text("chat_space_id"),
+  chatSpaceUrl: text("chat_space_url"),
 });
 
 // === FIELD NOTES (AI Technical Translation) ===
@@ -573,8 +576,8 @@ export const fieldNotes = pgTable("field_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertFieldNoteSchema = createInsertSchema(fieldNotes).omit({ 
-  id: true, 
+export const insertFieldNoteSchema = createInsertSchema(fieldNotes).omit({
+  id: true,
   createdAt: true,
   processedScope: true,
   status: true
@@ -609,27 +612,27 @@ export const missionLogs = pgTable("mission_logs", {
   projectId: integer("project_id").references(() => projects.id).notNull(),
   techId: text("tech_id").notNull(),
   missionDate: timestamp("mission_date").defaultNow(),
-  
+
   // Four-point timestamps
   startTravelTime: timestamp("start_travel_time"), // Departure from home/office
   arriveSiteTime: timestamp("arrive_site_time"),   // Arrival at project location
   leaveSiteTime: timestamp("leave_site_time"),     // Completion of scan/walkthrough
   arriveHomeTime: timestamp("arrive_home_time"),   // Arrival back at home/office
-  
+
   // Manual override flags (true if manually entered vs auto-tapped)
   startTravelManual: boolean("start_travel_manual").default(false),
   arriveSiteManual: boolean("arrive_site_manual").default(false),
   leaveSiteManual: boolean("leave_site_manual").default(false),
   arriveHomeManual: boolean("arrive_home_manual").default(false),
-  
+
   // Calculated durations (in minutes)
   travelDurationMinutes: integer("travel_duration_minutes"),
   scanningDurationMinutes: integer("scanning_duration_minutes"),
-  
+
   // Status
   status: text("status").default("in_progress"), // in_progress, completed, invoiced
   notes: text("notes"),
-  
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -969,7 +972,7 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   id: serial("id").primaryKey(),
   leadId: integer("lead_id").references(() => leads.id),
   quoteNumber: text("quote_number").notNull(),
-  
+
   clientName: text("client_name"),
   projectName: text("project_name").notNull(),
   projectAddress: text("project_address").notNull(),
@@ -978,56 +981,56 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   hasBasement: boolean("has_basement").default(false),
   hasAttic: boolean("has_attic").default(false),
   notes: text("notes"),
-  
+
   scopingMode: boolean("scoping_mode").default(false).notNull(),
   areas: jsonb("areas").notNull(),
   risks: jsonb("risks").default('[]').notNull(),
-  
+
   dispatchLocation: text("dispatch_location").notNull(),
   distance: integer("distance"),
   customTravelCost: decimal("custom_travel_cost", { precision: 12, scale: 2 }),
-  
+
   services: jsonb("services").default('{}').notNull(),
   scopingData: jsonb("scoping_data"),
-  
+
   totalPrice: decimal("total_price", { precision: 12, scale: 2 }),
   pricingBreakdown: jsonb("pricing_breakdown"),
-  
+
   parentQuoteId: integer("parent_quote_id"),
   versionNumber: integer("version_number").default(1).notNull(),
   versionName: text("version_name"),
   isLatest: boolean("is_latest").default(true).notNull(),
-  
+
   // Additional fields for unified deal workspace
   travel: jsonb("travel"),
   paymentTerms: text("payment_terms").default("standard"),
-  
+
   // RFI fields that can be marked as "ask_client"
   siteStatus: text("site_status"),
   mepScope: text("mep_scope"),
   actScanning: text("act_scanning"),
   scanningOnly: text("scanning_only"),
   actScanningNotes: text("act_scanning_notes"),
-  
+
   // Client Input Portal (Magic Link)
   clientToken: text("client_token"),
   clientTokenExpiresAt: timestamp("client_token_expires_at"),
   clientStatus: text("client_status").default("pending"),
-  
+
   // External CPQ Integration
   externalCpqId: text("external_cpq_id"),
   externalCpqUrl: text("external_cpq_url"),
-  
+
   // PandaDoc Integration
   pandadocDocumentId: text("pandadoc_document_id"),
   pandadocStatus: text("pandadoc_status"),
   pandadocSentAt: timestamp("pandadoc_sent_at"),
   pandadocCompletedAt: timestamp("pandadoc_completed_at"),
   pandadocSignedBy: text("pandadoc_signed_by"),
-  
+
   // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
   fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
-  
+
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1386,24 +1389,24 @@ export const pandaDocDocuments = pgTable("pandadoc_documents", {
   pandaDocCreatedAt: timestamp("pandadoc_created_at"),
   pandaDocUpdatedAt: timestamp("pandadoc_updated_at"),
   pandaDocPdfUrl: text("pandadoc_pdf_url"),
-  
+
   importStatus: text("import_status").default("pending").notNull(),
   extractedData: jsonb("extracted_data"),
   extractionConfidence: decimal("extraction_confidence", { precision: 5, scale: 2 }),
   extractionErrors: jsonb("extraction_errors"),
-  
+
   reviewedBy: text("reviewed_by"),
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
-  
+
   cpqQuoteId: integer("cpq_quote_id").references(() => cpqQuotes.id),
   leadId: integer("lead_id").references(() => leads.id),
-  
+
   rawPandaDocData: jsonb("raw_pandadoc_data"),
   pricingTableData: jsonb("pricing_table_data"),
   recipientsData: jsonb("recipients_data"),
   variablesData: jsonb("variables_data"),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1522,26 +1525,26 @@ export const buyerPersonas = pgTable("buyer_personas", {
   code: text("code").notNull().unique(), // BP1, BP2, BP3, etc.
   name: text("name").notNull(), // "The Architect", "The GC"
   icon: text("icon"), // lucide icon name
-  
+
   // Identity
   roleTitle: text("role_title").notNull(),
   roleVariants: jsonb("role_variants").$type<string[]>(),
   organizationType: text("organization_type"),
   description: text("description"),
-  
+
   // Cognitive Blueprint
   coreValues: jsonb("core_values").$type<string[]>(),
   primaryPain: text("primary_pain").notNull(),
   secondaryPain: text("secondary_pain"),
   hiddenFear: text("hidden_fear"),
   purchaseTriggers: jsonb("purchase_triggers").$type<string[]>(),
-  
+
   // Sales Strategy
   valueDriver: text("value_driver").notNull(),
   valueHook: text("value_hook"), // "Design with confidence..."
   exactLanguage: jsonb("exact_language").$type<string[]>(), // phrases TO use
   avoidWords: jsonb("avoid_words").$type<string[]>(), // phrases to NEVER use
-  
+
   // Decision Making
   decisionCriteria: jsonb("decision_criteria").$type<string[]>(),
   dealbreakers: jsonb("dealbreakers").$type<string[]>(),
@@ -1553,36 +1556,36 @@ export const buyerPersonas = pgTable("buyer_personas", {
     needsApprovalFrom: string[];
     influencedBy: string[];
   }>(),
-  
+
   // Communication
   tonePreference: text("tone_preference").notNull(),
   communicationStyle: text("communication_style"),
   attentionSpan: text("attention_span"),
   technicalTriggers: jsonb("technical_triggers").$type<string[]>(),
   emotionalTriggers: jsonb("emotional_triggers").$type<string[]>(),
-  
+
   // Risk Profile
   vetoPower: boolean("veto_power").default(false),
   defaultRiskLevel: text("default_risk_level").default("medium"), // low, medium, high
   disqualifiers: jsonb("disqualifiers").$type<string[]>(),
-  
+
   // Buying Mode Overrides (Firefighter/Optimizer/Innovator strategies)
   buyingModeStrategies: jsonb("buying_mode_strategies").$type<{
     firefighter?: string;
     optimizer?: string;
     innovator?: string;
   }>(),
-  
+
   // Asset Mapping
   requiredAssets: jsonb("required_assets").$type<string[]>(), // ["precision_validation_report", "technical_appendix"]
   proposalSections: jsonb("proposal_sections").$type<string[]>(), // PandaDoc section IDs to auto-include
-  
+
   // AI Learning Metrics
   winRate: decimal("win_rate", { precision: 5, scale: 2 }),
   avgDealSize: decimal("avg_deal_size", { precision: 12, scale: 2 }),
   avgSalesCycleDays: integer("avg_sales_cycle_days"),
   totalDeals: integer("total_deals").default(0),
-  
+
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1600,18 +1603,18 @@ export const personaInsights = pgTable("persona_insights", {
   id: serial("id").primaryKey(),
   personaId: integer("persona_id").references(() => buyerPersonas.id),
   leadId: integer("lead_id").references(() => leads.id),
-  
+
   // What was used
   buyingModeUsed: text("buying_mode_used"), // firefighter, optimizer, innovator
   strategyNotes: text("strategy_notes"),
   assetsDelivered: jsonb("assets_delivered").$type<string[]>(),
-  
+
   // Outcome
   outcome: text("outcome").notNull(), // won, lost, stalled
   dealValue: decimal("deal_value", { precision: 12, scale: 2 }),
   cycleLengthDays: integer("cycle_length_days"),
   lossReason: text("loss_reason"),
-  
+
   // AI-generated learnings
   aiAnalysis: text("ai_analysis"),
   suggestedRefinements: jsonb("suggested_refinements").$type<{
@@ -1621,7 +1624,7 @@ export const personaInsights = pgTable("persona_insights", {
     buyingModeStrategy?: string;
     otherNotes?: string;
   }>(),
-  
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

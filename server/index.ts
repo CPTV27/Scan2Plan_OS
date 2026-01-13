@@ -14,6 +14,15 @@ import { pool } from "./db";
 import { log } from "./lib/logger";
 import { applyStalenessPenalties } from "./staleness";
 import { performanceLoggerMiddleware } from "./middleware/performanceLogger";
+import { getEnv } from "./config/env";
+
+// Validate environment configuration on startup
+try {
+  getEnv();
+} catch (error) {
+  console.error("Failed to start server: Invalid environment configuration");
+  process.exit(1);
+}
 
 export { log };
 
@@ -54,31 +63,6 @@ app.use("/api/ai/", aiLimiter);
 app.use("/api/brand-generator/", aiLimiter);
 app.use("/api/auth/verify-password", passwordLimiter);
 app.use("/api/auth/set-password", passwordLimiter);
-
-app.get("/api/health", async (_req: Request, res: Response) => {
-  if (isShuttingDown) {
-    return res.status(503).json({
-      status: "shutting_down",
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  try {
-    await pool.query("SELECT 1");
-    res.json({
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      database: "connected",
-    });
-  } catch (error: any) {
-    res.status(503).json({
-      status: "unhealthy",
-      timestamp: new Date().toISOString(),
-      error: error.message,
-    });
-  }
-});
 
 
 app.use((req, res, next) => {
@@ -163,10 +147,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       log(`[Staleness] Daily check failed: ${error.message}`);
     }
   };
-  
+
   // Run immediately on startup
   runDailyStaleness();
-  
+
   // Then run every 24 hours (86400000 ms)
   setInterval(runDailyStaleness, 24 * 60 * 60 * 1000);
 

@@ -22,7 +22,7 @@ const getOidcConfig = memoize(
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week max age
   const idleTimeout = 30 * 60 * 1000; // 30 minutes idle timeout
-  
+
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -30,17 +30,17 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
-  
+
   // Detect production environment - check multiple indicators
   const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
   const isProduction = process.env.NODE_ENV === 'production';
   const hasReplitAppDomain = (process.env.REPLIT_DOMAINS || '').includes('.replit.app');
-  
+
   // Use secure cookies in any production-like environment
   const useSecureCookies = isDeployment || isProduction || hasReplitAppDomain;
-  
+
   log(`Session config: isDeployment=${isDeployment}, isProduction=${isProduction}, hasReplitAppDomain=${hasReplitAppDomain}, useSecureCookies=${useSecureCookies}`);
-  
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -158,7 +158,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Test-only authentication bypass (only in development/test environment)
-  if (process.env.NODE_ENV !== 'production' || process.env.PLAYWRIGHT_TEST === 'true') {
+  if (process.env.NODE_ENV !== 'production' && process.env.PLAYWRIGHT_TEST === 'true') {
     app.post("/api/test-login", async (req, res) => {
       const testUser = {
         claims: {
@@ -209,12 +209,12 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     log("DEBUG: [Auth Debug] req.isAuthenticated() returned false");
     return res.status(401).json({ message: "Unauthorized" });
   }
-  
+
   if (!user) {
     log("DEBUG: [Auth Debug] No user object on request");
     return res.status(401).json({ message: "Unauthorized" });
   }
-  
+
   if (!user.expires_at) {
     log(`DEBUG: [Auth Debug] User exists but no expires_at. User keys: ${Object.keys(user).join(", ")}`);
     return res.status(401).json({ message: "Unauthorized" });
@@ -224,7 +224,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const userEmail = user.claims?.email;
   if (!isEmailDomainAllowed(userEmail)) {
     log(`SECURITY: Access denied for non-allowed email domain: ${userEmail}`);
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: "Access denied. This application is restricted to @scan2plan.io email addresses only.",
       code: "DOMAIN_NOT_ALLOWED"
     });
@@ -234,11 +234,11 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Skip this check for password-related endpoints
   const passwordEndpoints = ['/api/auth/session-status', '/api/auth/password-status', '/api/auth/set-password', '/api/auth/verify-password'];
   const isPasswordEndpoint = passwordEndpoints.some(ep => req.path === ep);
-  
+
   if (!isPasswordEndpoint) {
     const session = req.session as any;
     if (!session?.passwordVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: "Password verification required",
         code: "PASSWORD_NOT_VERIFIED"
       });
@@ -274,7 +274,7 @@ import type { UserRole } from "@shared/models/auth";
 export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
   return async (req, res, next) => {
     const sessionUser = req.user as any;
-    
+
     if (!sessionUser?.claims?.sub) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -282,14 +282,14 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
     try {
       // Fetch user from database to get their role
       const dbUser = await authStorage.getUser(sessionUser.claims.sub);
-      
+
       if (!dbUser) {
         return res.status(401).json({ message: "User not found" });
       }
 
       // Check if user's role is in the allowed roles
       if (!allowedRoles.includes(dbUser.role as UserRole)) {
-        return res.status(403).json({ 
+        return res.status(403).json({
           message: "Access denied. Insufficient permissions.",
           requiredRoles: allowedRoles,
           userRole: dbUser.role
