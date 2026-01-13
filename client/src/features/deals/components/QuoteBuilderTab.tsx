@@ -240,6 +240,10 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   }, [lead, sourceQuote]);
 
   useEffect(() => {
+    let distanceApplied = false;
+    let dispatchApplied = false;
+    
+    // First priority: existing quotes
     if (existingQuotes && existingQuotes.length > 0 && !sourceQuote) {
       const latestQuote = existingQuotes.find(q => q.isLatest) || existingQuotes[0];
       if (latestQuote?.travel) {
@@ -248,17 +252,41 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
           : latestQuote.travel;
         if (travelData.dispatchLocation) {
           setDispatchLocation(travelData.dispatchLocation.toLowerCase());
+          dispatchApplied = true;
         }
         const distValue = travelData.distance ?? travelData.miles;
         if (distValue !== undefined && distValue !== null) {
           const numericDist = typeof distValue === 'string' ? Number(distValue) : distValue;
-          if (!isNaN(numericDist)) {
+          if (!isNaN(numericDist) && numericDist > 0) {
             setDistance(numericDist.toString());
+            distanceApplied = true;
           }
         }
       }
     }
-  }, [existingQuotes, sourceQuote]);
+    
+    // Second priority: lead's googleIntel travel data (auto-calculated from address)
+    // Only use if existing quote didn't provide valid data
+    if (lead && !sourceQuote) {
+      const googleIntel = (lead as any).googleIntel;
+      const travelInsights = googleIntel?.travelInsights;
+      
+      if (!distanceApplied && travelInsights?.available && travelInsights?.distanceMiles !== undefined) {
+        const distMiles = travelInsights.distanceMiles;
+        if (typeof distMiles === 'number' && !isNaN(distMiles) && distMiles > 0) {
+          setDistance(Math.round(distMiles).toString());
+        }
+      }
+      
+      // Also sync dispatch location from lead if not already set
+      if (!dispatchApplied) {
+        const leadDispatch = (lead as any).dispatchLocation;
+        if (leadDispatch) {
+          setDispatchLocation(leadDispatch.toLowerCase());
+        }
+      }
+    }
+  }, [existingQuotes, sourceQuote, lead]);
 
   const addArea = () => {
     const newId = (areas.length + 1).toString();
