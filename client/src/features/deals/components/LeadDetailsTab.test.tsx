@@ -137,6 +137,7 @@ const mockDocuments: LeadDocument[] = [
     uploadedBy: null,
     movedToDriveAt: null,
     driveFileId: null,
+    metadata: null,
   },
 ];
 

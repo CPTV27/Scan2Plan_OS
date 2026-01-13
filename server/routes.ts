@@ -32,6 +32,7 @@ import { registerStorageRoutes } from "./routes/storage";
 import { registerDeliveryRoutes } from "./routes/delivery";
 import { registerFieldOpsRoutes } from "./routes/fieldOps";
 import { registerGHLRoutes } from "./routes/ghl";
+import { registerHealthRoutes } from "./routes/health";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -64,7 +65,7 @@ export async function registerRoutes(
 
   app.use('/api', (req, res, next) => {
     const routePath = req.path;
-    
+
     const isPublicPath = publicPaths.some(({ path, type }) => {
       if (type === 'exact') {
         return routePath === path;
@@ -74,18 +75,21 @@ export async function registerRoutes(
       }
       return false;
     });
-    
+
     const matchesPublicPattern = publicPatterns.some(pattern => pattern.test(routePath));
-    
+
     if (isPublicPath || matchesPublicPattern) {
       return next();
     }
-    
+
     isAuthenticated(req, res, next);
   });
 
   registerChatRoutes(app);
   registerImageRoutes(app);
+
+  // Health checks (no auth required)
+  registerHealthRoutes(app);
 
   registerUserRoutes(app);
   await registerLeadRoutes(app);
@@ -117,14 +121,14 @@ export async function registerRoutes(
     try {
       const projectId = Number(req.params.projectId);
       const project = await storage.getProject(projectId);
-      
+
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
       const items = req.body.items || [];
       const allComplete = items.length > 0 && items.every((item: any) => item.completed);
-      
+
       await storage.updateProject(projectId, {
         status: allComplete ? "Complete" : project.status,
       } as any);

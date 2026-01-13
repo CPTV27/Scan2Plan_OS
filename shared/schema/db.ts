@@ -561,9 +561,6 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   matterportRequired: z.boolean().optional(),
   droneRequired: z.boolean().optional(),
   extensionTripodNeeded: z.boolean().optional(),
-  // Google Chat
-  chatSpaceId: text("chat_space_id"),
-  chatSpaceUrl: text("chat_space_url"),
 });
 
 // === FIELD NOTES (AI Technical Translation) ===
