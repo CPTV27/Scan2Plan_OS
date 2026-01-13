@@ -158,3 +158,25 @@ export async function generatePotreeViewerUrl(
 export function getPublicGcsUrl(bucketName: string, path: string): string {
   return `https://storage.googleapis.com/${bucketName}/${path}`;
 }
+
+export async function streamGcsFile(
+  filePath: string,
+  bucketName?: string
+): Promise<NodeJS.ReadableStream | null> {
+  try {
+    const bucket = await getBucket(bucketName);
+    if (!bucket) return null;
+
+    const file = bucket.file(filePath);
+    const [exists] = await file.exists();
+    if (!exists) {
+      log(`File not found for streaming: ${filePath}`);
+      return null;
+    }
+
+    return file.createReadStream();
+  } catch (error) {
+    log(`ERROR: Failed to stream GCS file - ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}

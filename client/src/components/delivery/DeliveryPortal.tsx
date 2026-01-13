@@ -147,8 +147,11 @@ export function DeliveryPortal({ projectId, universalProjectId }: DeliveryPortal
         <TabsContent value="3d-model">
           <Card>
             <CardContent className="p-0 overflow-hidden rounded-lg">
-              {deliveryData?.viewerUrl ? (
-                <PotreeViewer cloudUrl={deliveryData.viewerUrl} height="500px" />
+              {deliveryData?.potreePath ? (
+                <PotreeViewer 
+                  cloudUrl={`/api/delivery/potree/proxy/${projectId}/metadata.json`} 
+                  height="500px" 
+                />
               ) : (
                 <div className="flex flex-col items-center justify-center h-[400px] bg-muted/30">
                   <Box className="h-12 w-12 text-muted-foreground/50 mb-4" />

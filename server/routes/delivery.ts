@@ -126,4 +126,49 @@ export function registerDeliveryRoutes(app: Express) {
     log(`Updated delivery status for project ${projectId}: ${status}`);
     res.json({ success: true, status });
   }));
+
+  app.get("/api/delivery/potree/proxy/:projectId/*", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: "Invalid project ID" });
+    }
+
+    const project = await storage.getProject(projectId);
+    if (!project || !project.potreePath) {
+      return res.status(404).json({ error: "Potree data not configured for this project" });
+    }
+
+    const filePath = req.params[0];
+    if (!filePath) {
+      return res.status(400).json({ error: "File path required" });
+    }
+
+    const gcsPath = `${project.potreePath}/${filePath}`;
+
+    try {
+      const { streamGcsFile } = await import("../lib/gcs.js");
+      const stream = await streamGcsFile(gcsPath);
+      
+      if (!stream) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      const ext = filePath.split('.').pop()?.toLowerCase();
+      const contentTypes: Record<string, string> = {
+        'json': 'application/json',
+        'bin': 'application/octet-stream',
+        'las': 'application/octet-stream',
+        'laz': 'application/octet-stream',
+      };
+      res.setHeader('Content-Type', contentTypes[ext || ''] || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      
+      stream.pipe(res);
+    } catch (err) {
+      log(`ERROR: Potree proxy stream error - ${err instanceof Error ? err.message : String(err)}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to stream file" });
+      }
+    }
+  }));
 }
