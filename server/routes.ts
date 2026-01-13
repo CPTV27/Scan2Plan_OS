@@ -41,7 +41,6 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
-  app.use(customersRouter);
 
   const publicPaths: Array<{ path: string; type: 'exact' | 'prefix' | 'pattern' }> = [
     { path: '/login', type: 'exact' },
@@ -118,6 +117,7 @@ export async function registerRoutes(
   registerDeliveryRoutes(app);
   registerFieldOpsRoutes(app);
   registerGHLRoutes(app);
+  app.use(customersRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
