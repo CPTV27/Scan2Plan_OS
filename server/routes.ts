@@ -33,6 +33,7 @@ import { registerDeliveryRoutes } from "./routes/delivery";
 import { registerFieldOpsRoutes } from "./routes/fieldOps";
 import { registerGHLRoutes } from "./routes/ghl";
 import { registerHealthRoutes } from "./routes/health";
+import { customersRouter } from "./routes/customers";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -40,6 +41,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
   registerAuthRoutes(app);
+  app.use(customersRouter);
 
   const publicPaths: Array<{ path: string; type: 'exact' | 'prefix' | 'pattern' }> = [
     { path: '/login', type: 'exact' },

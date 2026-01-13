@@ -14,7 +14,8 @@ import type { UserRole } from "@shared/models/auth";
 // Production: Dashboard, Production, Settings
 const allNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
-  { name: 'Sales', href: '/sales', icon: Users, roles: ['ceo', 'sales'] as UserRole[] },
+  { name: 'Sales', href: '/sales', icon: Users, roles: ['ceo', 'sales', 'marketing'] as UserRole[] },
+  { name: 'Customers', href: '/customers', icon: Users, roles: ['ceo', 'sales', 'marketing'] as UserRole[] },
   { name: 'Production', href: '/production', icon: FolderKanban, roles: ['ceo', 'production'] as UserRole[] },
   // Hidden for Executive View: ScanTech, FieldHub, QC Console, Vendor Portal
   // { name: 'ScanTech', href: '/scan-tech', icon: Smartphone, roles: ['ceo', 'production'] as UserRole[] },
@@ -42,7 +43,7 @@ function getRoleLabel(role: UserRole | undefined): string {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const [location] = useLocation();
   const { logout, user } = useAuth();
-  
+
   // Filter navigation items based on user role
   const userRole = (user?.role as UserRole) || 'ceo';
   const navigation = useMemo(() => {
@@ -65,14 +66,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {navigation.map((item) => {
           const isActive = location === item.href;
           return (
-            <Link 
-              key={item.name} 
-              href={item.href} 
-              data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`} 
+            <Link
+              key={item.name}
+              href={item.href}
+              data-testid={`nav-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
               className={clsx(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group hover-elevate",
-                isActive 
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                   : "text-muted-foreground"
               )}
               onClick={onNavigate}
@@ -97,8 +98,8 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full justify-start gap-2"
           onClick={() => logout()}
           data-testid="button-logout"
@@ -123,12 +124,12 @@ export function MobileHeader() {
   const [open, setOpen] = useState(false);
   const [location] = useLocation();
   const { user } = useAuth();
-  
+
   const userRole = (user?.role as UserRole) || 'ceo';
   const navigation = useMemo(() => {
     return allNavigation.filter(item => item.roles.includes(userRole));
   }, [userRole]);
-  
+
   const currentPage = navigation.find(n => n.href === location);
 
   return (
@@ -139,7 +140,7 @@ export function MobileHeader() {
         </div>
         <span className="font-display font-bold text-sm">{currentPage?.name || 'Scan2Plan-OS'}</span>
       </div>
-      
+
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" data-testid="button-mobile-menu">

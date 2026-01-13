@@ -749,6 +749,15 @@ export const qbCustomers = pgTable("qb_customers", {
   shippingCountry: text("shipping_country"),
   balance: decimal("balance", { precision: 12, scale: 2 }),
   active: boolean("active").default(true),
+  // CRM / Enrichment Fields
+  website: text("website"),
+  industry: text("industry"),
+  employeeCount: text("employee_count"),
+  linkedinUrl: text("linkedin_url"),
+  marketingStatus: text("marketing_status").default("Lead"), // Lead, Customer, Churned, Partner
+  tags: text("tags").array(), // Application-level tags
+  notes: text("notes"),
+  enrichmentData: jsonb("enrichment_data"), // AI gathered data
   syncedAt: timestamp("synced_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });

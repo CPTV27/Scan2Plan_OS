@@ -2,10 +2,10 @@ import { sql } from "drizzle-orm";
 import { index, jsonb, pgTable, timestamp, varchar, pgEnum } from "drizzle-orm/pg-core";
 
 // User role enum for role-based access control
-export const userRoleEnum = pgEnum("user_role", ["ceo", "sales", "production", "accounting"]);
+export const userRoleEnum = pgEnum("user_role", ["ceo", "sales", "production", "accounting", "marketing"]);
 
 // Valid roles as a type for use throughout the app
-export type UserRole = "ceo" | "sales" | "production" | "accounting";
+export type UserRole = "ceo" | "sales" | "production" | "accounting" | "marketing";
 
 // Session storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.

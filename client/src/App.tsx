@@ -14,6 +14,8 @@ import Analytics from "@/pages/Analytics";
 import Financial from "@/pages/Financial";
 import Tools from "@/pages/Tools";
 import AirtableInsights from "@/pages/AirtableInsights";
+import { CustomerList } from "@/features/customers/CustomerList";
+import { CustomerDetail } from "@/features/customers/CustomerDetail";
 import RegionalIntel from "@/pages/RegionalIntel";
 import Settings from "@/pages/Settings";
 import ScanTech from "@/pages/ScanTech";
@@ -38,7 +40,7 @@ import MissionBriefPage from "@/pages/MissionBriefPage";
 
 function ProtectedRoutes() {
   const { user } = useAuth();
-  
+
   // Production role redirect to Field Hub
   const userRole = (user?.role as string) || 'ceo';
   if (userRole === 'production' && window.location.pathname === '/') {
@@ -57,6 +59,14 @@ function ProtectedRoutes() {
         <RoleGuard allowedRoles={["ceo", "sales"]}>
           <Sales />
         </RoleGuard>
+      </Route>
+      <Route path="/customers">
+        <RoleGuard allowedRoles={["ceo", "sales", "marketing"]}>
+          <CustomerList />
+        </RoleGuard>
+      </Route>
+      <Route path="/customers/:id">
+        <CustomerDetail />
       </Route>
       <Route path="/sales/trash">
         <RoleGuard allowedRoles={["ceo", "sales"]}>
@@ -163,7 +173,7 @@ function ProtectedRoutes() {
 
 function Router() {
   const path = window.location.pathname;
-  
+
   if (path === "/privacy") {
     return <PrivacyPolicy />;
   }
