@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -307,7 +307,7 @@ export async function registerRoutes(
   registerProposalRoutes(app);
   registerStorageRoutes(app);
 
-  app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req, res) => {
+  app.post("/api/leads/import-pdf", isAuthenticated, requireRole("ceo", "sales"), upload.single("file"), asyncHandler(async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -348,30 +348,33 @@ export async function registerRoutes(
     }
   }));
 
-  app.get("/api/staleness/status", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+  app.get("/api/staleness/status", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req: Request, res: Response) => {
     const leads = await storage.getLeads();
-    const status = getStalenessStatus(leads);
-    res.json(status);
+    const statusList = leads.map(lead => ({
+      leadId: lead.id,
+      clientName: lead.clientName,
+      ...getStalenessStatus(lead.lastContactDate)
+    }));
+    res.json(statusList);
   }));
 
-  app.post("/api/staleness/apply", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
-    const leads = await storage.getLeads();
-    const results = applyStalenessPenalties(leads);
+  app.post("/api/staleness/apply", isAuthenticated, requireRole("ceo"), asyncHandler(async (req: Request, res: Response) => {
+    const results = await applyStalenessPenalties();
     res.json(results);
   }));
 
-  app.post("/api/probability/recalculate", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+  app.post("/api/probability/recalculate", isAuthenticated, requireRole("ceo"), asyncHandler(async (req: Request, res: Response) => {
     const results = await recalculateAllProbabilities();
     res.json(results);
   }));
 
-  app.get("/api/leads/:id/probability-factors", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+  app.get("/api/leads/:id/probability-factors", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req: Request, res: Response) => {
     const leadId = Number(req.params.id);
     const lead = await storage.getLead(leadId);
     if (!lead) return res.status(404).json({ message: "Lead not found" });
     
     const factors = calculateProbability(lead);
-    const staleness = getStageSpecificStaleness(lead);
+    const staleness = getStageSpecificStaleness(lead.dealStage, lead.lastContactDate);
     
     res.json({
       currentProbability: lead.probability,
@@ -383,7 +386,7 @@ export async function registerRoutes(
     });
   }));
 
-  app.get("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+  app.get("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
       const logs = await db.select().from(missionLogs).orderBy(desc(missionLogs.missionDate)).limit(100);
       res.json(logs);
@@ -393,7 +396,7 @@ export async function registerRoutes(
     }
   }));
 
-  app.post("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+  app.post("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
       const { projectId, techId, notes } = req.body;
       
@@ -411,7 +414,7 @@ export async function registerRoutes(
     }
   }));
 
-  app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+  app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
       const projectId = Number(req.params.projectId);
       const project = await storage.getProject(projectId);
@@ -434,12 +437,12 @@ export async function registerRoutes(
     }
   }));
 
-  app.get("/api/field-translation/status", isAuthenticated, asyncHandler(async (req, res) => {
+  app.get("/api/field-translation/status", isAuthenticated, asyncHandler(async (req: Request, res: Response) => {
     const hasOpenAI = !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     res.json({ enabled: hasOpenAI });
   }));
 
-  app.post("/api/field-translation/translate", isAuthenticated, asyncHandler(async (req, res) => {
+  app.post("/api/field-translation/translate", isAuthenticated, asyncHandler(async (req: Request, res: Response) => {
     try {
       const { rawNote, projectId } = req.body;
       
@@ -505,7 +508,7 @@ Return ONLY valid JSON:
     }
   }));
 
-  app.get("/api/performance/stats", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+  app.get("/api/performance/stats", isAuthenticated, requireRole("ceo"), asyncHandler(async (req: Request, res: Response) => {
     res.json({
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
@@ -514,12 +517,12 @@ Return ONLY valid JSON:
     });
   }));
 
-  app.post("/api/performance/stats/clear", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+  app.post("/api/performance/stats/clear", isAuthenticated, requireRole("ceo"), asyncHandler(async (req: Request, res: Response) => {
     clearPerformanceStats();
     res.json({ success: true, message: "Performance stats cleared" });
   }));
 
-  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
+  app.get("/api/daily-summary", isAuthenticated, requireRole("ceo"), asyncHandler(async (req: Request, res: Response) => {
     try {
       const leads = await storage.getLeads();
       const projects = await storage.getProjects();

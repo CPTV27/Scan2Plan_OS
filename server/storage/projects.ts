@@ -30,13 +30,13 @@ export class ProjectRepository {
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const [project] = await db.insert(projects).values(insertProject).returning();
+    const [project] = await db.insert(projects).values(insertProject as any).returning();
     return project;
   }
 
   async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project> {
     const [updated] = await db.update(projects)
-      .set(updates)
+      .set(updates as any)
       .where(eq(projects.id, id))
       .returning();
     return updated;
