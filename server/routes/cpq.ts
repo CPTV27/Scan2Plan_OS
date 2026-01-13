@@ -7,12 +7,12 @@ import { generateUPID } from "@shared/utils/projectId";
 import { nanoid } from "nanoid";
 import { log } from "../lib/logger";
 import { validateQuote, normalizeQuoteForValidation } from "../validators/cpqValidator";
+import { cpqService } from "../services/cpqService";
 
 export async function registerCpqRoutes(app: Express): Promise<void> {
   const CPQ_API_KEY = process.env.CPQ_API_KEY;
   const CRM_API_KEY = process.env.CRM_API_KEY;
   
-  // Middleware for internal CPQ calls (CRM → CPQ direction)
   const verifyCpqAuth = (req: any, res: any, next: any) => {
     if (!CPQ_API_KEY) {
       log("WARN: CPQ_API_KEY not configured - CPQ endpoints disabled");
@@ -36,7 +36,6 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     next();
   };
   
-  // Middleware for external CPQ app calls (CPQ → CRM direction)
   const verifyCrmApiKey = (req: any, res: any, next: any) => {
     if (!CRM_API_KEY) {
       log("WARN: CRM_API_KEY not configured - external CPQ integration disabled");
@@ -45,7 +44,6 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
       });
     }
     
-    // Support both x-api-key header and Authorization Bearer
     const apiKey = req.headers["x-api-key"] || 
                    (req.headers.authorization?.startsWith("Bearer ") 
                      ? req.headers.authorization.substring(7) 
@@ -64,41 +62,7 @@ export async function registerCpqRoutes(app: Express): Promise<void> {
     next();
   };
 
-  // Helper function to normalize quote data before saving
-  // - Converts travel.dispatchLocation to uppercase for legacy system compatibility
-  // - Backfills areas[].kind based on buildingType (14-15 = landscape, others = standard)
-  const normalizeQuoteData = (data: any): any => {
-    const normalized = { ...data };
-    
-    // Normalize travel.dispatchLocation to uppercase (with type guard)
-    if (normalized.travel && typeof normalized.travel.dispatchLocation === 'string') {
-      normalized.travel = {
-        ...normalized.travel,
-        dispatchLocation: normalized.travel.dispatchLocation.toUpperCase(),
-      };
-    }
-    
-    // Also normalize top-level dispatchLocation if present (with type guard)
-    if (typeof normalized.dispatchLocation === 'string') {
-      normalized.dispatchLocation = normalized.dispatchLocation.toUpperCase();
-    }
-    
-    // Backfill areas[].kind based on buildingType
-    if (Array.isArray(normalized.areas)) {
-      normalized.areas = normalized.areas.map((area: any) => {
-        const buildingType = String(area.buildingType || '');
-        // Building types 14 and 15 are landscape types
-        const isLandscape = buildingType === '14' || buildingType === '15' || 
-                           buildingType === 'landscape_built' || buildingType === 'landscape_natural';
-        return {
-          ...area,
-          kind: area.kind || (isLandscape ? 'landscape' : 'standard'),
-        };
-      });
-    }
-    
-    return normalized;
-  };
+  const normalizeQuoteData = cpqService.normalizeQuoteData;
 
   const cpqSyncSchema = z.object({
     value: z.number().optional(),

@@ -12,6 +12,7 @@ import { logSecurityEvent } from "../middleware/securityLogger";
 import multer from "multer";
 import fs from "fs";
 import { z } from "zod";
+import { projectService } from "../services/projectService";
 
 const MAX_FIELD_UPLOAD_SIZE = 100 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 20;
@@ -75,15 +76,10 @@ export function registerProjectRoutes(app: Express): void {
     const actualSqft = input.actualSqft ?? existingProject.actualSqft;
     const estimatedSqft = input.estimatedSqft ?? existingProject.estimatedSqft;
     
-    if (actualSqft && estimatedSqft) {
-      const variance = ((actualSqft - estimatedSqft) / estimatedSqft) * 100;
-      (input as any).sqftVariance = variance.toFixed(2);
-      
-      if (Math.abs(variance) <= 10) {
-        (input as any).sqftAuditComplete = true;
-      } else {
-        (input as any).sqftAuditComplete = false;
-      }
+    const { variance, auditComplete } = projectService.calculateSqftVariance(actualSqft, estimatedSqft);
+    if (variance !== null) {
+      (input as any).sqftVariance = variance;
+      (input as any).sqftAuditComplete = auditComplete;
     }
 
     const project = await storage.updateProject(projectId, input);
@@ -98,13 +94,9 @@ export function registerProjectRoutes(app: Express): void {
     }
     
     const responseProject = { ...project };
-    if (project.sqftVariance && Math.abs(Number(project.sqftVariance)) > 10) {
-      (responseProject as any).sqftAuditAlert = {
-        message: `Square Foot Audit Required: Variance of ${project.sqftVariance}% exceeds 10% tolerance. Billing adjustment approval required before Modeling.`,
-        estimatedSqft,
-        actualSqft,
-        variancePercent: Number(project.sqftVariance)
-      };
+    const sqftAuditAlert = projectService.buildSqftAuditAlert(project.sqftVariance, estimatedSqft, actualSqft);
+    if (sqftAuditAlert) {
+      (responseProject as any).sqftAuditAlert = sqftAuditAlert;
     }
     
     res.json(responseProject);
@@ -128,30 +120,7 @@ export function registerProjectRoutes(app: Express): void {
       return res.status(404).json({ message: "Linked deal not found" });
     }
     
-    // Sync all scope-related fields from lead to project (only if lead has data)
-    const updateData: Record<string, any> = {};
-    
-    if (lead.value != null) updateData.quotedPrice = lead.value.toString();
-    if (lead.grossMarginPercent != null) updateData.quotedMargin = lead.grossMarginPercent.toString();
-    if (lead.cpqAreas && Array.isArray(lead.cpqAreas) && lead.cpqAreas.length > 0) {
-      updateData.quotedAreas = lead.cpqAreas;
-      updateData.estimatedSqft = lead.cpqAreas.reduce((sum: number, a: any) => sum + (Number(a.squareFeet) || 0), 0);
-    }
-    if (lead.cpqRisks) {
-      // Ensure risks is stored as an array
-      updateData.quotedRisks = Array.isArray(lead.cpqRisks) ? lead.cpqRisks : [];
-    }
-    if (lead.cpqTravel) updateData.quotedTravel = lead.cpqTravel;
-    if (lead.cpqServices) updateData.quotedServices = lead.cpqServices;
-    if (lead.siteReadiness) updateData.siteReadiness = lead.siteReadiness;
-    if (lead.clientName) updateData.clientName = lead.clientName;
-    if (lead.contactName) updateData.clientContact = lead.contactName;
-    if (lead.contactEmail) updateData.clientEmail = lead.contactEmail;
-    if (lead.contactPhone) updateData.clientPhone = lead.contactPhone;
-    if (lead.projectAddress) updateData.projectAddress = lead.projectAddress;
-    if (lead.dispatchLocation) updateData.dispatchLocation = lead.dispatchLocation;
-    if (lead.distance) updateData.distance = Number(lead.distance);
-    
+    const updateData = await projectService.buildSyncScopeData(lead);
     const updatedProject = await storage.updateProject(projectId, updateData);
     
     log(`[Sync Scope] Synced scope from lead ${lead.id} to project ${projectId}`);
