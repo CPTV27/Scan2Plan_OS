@@ -121,7 +121,8 @@ googleMapsRouter.get(
                     if (location) {
                         lat = location.lat;
                         lng = location.lng;
-                        streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=600x400&location=${lat},${lng}&key=${apiKey}`;
+                        // Use Embed API for iframe-compatible Street View
+                        streetViewUrl = `https://www.google.com/maps/embed/v1/streetview?key=${apiKey}&location=${lat},${lng}&heading=0&pitch=0&fov=90`;
                     }
                 }
             } catch (geoErr) {
@@ -244,6 +245,316 @@ googleMapsRouter.get(
         } catch (error) {
             log("ERROR: Place details error - " + (error as any)?.message);
             res.status(500).json({ error: "Failed to fetch place details" });
+        }
+    })
+);
+
+// GET /api/location/building-insights - Google Solar API Building Insights
+googleMapsRouter.get(
+    "/api/location/building-insights",
+    asyncHandler(async (req, res) => {
+        try {
+            const lat = parseFloat(req.query.lat as string);
+            const lng = parseFloat(req.query.lng as string);
+
+            if (isNaN(lat) || isNaN(lng)) {
+                return res.status(400).json({ 
+                    available: false,
+                    error: "Valid latitude and longitude are required" 
+                });
+            }
+
+            const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+                return res.status(503).json({
+                    available: false,
+                    error: "Google Maps API key not configured"
+                });
+            }
+
+            // Call Google Solar API buildingInsights endpoint
+            const solarUrl = `https://solar.googleapis.com/v1/buildingInsights:findClosest?location.latitude=${lat}&location.longitude=${lng}&requiredQuality=MEDIUM&key=${apiKey}`;
+            
+            const response = await fetch(solarUrl);
+            const data = await response.json();
+
+            if (!response.ok) {
+                // Solar API may return 404 for locations without data
+                if (response.status === 404 || data.error?.status === "NOT_FOUND") {
+                    return res.json({
+                        available: false,
+                        message: "Solar data not available for this location"
+                    });
+                }
+                log("WARN: Solar API error - " + JSON.stringify(data.error || data));
+                return res.json({
+                    available: false,
+                    message: data.error?.message || "Building insights not available"
+                });
+            }
+
+            // Extract relevant building insights
+            const solarPotential = data.solarPotential;
+            const roofSegments = solarPotential?.roofSegmentStats || [];
+            
+            // Calculate building area from roof segments
+            let totalRoofAreaMeters2 = 0;
+            roofSegments.forEach((segment: any) => {
+                totalRoofAreaMeters2 += segment.stats?.areaMeters2 || 0;
+            });
+
+            // Get max roof height from segments
+            let maxPitchDegrees = 0;
+            let avgAzimuthDegrees = 0;
+            if (roofSegments.length > 0) {
+                roofSegments.forEach((segment: any) => {
+                    if (segment.pitchDegrees > maxPitchDegrees) {
+                        maxPitchDegrees = segment.pitchDegrees;
+                    }
+                    avgAzimuthDegrees += segment.azimuthDegrees || 0;
+                });
+                avgAzimuthDegrees = avgAzimuthDegrees / roofSegments.length;
+            }
+
+            // Use whole roof stats if available
+            const wholeRoofStats = solarPotential?.wholeRoofStats;
+            if (wholeRoofStats?.areaMeters2) {
+                totalRoofAreaMeters2 = wholeRoofStats.areaMeters2;
+            }
+
+            const squareMeters = Math.round(totalRoofAreaMeters2);
+            const squareFeet = Math.round(totalRoofAreaMeters2 * 10.764);
+
+            // Get building height from solar potential if available
+            const buildingHeight = solarPotential?.buildingStats?.buildingHeightMeters;
+
+            res.json({
+                available: true,
+                buildingArea: {
+                    squareMeters,
+                    squareFeet
+                },
+                roofStats: {
+                    segments: roofSegments.length,
+                    pitchDegrees: Math.round(maxPitchDegrees),
+                    azimuthDegrees: Math.round(avgAzimuthDegrees)
+                },
+                height: buildingHeight ? {
+                    maxRoofHeightMeters: Math.round(buildingHeight * 10) / 10,
+                    maxRoofHeightFeet: Math.round(buildingHeight * 3.281)
+                } : undefined,
+                imagery: {
+                    date: data.imageryDate ? 
+                        `${data.imageryDate.year}-${String(data.imageryDate.month).padStart(2, '0')}-${String(data.imageryDate.day).padStart(2, '0')}` 
+                        : undefined,
+                    quality: data.imageryQuality || "MEDIUM"
+                },
+                solarPotential: solarPotential ? {
+                    maxPanels: solarPotential.maxArrayPanelsCount,
+                    maxSunshineHours: Math.round(solarPotential.maxSunshineHoursPerYear || 0)
+                } : undefined
+            });
+        } catch (error) {
+            log("ERROR: Building insights error - " + (error as any)?.message);
+            res.json({
+                available: false,
+                error: "Failed to fetch building insights"
+            });
+        }
+    })
+);
+
+// GET /api/location/aerial-view - Google Aerial View API (3D flyover videos)
+googleMapsRouter.get(
+    "/api/location/aerial-view",
+    asyncHandler(async (req, res) => {
+        try {
+            const address = req.query.address as string;
+            const videoId = req.query.videoId as string;
+
+            if (!address && !videoId) {
+                return res.status(400).json({ 
+                    available: false,
+                    hasVideo: false,
+                    error: "Address or videoId is required" 
+                });
+            }
+
+            const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+                return res.status(503).json({
+                    available: false,
+                    hasVideo: false,
+                    error: "Google Maps API key not configured"
+                });
+            }
+
+            // Aerial View API uses GET with query parameters
+            // It only works with US addresses
+            let aerialUrl = `https://aerialview.googleapis.com/v1/videos:lookupVideo?key=${apiKey}`;
+            
+            if (videoId) {
+                aerialUrl += `&videoId=${encodeURIComponent(videoId)}`;
+            } else if (address) {
+                aerialUrl += `&address=${encodeURIComponent(address)}`;
+            }
+            
+            try {
+                const response = await fetch(aerialUrl, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Most locations won't have aerial view videos
+                    if (response.status === 404 || errorData.error?.status === "NOT_FOUND") {
+                        return res.json({
+                            available: true,
+                            hasVideo: false,
+                            canRequest: true,
+                            message: "No aerial video available for this location. You can request one."
+                        });
+                    }
+                    
+                    // API might not be enabled
+                    if (response.status === 403) {
+                        return res.json({
+                            available: false,
+                            hasVideo: false,
+                            message: "Aerial View API not enabled for this project"
+                        });
+                    }
+
+                    // Invalid address format or non-US address
+                    if (response.status === 400) {
+                        return res.json({
+                            available: false,
+                            hasVideo: false,
+                            message: "Aerial View only supports US addresses"
+                        });
+                    }
+
+                    return res.json({
+                        available: false,
+                        hasVideo: false,
+                        message: "Aerial view not available"
+                    });
+                }
+
+                const data = await response.json();
+                
+                // Check video state
+                if (data.state === "ACTIVE" && data.uris) {
+                    return res.json({
+                        available: true,
+                        hasVideo: true,
+                        videoId: data.metadata?.videoId,
+                        landscapeUri: data.uris?.landscapeUri,
+                        portraitUri: data.uris?.portraitUri,
+                        captureDate: data.metadata?.captureDate,
+                        duration: data.metadata?.duration
+                    });
+                }
+
+                if (data.state === "PROCESSING") {
+                    return res.json({
+                        available: true,
+                        hasVideo: false,
+                        canRequest: false,
+                        videoId: data.metadata?.videoId,
+                        message: "Aerial video is being generated"
+                    });
+                }
+
+                return res.json({
+                    available: true,
+                    hasVideo: false,
+                    canRequest: true,
+                    message: "No aerial video available"
+                });
+            } catch (aerialErr) {
+                log("WARN: Aerial View API error - " + (aerialErr as any)?.message);
+                return res.json({
+                    available: false,
+                    hasVideo: false,
+                    message: "Aerial View API not available"
+                });
+            }
+        } catch (error) {
+            log("ERROR: Aerial view error - " + (error as any)?.message);
+            res.json({
+                available: false,
+                hasVideo: false,
+                error: "Failed to fetch aerial view"
+            });
+        }
+    })
+);
+
+// POST /api/location/aerial-view/request - Request aerial view video generation
+googleMapsRouter.post(
+    "/api/location/aerial-view/request",
+    asyncHandler(async (req, res) => {
+        try {
+            const { address } = req.body;
+
+            if (!address) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: "Address is required" 
+                });
+            }
+
+            const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+            if (!apiKey) {
+                return res.status(503).json({
+                    success: false,
+                    error: "Google Maps API key not configured"
+                });
+            }
+
+            // Request video generation from Aerial View API
+            // Uses POST with address in JSON body
+            const requestUrl = `https://aerialview.googleapis.com/v1/videos:renderVideo?key=${apiKey}`;
+            
+            const response = await fetch(requestUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                
+                // Check for specific errors
+                if (response.status === 400) {
+                    return res.json({
+                        success: false,
+                        message: "Aerial View only supports US addresses"
+                    });
+                }
+                
+                return res.json({
+                    success: false,
+                    message: errorData.error?.message || "Could not request aerial video"
+                });
+            }
+
+            const data = await response.json();
+            
+            res.json({
+                success: true,
+                state: data.state || "PROCESSING",
+                videoId: data.metadata?.videoId,
+                message: "Aerial video generation requested. Check back in a few minutes."
+            });
+        } catch (error) {
+            log("ERROR: Aerial view request error - " + (error as any)?.message);
+            res.status(500).json({
+                success: false,
+                error: "Failed to request aerial view"
+            });
         }
     })
 );

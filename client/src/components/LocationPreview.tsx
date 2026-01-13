@@ -253,15 +253,15 @@ export function LocationPreview({
     staleTime: 1000 * 60 * 30,
   });
 
-  // Aerial View from Google Aerial View API
+  // Aerial View from Google Aerial View API (US addresses only)
   const { data: aerialView, isLoading: isLoadingAerial } = useQuery<AerialViewData>({
-    queryKey: ["/api/location/aerial-view", locationData?.coordinates?.lat, locationData?.coordinates?.lng],
+    queryKey: ["/api/location/aerial-view", debouncedAddress],
     queryFn: async () => {
-      if (!locationData?.coordinates) return { available: false, hasVideo: false };
-      const response = await apiRequest("GET", `/api/location/aerial-view?lat=${locationData.coordinates.lat}&lng=${locationData.coordinates.lng}`);
+      if (!debouncedAddress || debouncedAddress.length < 5) return { available: false, hasVideo: false };
+      const response = await apiRequest("GET", `/api/location/aerial-view?address=${encodeURIComponent(debouncedAddress)}`);
       return response.json();
     },
-    enabled: !!locationData?.coordinates,
+    enabled: debouncedAddress.length >= 5,
     staleTime: 1000 * 60 * 30,
   });
 
@@ -279,8 +279,6 @@ export function LocationPreview({
   const aerialRequestMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/location/aerial-view/request", {
-        lat: locationData?.coordinates?.lat,
-        lng: locationData?.coordinates?.lng,
         address: debouncedAddress
       });
       return res.json();
