@@ -64,7 +64,8 @@ export function registerProjectRoutes(app: Express): void {
     }
   }));
 
-  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
+  // Handle both PUT and PATCH for project updates (client uses PUT, PATCH is also valid)
+  const updateProjectHandler = asyncHandler(async (req: any, res: any) => {
     const projectId = Number(req.params.id);
     const input = req.body;
     
@@ -100,7 +101,10 @@ export function registerProjectRoutes(app: Express): void {
     }
     
     res.json(responseProject);
-  }));
+  });
+
+  app.put("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), updateProjectHandler);
+  app.patch("/api/projects/:id", isAuthenticated, requireRole("ceo", "production"), updateProjectHandler);
 
   // Sync scope data from linked lead to project
   app.post("/api/projects/:id/sync-scope", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req, res) => {
