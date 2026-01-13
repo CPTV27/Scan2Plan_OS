@@ -18,6 +18,11 @@
  *   - accountStorage, invoiceStorage, internalLoanStorage, vendorPayableStorage: Financial
  *   - caseStudyStorage, eventStorage, eventRegistrationStorage: Marketing
  *   - dealAttributionStorage, notificationStorage, proposalEmailStorage: Marketing
+ *   - projectStorage, projectAttachmentStorage: Projects
+ *   - userStorage: User management
+ *   - settingsStorage: Application settings
+ *   - scantechStorage: Field technicians
+ *   - fieldNoteStorage: Field notes
  */
 
 export { storage, IStorage, DatabaseStorage } from "../storage";
@@ -26,3 +31,8 @@ export * from "./leads";
 export * from "./quotes";
 export * from "./financial";
 export * from "./marketing";
+export * from "./projects";
+export * from "./users";
+export * from "./settings";
+export * from "./scantechs";
+export * from "./notes";

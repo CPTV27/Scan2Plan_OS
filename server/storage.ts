@@ -1,10 +1,6 @@
 import { db } from "./db";
 import {
-  leads, projects, fieldNotes, settings, leadResearch, scantechs,
-  users, accounts, invoices, internalLoans, vendorPayables, quoteVersions, projectAttachments,
-  cpqPricingMatrix, cpqUpteamPricingMatrix, cpqCadPricingMatrix, cpqPricingParameters, cpqQuotes,
-  caseStudies, notifications, dealAttributions, events, eventRegistrations, qbCustomers, leadDocuments,
-  proposalEmailEvents,
+  qbCustomers,
   type InsertLead, type InsertProject, type InsertFieldNote, type InsertLeadResearch,
   type Lead, type Project, type FieldNote, type Setting, type LeadResearch, type User, type UserRole,
   type Account, type InsertAccount, type Invoice, type InsertInvoice,
@@ -22,8 +18,7 @@ import {
   type LeadDocument, type InsertLeadDocument,
   type ProposalEmailEvent, type InsertProposalEmailEvent
 } from "@shared/schema";
-import { eq, desc, and, lt, sql, max, ilike, isNull, isNotNull } from "drizzle-orm";
-import { getNextQuoteNumber } from "@shared/utils/projectId";
+import { eq, ilike } from "drizzle-orm";
 import { leadRepo, leadResearchRepo, leadDocumentRepo } from "./storage/leads";
 import { cpqQuoteRepo, quoteVersionRepo, cpqPricingRepo } from "./storage/quotes";
 import { accountRepo, invoiceRepo, internalLoanRepo, vendorPayableRepo } from "./storage/financial";
@@ -31,6 +26,11 @@ import {
   caseStudyRepo, eventRepo, eventRegistrationRepo, dealAttributionRepo, 
   notificationRepo, proposalEmailRepo, abmAnalyticsRepo 
 } from "./storage/marketing";
+import { projectRepo, projectAttachmentRepo } from "./storage/projects";
+import { userRepo } from "./storage/users";
+import { settingsRepo } from "./storage/settings";
+import { scantechRepo } from "./storage/scantechs";
+import { fieldNoteRepo } from "./storage/notes";
 
 export interface IStorage {
   // Leads
@@ -256,92 +256,63 @@ export class DatabaseStorage implements IStorage {
     return leadRepo.deleteLead(id);
   }
 
-  // Projects
+  // Projects - delegated to ProjectRepository
   async getProjects(): Promise<Project[]> {
-    return await db.select().from(projects).orderBy(desc(projects.createdAt));
+    return projectRepo.getProjects();
   }
 
   async getProject(id: number): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project;
+    return projectRepo.getProject(id);
   }
 
   async getProjectByLeadId(leadId: number): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.leadId, leadId));
-    return project;
+    return projectRepo.getProjectByLeadId(leadId);
   }
 
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const [project] = await db.insert(projects).values(insertProject).returning();
-    return project;
+    return projectRepo.createProject(insertProject);
   }
 
   async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project> {
-    const [updated] = await db.update(projects)
-      .set(updates)
-      .where(eq(projects.id, id))
-      .returning();
-    return updated;
+    return projectRepo.updateProject(id, updates);
   }
 
-  // Field Notes
+  // Field Notes - delegated to FieldNoteRepository
   async getFieldNotes(): Promise<FieldNote[]> {
-    return await db.select().from(fieldNotes).orderBy(desc(fieldNotes.createdAt));
+    return fieldNoteRepo.getFieldNotes();
   }
 
   async getFieldNote(id: number): Promise<FieldNote | undefined> {
-    const [note] = await db.select().from(fieldNotes).where(eq(fieldNotes.id, id));
-    return note;
+    return fieldNoteRepo.getFieldNote(id);
   }
 
   async createFieldNote(insertNote: InsertFieldNote): Promise<FieldNote> {
-    const [note] = await db.insert(fieldNotes).values(insertNote).returning();
-    return note;
+    return fieldNoteRepo.createFieldNote(insertNote);
   }
 
   async updateFieldNote(id: number, updates: Partial<FieldNote>): Promise<FieldNote> {
-    const [updated] = await db.update(fieldNotes)
-      .set(updates)
-      .where(eq(fieldNotes.id, id))
-      .returning();
-    return updated;
+    return fieldNoteRepo.updateFieldNote(id, updates);
   }
 
-  // Settings
+  // Settings - delegated to SettingsRepository
   async getAllSettings(): Promise<Setting[]> {
-    return await db.select().from(settings);
+    return settingsRepo.getAllSettings();
   }
 
   async getSetting(key: string): Promise<Setting | undefined> {
-    const [setting] = await db.select().from(settings).where(eq(settings.key, key));
-    return setting;
+    return settingsRepo.getSetting(key);
   }
 
   async setSetting(key: string, value: unknown): Promise<Setting> {
-    const existing = await this.getSetting(key);
-    if (existing) {
-      const [updated] = await db.update(settings)
-        .set({ value, updatedAt: new Date() })
-        .where(eq(settings.key, key))
-        .returning();
-      return updated;
-    } else {
-      const [created] = await db.insert(settings)
-        .values({ key, value })
-        .returning();
-      return created;
-    }
+    return settingsRepo.setSetting(key, value);
   }
 
-  // Alias for setSetting with more descriptive name
   async updateSetting(key: string, value: unknown): Promise<Setting> {
-    return this.setSetting(key, value);
+    return settingsRepo.updateSetting(key, value);
   }
 
-  // Type-safe getSetting helper
   async getSettingValue<T>(key: string): Promise<T | null> {
-    const setting = await this.getSetting(key);
-    return setting?.value as T ?? null;
+    return settingsRepo.getSettingValue<T>(key);
   }
 
   // Lead Research - delegated to LeadResearchRepository
@@ -357,17 +328,13 @@ export class DatabaseStorage implements IStorage {
     return leadResearchRepo.createLeadResearch(research);
   }
 
-  // User Management
+  // User Management - delegated to UserRepository
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    return userRepo.getAllUsers();
   }
 
   async updateUserRole(userId: string, role: UserRole): Promise<User | undefined> {
-    const [updated] = await db.update(users)
-      .set({ role, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
-    return updated;
+    return userRepo.updateUserRole(userId, role);
   }
 
   // === FINANCIAL MODULE === (delegated to domain repositories)
@@ -469,58 +436,46 @@ export class DatabaseStorage implements IStorage {
     return quoteVersionRepo.getNextVersionNumber(leadId);
   }
 
-  // ScanTechs (Field Technicians)
+  // ScanTechs (Field Technicians) - delegated to ScantechRepository
   async getScantechs(): Promise<Scantech[]> {
-    return await db.select().from(scantechs).orderBy(scantechs.name);
+    return scantechRepo.getScantechs();
   }
 
   async getScantech(id: number): Promise<Scantech | undefined> {
-    const [scantech] = await db.select().from(scantechs).where(eq(scantechs.id, id));
-    return scantech;
+    return scantechRepo.getScantech(id);
   }
 
   async createScantech(insertScantech: InsertScantech): Promise<Scantech> {
-    const [scantech] = await db.insert(scantechs).values(insertScantech).returning();
-    return scantech;
+    return scantechRepo.createScantech(insertScantech);
   }
 
   async updateScantech(id: number, updates: Partial<InsertScantech>): Promise<Scantech> {
-    const [updated] = await db.update(scantechs).set(updates).where(eq(scantechs.id, id)).returning();
-    return updated;
+    return scantechRepo.updateScantech(id, updates);
   }
 
-  // Project Attachments (Visual Scoping - Drive Sync)
+  // Project Attachments (Visual Scoping - Drive Sync) - delegated to ProjectAttachmentRepository
   async getProjectAttachments(projectId: number): Promise<ProjectAttachment[]> {
-    return await db.select().from(projectAttachments)
-      .where(eq(projectAttachments.projectId, projectId))
-      .orderBy(desc(projectAttachments.createdAt));
+    return projectAttachmentRepo.getProjectAttachments(projectId);
   }
 
   async getLeadAttachments(leadId: number): Promise<ProjectAttachment[]> {
-    return await db.select().from(projectAttachments)
-      .where(eq(projectAttachments.leadId, leadId))
-      .orderBy(desc(projectAttachments.createdAt));
+    return projectAttachmentRepo.getLeadAttachments(leadId);
   }
 
   async getAttachment(id: number): Promise<ProjectAttachment | undefined> {
-    const [attachment] = await db.select().from(projectAttachments).where(eq(projectAttachments.id, id));
-    return attachment;
+    return projectAttachmentRepo.getAttachment(id);
   }
 
   async createAttachment(insertAttachment: InsertProjectAttachment): Promise<ProjectAttachment> {
-    const [attachment] = await db.insert(projectAttachments).values(insertAttachment).returning();
-    return attachment;
+    return projectAttachmentRepo.createAttachment(insertAttachment);
   }
 
   async deleteAttachment(id: number): Promise<void> {
-    await db.delete(projectAttachments).where(eq(projectAttachments.id, id));
+    return projectAttachmentRepo.deleteAttachment(id);
   }
 
   async countProjectAttachments(projectId: number): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)::int` })
-      .from(projectAttachments)
-      .where(eq(projectAttachments.projectId, projectId));
-    return result[0]?.count ?? 0;
+    return projectAttachmentRepo.countProjectAttachments(projectId);
   }
 
   // CPQ Internal Pricing & Quotes - delegated to CpqQuoteRepository and CpqPricingRepository
