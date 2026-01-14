@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PersonaManager from "@/components/PersonaManager";
 import { CIStatusPanel } from "@/components/CIStatusPanel";
 import { CaseStudyManager } from "@/components/CaseStudyManager";
+import { IntelFeedSourcesConfig } from "@/components/IntelFeedSourcesConfig";
 
 interface IntegrationStatus {
   airtable: { configured: boolean; writeEnabled: boolean };
@@ -500,6 +501,9 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Intel Feed Sources */}
+            <IntelFeedSourcesConfig />
 
             {/* Financial Mapping - Profit First */}
             {qbStatus?.connected && <FinancialMappingEditor />}
