@@ -3,7 +3,7 @@ import { asyncHandler } from "../middleware/errorHandler";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { db } from "../db";
 import { leads } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { log } from "../lib/logger";
 
 const router = Router();
@@ -69,17 +69,20 @@ router.post(
 
         const { leadIds } = req.body;
 
-        // If specific leadIds provided, sync those; otherwise sync active leads
+        // If specific leadIds provided, sync those; otherwise sync unsynced leads
         let leadsToSync;
-        if (leadIds && Array.isArray(leadIds)) {
+        if (leadIds && Array.isArray(leadIds) && leadIds.length > 0) {
+            // Fix: Use inArray for multiple IDs
             leadsToSync = await db.select().from(leads).where(
-                // Use inArray for multiple IDs if needed
-                eq(leads.id, leadIds[0])
+                inArray(leads.id, leadIds)
             );
         } else {
-            // Sync leads with email that aren't synced yet
-            leadsToSync = await db.select().from(leads).where(eq(leads.mauticContactId as any, null)).limit(100);
+            // Sync leads with email that aren't synced yet (mauticContactId is null)
+            leadsToSync = await db.select().from(leads)
+                .where(isNull(leads.mauticContactId as any))
+                .limit(100);
         }
+
 
         let synced = 0;
         let errors: string[] = [];
