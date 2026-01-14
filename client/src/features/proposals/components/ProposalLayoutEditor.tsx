@@ -420,6 +420,7 @@ export function ProposalLayoutEditor({
                             <ProposalPreview
                                 sections={sections}
                                 activeSectionId={activeSectionId}
+                                lead={lead}
                             />
                         </div>
                     </ResizablePanel>

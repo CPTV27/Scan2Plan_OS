@@ -13,17 +13,20 @@ import { Separator } from "@/components/ui/separator";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ProposalSection } from "../hooks/useProposalTemplates";
+import type { Lead } from "@shared/schema";
 
 interface ProposalPreviewProps {
     sections: ProposalSection[];
     activeSectionId?: string;
     onSectionVisible?: (sectionId: string) => void;
+    lead?: Lead;
 }
 
 export function ProposalPreview({
     sections,
     activeSectionId,
     onSectionVisible,
+    lead,
 }: ProposalPreviewProps) {
     const scrollAreaRef = useRef<HTMLDivElement>(null);
     const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -82,7 +85,7 @@ export function ProposalPreview({
                                             Professional 3D Scanning & BIM Services
                                         </h2>
                                         <div className="text-sm text-muted-foreground mt-8">
-                                            <p>Scan2Plan Brooklyn, NY</p>
+                                            <p>Scan2Plan {lead?.projectAddress || "New York"}</p>
                                             <p className="text-primary">www.scan2plan.com</p>
                                         </div>
                                     </div>
