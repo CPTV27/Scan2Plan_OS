@@ -130,7 +130,7 @@ export function LeadDetailsTab({
   return (
     <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
       <ScrollArea className="h-full">
-        <div className="p-4 space-y-4">
+        <div className="p-4 pb-32 space-y-4">
           <PersonaSuggestion
             leadId={leadId}
             clientName={lead.clientName}
