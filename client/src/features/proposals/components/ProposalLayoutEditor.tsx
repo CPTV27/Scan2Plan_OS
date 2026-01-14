@@ -46,9 +46,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import type { Lead, CpqQuote, ProposalTemplate, ProposalTemplateGroup } from "@shared/schema";
+import type { Lead, CpqQuote, ProposalTemplate, ProposalTemplateGroup, GeneratedProposal } from "@shared/schema";
 import { SectionPanel } from "./SectionPanel";
 import { ProposalPreview } from "./ProposalPreview";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { CaseStudyPicker } from "./CaseStudyPicker";
 import {
     ProposalSection,
@@ -96,10 +98,15 @@ export function ProposalLayoutEditor({
     onDownloadPDF,
     isSending = false,
 }: ProposalLayoutEditorProps) {
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
     const [activeSectionId, setActiveSectionId] = useState<string | undefined>();
     const [sections, setSections] = useState<ProposalSection[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [currentProposalId, setCurrentProposalId] = useState<number | null>(null);
+    const [hasInitialized, setHasInitialized] = useState(false);
+    const [lastLoadedGroupId, setLastLoadedGroupId] = useState<number | null>(null);
 
     // Edit section dialog state
     const [editingSection, setEditingSection] = useState<ProposalSection | null>(null);
@@ -112,6 +119,71 @@ export function ProposalLayoutEditor({
     // AI Rewrite state
     const [isRewriteDialogOpen, setIsRewriteDialogOpen] = useState(false);
     const [rewriteInstruction, setRewriteInstruction] = useState("");
+
+    // Fetch existing saved proposals for this lead
+    const { data: savedProposals = [], isLoading: proposalsLoading } = useQuery<GeneratedProposal[]>({
+        queryKey: ["/api/generated-proposals/lead", lead.id],
+        enabled: !!lead.id,
+    });
+
+    // Get the latest draft proposal if it exists
+    const latestDraft = savedProposals.find(p => p.status === "draft") || savedProposals[0];
+
+    // Mutation to save/update proposal
+    const saveProposalMutation = useMutation({
+        mutationFn: async (data: { sections: ProposalSection[]; proposalId?: number }) => {
+            const payload = {
+                leadId: lead.id,
+                quoteId: quote?.id || null,
+                templateGroupId: selectedGroupId,
+                name: `Proposal - ${lead.projectName || lead.clientName}`,
+                status: "draft",
+                sections: data.sections.map(s => ({
+                    templateId: s.templateId,
+                    name: s.name,
+                    content: s.content,
+                    sortOrder: s.sortOrder,
+                    included: s.included,
+                    category: s.category,
+                })),
+            };
+
+            if (data.proposalId) {
+                const res = await fetch(`/api/generated-proposals/${data.proposalId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    credentials: "include",
+                });
+                if (!res.ok) throw new Error("Failed to update proposal");
+                return res.json();
+            } else {
+                const res = await fetch("/api/generated-proposals", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    credentials: "include",
+                });
+                if (!res.ok) throw new Error("Failed to save proposal");
+                return res.json();
+            }
+        },
+        onSuccess: (data) => {
+            setCurrentProposalId(data.id);
+            queryClient.invalidateQueries({ queryKey: ["/api/generated-proposals/lead", lead.id] });
+            toast({
+                title: "Saved",
+                description: "Proposal draft saved successfully.",
+            });
+        },
+        onError: (error: Error) => {
+            toast({
+                title: "Save Failed",
+                description: error.message,
+                variant: "destructive",
+            });
+        },
+    });
 
     const { mutate: rewriteText, isPending: isRewriting } = useMutation({
         mutationFn: async (data: { text: string; instruction: string; leadId: number }) => {
@@ -163,8 +235,50 @@ export function ProposalLayoutEditor({
         }
     }, [templateGroups, selectedGroupId]);
 
-    // Build sections when group loads
+    // Initial load: Load saved proposal if it exists (only once on first load)
     useEffect(() => {
+        // Wait for both proposals and templates to be loaded before initializing
+        const templatesReady = Object.keys(groupedTemplates).length > 0;
+        if (proposalsLoading || templatesLoading || !templatesReady || hasInitialized) return;
+
+        // If there's a saved draft, load it
+        if (latestDraft?.sections && Array.isArray(latestDraft.sections) && latestDraft.sections.length > 0) {
+            // Build a map of templateId -> category from all templates
+            const templateCategoryMap: Record<number, string> = {};
+            Object.entries(groupedTemplates).forEach(([category, templates]) => {
+                templates.forEach(t => {
+                    templateCategoryMap[t.id] = category;
+                });
+            });
+
+            const savedSections: ProposalSection[] = (latestDraft.sections as any[]).map((s, idx) => ({
+                id: `section-${s.templateId}-${idx}`,
+                templateId: s.templateId,
+                category: templateCategoryMap[s.templateId] || (s as any).category || "other",
+                name: s.name,
+                content: s.content,
+                sortOrder: s.sortOrder,
+                included: s.included,
+            }));
+            setSections(savedSections);
+            setCurrentProposalId(latestDraft.id);
+            if (latestDraft.templateGroupId) {
+                setSelectedGroupId(latestDraft.templateGroupId);
+                setLastLoadedGroupId(latestDraft.templateGroupId);
+            }
+        }
+        setHasInitialized(true);
+    }, [proposalsLoading, templatesLoading, hasInitialized, latestDraft, groupedTemplates]);
+
+    // Build sections from template group (when group changes or on initial load without saved draft)
+    useEffect(() => {
+        // Skip if not initialized yet or if proposals are still loading
+        if (!hasInitialized || proposalsLoading) return;
+        
+        // Skip if this is the same group we already loaded
+        if (selectedGroupId === lastLoadedGroupId && sections.length > 0) return;
+
+        // Build from template group
         if (selectedGroup?.expandedSections && selectedGroup.expandedSections.length > 0) {
             const context = { lead, quote };
             const newSections: ProposalSection[] = selectedGroup.expandedSections.map(
@@ -179,8 +293,9 @@ export function ProposalLayoutEditor({
                 })
             );
             setSections(newSections);
+            setLastLoadedGroupId(selectedGroupId);
         }
-    }, [selectedGroup, lead, quote]);
+    }, [hasInitialized, proposalsLoading, selectedGroup, selectedGroupId, lastLoadedGroupId, sections.length, lead, quote]);
 
     // Re-substitute variables when sections change template
     const handleSectionsChange = (newSections: ProposalSection[]) => {
@@ -225,7 +340,7 @@ export function ProposalLayoutEditor({
         setEditedName(section.name);
     };
 
-    // Handle save edited section
+    // Handle save edited section (and persist to backend)
     const handleSaveSection = () => {
         if (!editingSection) return;
         const updated = sections.map(s =>
@@ -235,6 +350,12 @@ export function ProposalLayoutEditor({
         );
         setSections(updated);
         setEditingSection(null);
+        
+        // Persist to backend
+        saveProposalMutation.mutate({
+            sections: updated,
+            proposalId: currentProposalId || undefined,
+        });
     };
 
     // Handle inserting case study content
@@ -364,6 +485,23 @@ export function ProposalLayoutEditor({
                         )}
 
                         <div className="flex items-center gap-2 ml-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => saveProposalMutation.mutate({
+                                    sections,
+                                    proposalId: currentProposalId || undefined,
+                                })}
+                                disabled={saveProposalMutation.isPending}
+                                data-testid="button-save-draft"
+                            >
+                                {saveProposalMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Save className="h-4 w-4 mr-2" />
+                                )}
+                                Save Draft
+                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
