@@ -166,10 +166,44 @@ Your Revit model will include:
 `,
     },
     {
+        name: "Service Deliverables",
+        slug: "service-deliverables",
+        category: "pricing",
+        sortOrder: 6,
+        isDefault: true,
+        variables: ["scope", "matterport_scope"],
+        content: `## What's Included
+
+**End-to-End Project Management and Customer Service**
+
+Our team provides dedicated project management from kick-off through delivery, ensuring clear communication and timely updates throughout the engagement.
+
+---
+
+### LiDAR Scanning
+A certified scanning technician will capture the {{scope}} using state-of-the-art 3D laser scanning equipment. Our technicians are trained to efficiently capture comprehensive data while minimizing disruption to your operations.
+
+### Matterport Scanning
+A scanning technician will capture the {{matterport_scope}} using Matterport Pro2 cameras, creating immersive 3D virtual tours and dollhouse views of your space.
+
+### Point Cloud Registration
+Point cloud data captured on-site will be registered, cleaned, and reviewed for quality assurance. This process ensures seamless alignment of all scan positions and removes noise or artifacts from the data.
+
+### BIM Modeling
+Your deliverable will be modeled in your preferred software (Revit, ArchiCAD, Rhino, SketchUp, etc.) to the specified Level of Detail. Our modeling team follows industry-standard BIM practices and your template requirements.
+
+### CAD Drafting
+CAD sheets will be prepared according to your standards, including floor plans, reflected ceiling plans, elevations, and sections as specified in your scope.
+
+### QA/QC
+The entire project is redundantly reviewed and checked by our QC team and senior engineering staff. Multiple quality gates ensure accuracy, completeness, and adherence to your deliverable specifications.
+`,
+    },
+    {
         name: "Pricing",
         slug: "pricing",
         category: "pricing",
-        sortOrder: 6,
+        sortOrder: 7,
         isDefault: true,
         variables: ["line_items_table", "total_price"],
         content: `## Investment
@@ -197,7 +231,7 @@ Your Revit model will include:
         name: "Timeline",
         slug: "timeline",
         category: "scope",
-        sortOrder: 7,
+        sortOrder: 8,
         isDefault: true,
         variables: ["timeline"],
         content: `## Timeline
@@ -224,7 +258,7 @@ We can often accommodate rush timelines for an additional fee. Please contact us
         name: "Terms & Conditions",
         slug: "terms-conditions",
         category: "terms",
-        sortOrder: 8,
+        sortOrder: 9,
         isDefault: true,
         variables: ["payment_terms"],
         content: `## Terms & Conditions
@@ -259,7 +293,7 @@ We can often accommodate rush timelines for an additional fee. Please contact us
         name: "Insurance & Liability",
         slug: "insurance-liability",
         category: "legal",
-        sortOrder: 9,
+        sortOrder: 10,
         isDefault: true,
         variables: [],
         content: `## Insurance & Liability
@@ -291,7 +325,7 @@ Scan2Plan's liability is limited to the contract value. We are not responsible f
         name: "Signature Block",
         slug: "signature-block",
         category: "legal",
-        sortOrder: 10,
+        sortOrder: 11,
         isDefault: true,
         variables: ["client_name", "quote_date"],
         content: `## Acceptance
@@ -379,7 +413,7 @@ async function seedProposalTemplates() {
         }));
 
     // Simple group - just core sections
-    const simpleSections = ["cover-page", "scope-of-work", "pricing", "signature-block"]
+    const simpleSections = ["cover-page", "scope-of-work", "service-deliverables", "pricing", "signature-block"]
         .map((slug, idx) => ({
             templateId: templatesBySlug[slug]?.id,
             sortOrder: idx + 1,
