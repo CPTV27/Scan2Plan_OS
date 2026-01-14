@@ -6,7 +6,6 @@ import { sql, and, eq, inArray } from 'drizzle-orm';
 const STAGE_BASELINES: Record<string, number> = {
   'Leads': 5,
   'Contacted': 15,
-  'Qualified': 30,
   'Proposal': 45,
   'Negotiation': 60,
   'On Hold': 20,
@@ -18,7 +17,6 @@ const STAGE_BASELINES: Record<string, number> = {
 const STAGE_STALENESS: Record<string, { aging: number; stale: number; critical: number }> = {
   'Leads': { aging: 2, stale: 5, critical: 10 },
   'Contacted': { aging: 3, stale: 7, critical: 14 },
-  'Qualified': { aging: 5, stale: 10, critical: 21 },
   'Proposal': { aging: 5, stale: 14, critical: 30 },
   'Negotiation': { aging: 2, stale: 5, critical: 10 }, // Hot leads need quick follow-up
   'On Hold': { aging: 14, stale: 30, critical: 60 }, // More lenient for on-hold

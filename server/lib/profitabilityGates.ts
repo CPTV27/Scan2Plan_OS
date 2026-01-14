@@ -43,7 +43,7 @@ export function checkGMGate(marginPercent: number): GateResult {
 }
 
 export function checkAttributionGate(lead: Lead, isClosingWon: boolean): GateResult {
-  const hasSource = !!lead.source && lead.source !== "";
+  const hasSource = !!lead.leadSource && lead.leadSource !== "";
   
   if (isClosingWon && !hasSource) {
     return {
