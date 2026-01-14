@@ -17,6 +17,15 @@ import {
     extractMarketingIntel,
     type StoredPrompt,
 } from "../services/agentPromptLibrary";
+import {
+    initializeAgents,
+    messageBus,
+    scoutAgent,
+    ScoutInput,
+} from "../services/agents";
+
+// Initialize agents on module load
+initializeAgents();
 
 const router = Router();
 
@@ -533,6 +542,87 @@ router.get(
                     thisWeek: thisWeekCount,
                     lastWeek: lastWeekCount,
                 },
+            },
+        });
+    })
+);
+
+// POST /api/agent/pipeline - Run intel through all 5 agents
+router.post(
+    "/pipeline",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const { rawContent, source = "manual" } = req.body;
+
+        if (!rawContent) {
+            return res.status(400).json({
+                success: false,
+                message: "rawContent is required"
+            });
+        }
+
+        const traceId = crypto.randomUUID();
+
+        try {
+            // Start the pipeline
+            const results = await messageBus.runPipeline({
+                rawContent,
+                source,
+            });
+
+            // Extract final outputs from each agent
+            const scoutOutput = results.find(r => r.from === "scout")?.payload;
+            const analystOutput = results.find(r => r.from === "analyst")?.payload;
+            const strategistOutput = results.find(r => r.from === "strategist")?.payload;
+            const composerOutput = results.find(r => r.from === "composer")?.payload;
+            const auditorOutput = results.find(r => r.from === "auditor")?.payload;
+
+            return res.json({
+                success: true,
+                traceId,
+                agentsCompleted: results.length,
+                outputs: {
+                    scout: scoutOutput,
+                    analyst: analystOutput,
+                    strategist: strategistOutput,
+                    composer: composerOutput,
+                    auditor: auditorOutput,
+                },
+                timeline: results.map(r => ({
+                    agent: r.from,
+                    type: r.type,
+                    timestamp: r.timestamp,
+                })),
+            });
+        } catch (error: any) {
+            console.error("[Pipeline] Error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Pipeline execution failed",
+                traceId,
+            });
+        }
+    })
+);
+
+// GET /api/agent/pipeline/status - Check if pipeline is ready
+router.get(
+    "/pipeline/status",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const hasOpenAI = !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY);
+        const hasGemini = !!(process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY);
+
+        return res.json({
+            success: true,
+            ready: hasOpenAI || hasGemini,
+            agents: {
+                scout: { ready: hasOpenAI, model: "gpt-4o-mini" },
+                analyst: { ready: hasGemini, model: "gemini-1.5-pro" },
+                strategist: { ready: hasOpenAI, model: "gpt-4o" },
+                composer: { ready: hasOpenAI, model: "gpt-4o" },
+                auditor: { ready: hasOpenAI, model: "gpt-4o-mini" },
             },
         });
     })

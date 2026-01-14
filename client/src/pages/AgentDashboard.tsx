@@ -22,6 +22,7 @@ import {
     Edit,
     Trash2,
     Check,
+    CheckCircle,
     X,
     TrendingUp,
     Target,
@@ -144,6 +145,8 @@ export default function AgentDashboard() {
     const [newPromptOpen, setNewPromptOpen] = useState(false);
     const [editingPrompt, setEditingPrompt] = useState<AgentPrompt | null>(null);
     const [newPrompt, setNewPrompt] = useState({ category: "", name: "", basePrompt: "" });
+    const [pipelineInput, setPipelineInput] = useState("");
+    const [pipelineResults, setPipelineResults] = useState<any>(null);
 
     // Fetch prompts
     const { data: prompts, isLoading: promptsLoading } = useQuery<AgentPrompt[]>({
@@ -248,6 +251,30 @@ export default function AgentDashboard() {
         mutationFn: (id: number) => apiRequest("POST", `/api/agent/intel/${id}/action`),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/agent/intel"] });
+        },
+    });
+
+    // Pipeline status query
+    const { data: pipelineStatus } = useQuery<any>({
+        queryKey: ["/api/agent/pipeline/status"],
+        select: (response: any) => response?.data || response,
+    });
+
+    // Run pipeline mutation
+    const pipelineMutation = useMutation({
+        mutationFn: async (rawContent: string) => {
+            const res = await apiRequest("POST", "/api/agent/pipeline", { rawContent, source: "dashboard" });
+            return res.json();
+        },
+        onSuccess: (data: any) => {
+            setPipelineResults(data);
+            toast({
+                title: "Pipeline Complete",
+                description: `${data.agentsCompleted} agents processed the intel`
+            });
+        },
+        onError: () => {
+            toast({ title: "Pipeline Failed", description: "Could not run agent pipeline", variant: "destructive" });
         },
     });
 
@@ -437,6 +464,10 @@ export default function AgentDashboard() {
                             <TabsTrigger value="context" className="gap-2">
                                 <Database className="w-4 h-4" />
                                 RAG Context
+                            </TabsTrigger>
+                            <TabsTrigger value="hub" className="gap-2">
+                                <Zap className="w-4 h-4" />
+                                Agent Hub
                             </TabsTrigger>
                         </TabsList>
 
@@ -1030,6 +1061,177 @@ export default function AgentDashboard() {
                                     </Card>
                                 </div>
                             )}
+                        </TabsContent>
+
+                        {/* Agent Hub Tab */}
+                        <TabsContent value="hub">
+                            <div className="space-y-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold">Multi-Agent Pipeline</h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Run intel through all 5 specialized AI agents
+                                    </p>
+                                </div>
+
+                                {/* Agent Status Grid */}
+                                <div className="grid grid-cols-5 gap-4">
+                                    {[
+                                        { name: "Scout", icon: "🔍", key: "scout", desc: "Gather intel" },
+                                        { name: "Analyst", icon: "📊", key: "analyst", desc: "Find trends" },
+                                        { name: "Strategist", icon: "🎯", key: "strategist", desc: "Recommend actions" },
+                                        { name: "Composer", icon: "✍️", key: "composer", desc: "Draft content" },
+                                        { name: "Auditor", icon: "🛡️", key: "auditor", desc: "Quality control" },
+                                    ].map((agent) => (
+                                        <Card key={agent.key} className={`text-center ${pipelineStatus?.agents?.[agent.key]?.ready
+                                            ? "border-green-500/30"
+                                            : "border-red-500/30"
+                                            }`}>
+                                            <CardContent className="pt-4">
+                                                <div className="text-2xl mb-2">{agent.icon}</div>
+                                                <p className="font-medium text-sm">{agent.name}</p>
+                                                <p className="text-xs text-muted-foreground">{agent.desc}</p>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={`mt-2 text-xs ${pipelineStatus?.agents?.[agent.key]?.ready
+                                                        ? "bg-green-500/10 text-green-500"
+                                                        : "bg-red-500/10 text-red-500"
+                                                        }`}
+                                                >
+                                                    {pipelineStatus?.agents?.[agent.key]?.model || "checking..."}
+                                                </Badge>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+
+                                {/* Pipeline Input */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Run Pipeline</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <textarea
+                                            className="w-full h-32 p-3 rounded-md border bg-background resize-none"
+                                            placeholder="Paste raw intel here (RFP text, news article, competitor info, etc.)"
+                                            value={pipelineInput}
+                                            onChange={(e) => setPipelineInput(e.target.value)}
+                                        />
+                                        <Button
+                                            onClick={() => pipelineMutation.mutate(pipelineInput)}
+                                            disabled={!pipelineInput.trim() || pipelineMutation.isPending}
+                                        >
+                                            {pipelineMutation.isPending ? (
+                                                <>Processing through 5 agents...</>
+                                            ) : (
+                                                <>
+                                                    <Zap className="w-4 h-4 mr-2" />
+                                                    Run Full Pipeline
+                                                </>
+                                            )}
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Pipeline Results */}
+                                {pipelineResults && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                                Pipeline Complete
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                {/* Scout Output */}
+                                                {pipelineResults.outputs?.scout && (
+                                                    <Card className="border-blue-500/20">
+                                                        <CardHeader className="py-3">
+                                                            <CardTitle className="text-sm">🔍 Scout</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="text-sm">
+                                                            <p className="font-medium">{pipelineResults.outputs.scout.title}</p>
+                                                            <p className="text-muted-foreground text-xs mt-1">
+                                                                {pipelineResults.outputs.scout.summary?.substring(0, 150)}...
+                                                            </p>
+                                                            <Badge className="mt-2">
+                                                                Relevance: {pipelineResults.outputs.scout.relevanceScore}%
+                                                            </Badge>
+                                                        </CardContent>
+                                                    </Card>
+                                                )}
+
+                                                {/* Strategist Output */}
+                                                {pipelineResults.outputs?.strategist && (
+                                                    <Card className="border-orange-500/20">
+                                                        <CardHeader className="py-3">
+                                                            <CardTitle className="text-sm">🎯 Strategist</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="text-sm">
+                                                            <p className="font-medium">{pipelineResults.outputs.strategist.weeklyFocus}</p>
+                                                            <ul className="text-xs text-muted-foreground mt-2 space-y-1">
+                                                                {pipelineResults.outputs.strategist.priorityActions?.slice(0, 3).map((a: any, i: number) => (
+                                                                    <li key={i}>• {a.action}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </CardContent>
+                                                    </Card>
+                                                )}
+
+                                                {/* Composer Output */}
+                                                {pipelineResults.outputs?.composer?.drafts?.[0] && (
+                                                    <Card className="border-purple-500/20 md:col-span-2">
+                                                        <CardHeader className="py-3">
+                                                            <CardTitle className="text-sm">✍️ Composer Draft</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="text-sm">
+                                                            <p className="font-medium">{pipelineResults.outputs.composer.drafts[0].title}</p>
+                                                            <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">
+                                                                {pipelineResults.outputs.composer.drafts[0].content?.substring(0, 300)}...
+                                                            </p>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="mt-2"
+                                                                onClick={() => copyToClipboard(pipelineResults.outputs.composer.drafts[0].content)}
+                                                            >
+                                                                <Copy className="w-3 h-3 mr-1" /> Copy Draft
+                                                            </Button>
+                                                        </CardContent>
+                                                    </Card>
+                                                )}
+
+                                                {/* Auditor Output */}
+                                                {pipelineResults.outputs?.auditor && (
+                                                    <Card className="border-green-500/20 md:col-span-2">
+                                                        <CardHeader className="py-3">
+                                                            <CardTitle className="text-sm">🛡️ Auditor Review</CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant={
+                                                                    pipelineResults.outputs.auditor.approvedDrafts?.length > 0
+                                                                        ? "default"
+                                                                        : "destructive"
+                                                                }>
+                                                                    {pipelineResults.outputs.auditor.approvedDrafts?.length > 0
+                                                                        ? "✓ APPROVED"
+                                                                        : "✗ NEEDS REVISION"}
+                                                                </Badge>
+                                                                {pipelineResults.outputs.auditor.results?.[0]?.overallScore && (
+                                                                    <span className="text-sm">
+                                                                        Score: {pipelineResults.outputs.auditor.results[0].overallScore}/100
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
                         </TabsContent>
                     </Tabs>
                 </main>
