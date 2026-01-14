@@ -31,10 +31,12 @@ import {
     Edit,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { calculatePricing, BUILDING_TYPES, LOD_OPTIONS, SCOPE_OPTIONS, DISCIPLINES } from "./pricing";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { calculatePricing, BUILDING_TYPES, LOD_OPTIONS, SCOPE_OPTIONS, DISCIPLINES, LANDSCAPE_TYPES, LANDSCAPE_LOD_OPTIONS, calculateLandscapePrice, LANDSCAPE_MINIMUM } from "./pricing";
 import { LineItemEditor, type QuoteLineItem } from "./LineItemEditor";
 import { generateEditableLineItems } from "./lineItemUtils";
 import { enrichAreaWithProducts, generateQuoteSkus } from "@/lib/productResolver";
+import { TreeDeciduous } from "lucide-react";
 import type { Lead } from "@shared/schema";
 
 interface Area {
@@ -84,6 +86,12 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
     const [customLineItems, setCustomLineItems] = useState<QuoteLineItem[] | null>(null);
     const [hasCustomizedPricing, setHasCustomizedPricing] = useState(false);
 
+    // Landscape configuration - included by default
+    const [includeLandscape, setIncludeLandscape] = useState(true);
+    const [landscapeType, setLandscapeType] = useState<"built" | "natural">("built");
+    const [landscapeAcres, setLandscapeAcres] = useState("");
+    const [landscapeLod, setLandscapeLod] = useState("300");
+
     // Load lead data
     const { data: lead } = useQuery<Lead>({
         queryKey: [`/api/leads/${leadId}`],
@@ -112,6 +120,20 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
             paymentTerms
         );
     }, [areas, services, risks, paymentTerms]);
+
+    // Calculate landscape pricing
+    const landscapePrice = useMemo(() => {
+        if (!includeLandscape || !landscapeAcres) return 0;
+        const acres = parseFloat(landscapeAcres);
+        if (isNaN(acres) || acres <= 0) return 0;
+        return calculateLandscapePrice(landscapeType, acres, landscapeLod as "200" | "300" | "350");
+    }, [includeLandscape, landscapeType, landscapeAcres, landscapeLod]);
+
+    // Total price including landscape
+    const totalPrice = useMemo(() => {
+        const basePrice = pricing?.totalClientPrice || 0;
+        return basePrice + landscapePrice;
+    }, [pricing, landscapePrice]);
 
     // Add new area
     const addArea = () => {
@@ -242,7 +264,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                 </div>
                 <div className="text-right">
                     <div className="text-2xl font-bold text-green-600">
-                        ${pricing?.totalClientPrice.toLocaleString() || "0"}
+                        ${totalPrice.toLocaleString() || "0"}
                     </div>
                     <div className="text-xs text-muted-foreground">Estimated Total</div>
                 </div>
@@ -421,6 +443,95 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                     <Plus className="h-4 w-4 mr-2" />
                     Add Another Area
                 </Button>
+
+                {/* Landscape Section */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <TreeDeciduous className="h-4 w-4" />
+                                Landscape
+                            </CardTitle>
+                            <div className="flex items-center gap-3">
+                                {includeLandscape && landscapePrice > 0 && (
+                                    <span className="text-sm font-semibold text-green-600">
+                                        ${landscapePrice.toLocaleString()}
+                                    </span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="include-landscape"
+                                        checked={includeLandscape}
+                                        onCheckedChange={(checked) => setIncludeLandscape(!!checked)}
+                                    />
+                                    <Label htmlFor="include-landscape" className="text-sm">Include</Label>
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+
+                    {includeLandscape && (
+                        <CardContent className="space-y-4">
+                            {/* Landscape Type */}
+                            <div>
+                                <Label className="mb-3 block">Landscape Type</Label>
+                                <RadioGroup
+                                    value={landscapeType}
+                                    onValueChange={(value) => setLandscapeType(value as "built" | "natural")}
+                                    className="flex gap-6"
+                                >
+                                    {LANDSCAPE_TYPES.map((type) => (
+                                        <div key={type.id} className="flex items-center gap-2">
+                                            <RadioGroupItem value={type.id} id={`landscape-${type.id}`} />
+                                            <Label htmlFor={`landscape-${type.id}`} className="cursor-pointer">
+                                                <span className="font-medium">{type.label}</span>
+                                                <p className="text-xs text-muted-foreground">{type.description}</p>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+                            </div>
+
+                            {/* Acreage */}
+                            <div>
+                                <Label htmlFor="landscape-acres">Acreage</Label>
+                                <Input
+                                    id="landscape-acres"
+                                    type="number"
+                                    placeholder="Enter acres (e.g., 5)"
+                                    value={landscapeAcres}
+                                    onChange={(e) => setLandscapeAcres(e.target.value)}
+                                    className="mt-1"
+                                />
+                                {landscapeAcres && parseFloat(landscapeAcres) > 0 && landscapePrice === LANDSCAPE_MINIMUM && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Minimum charge of ${LANDSCAPE_MINIMUM} applied
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* LOD Selection */}
+                            <div>
+                                <Label className="mb-3 block">Level of Detail</Label>
+                                <RadioGroup
+                                    value={landscapeLod}
+                                    onValueChange={setLandscapeLod}
+                                    className="space-y-2"
+                                >
+                                    {LANDSCAPE_LOD_OPTIONS.map((lod) => (
+                                        <div key={lod.id} className="flex items-start gap-2">
+                                            <RadioGroupItem value={lod.id} id={`landscape-lod-${lod.id}`} className="mt-0.5" />
+                                            <Label htmlFor={`landscape-lod-${lod.id}`} className="cursor-pointer">
+                                                <span className="font-medium">{lod.label}</span>
+                                                <p className="text-xs text-muted-foreground">{lod.description}</p>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+                            </div>
+                        </CardContent>
+                    )}
+                </Card>
 
                 {/* Payment Terms */}
                 <Card>

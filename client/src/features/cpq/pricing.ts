@@ -101,12 +101,8 @@ export const FACADE_TYPES = [
   { id: "curtainwall", label: "Curtain Wall" },
 ];
 
-// Landscape area types (measured in acres)
-export const LANDSCAPE_TYPES = [
-  { id: "landscape_built", label: "Landscape - Built (Hardscape, Structures)" },
-  { id: "landscape_natural", label: "Landscape - Natural (Terrain, Vegetation)" },
-  { id: "landscape_mixed", label: "Landscape - Mixed (Built + Natural)" },
-];
+// Legacy landscape types (use LANDSCAPE_TYPES from below for configurator)
+// Kept for backwards compatibility with existing area configurations
 
 // Acres to sqft conversion constant
 export const ACRES_TO_SQFT = 43560;
@@ -213,6 +209,59 @@ export const SCOPE_OPTIONS = [
   { id: "facade", label: "Facade Only (Front/Side)" },
 ];
 
+// Landscape pricing configuration (per acre rates)
+export const LANDSCAPE_TYPES = [
+  { id: "built", label: "Built Landscape", description: "Manicured areas - flower beds, shrubbery, mowed land" },
+  { id: "natural", label: "Natural Landscape", description: "Unmaintained - forests, dense vegetation, waterways" },
+];
+
+export const LANDSCAPE_LOD_OPTIONS = [
+  { id: "200", label: "LOD 200", description: "Basic topography with approximate dimensions" },
+  { id: "300", label: "LOD 300", description: "Topography + type, pattern, ground features" },
+  { id: "350", label: "LOD 350", description: "Detailed topography + development features, equipment" },
+];
+
+// Landscape rates per acre by type and LOD
+// Tier 1: ≤5 acres, Tier 2: 5-20, Tier 3: 20-50, Tier 4: 50-100, Tier 5: 100+
+export const LANDSCAPE_RATES: Record<string, Record<string, { tier1: number; tier2: number; tier3: number; tier4: number; tier5: number }>> = {
+  built: {
+    "200": { tier1: 175, tier2: 125, tier3: 75, tier4: 50, tier5: 40 },
+    "300": { tier1: 200, tier2: 150, tier3: 100, tier4: 75, tier5: 55 },
+    "350": { tier1: 250, tier2: 200, tier3: 150, tier4: 100, tier5: 65 },
+  },
+  natural: {
+    "200": { tier1: 125, tier2: 75, tier3: 50, tier4: 40, tier5: 35 },
+    "300": { tier1: 150, tier2: 100, tier3: 75, tier4: 55, tier5: 50 },
+    "350": { tier1: 200, tier2: 150, tier3: 100, tier4: 65, tier5: 60 },
+  },
+};
+
+export const LANDSCAPE_MINIMUM = 300;
+
+/**
+ * Calculate landscape pricing based on type, acreage, and LOD
+ */
+export function calculateLandscapePrice(
+  type: "built" | "natural",
+  acres: number,
+  lod: "200" | "300" | "350"
+): number {
+  if (acres <= 0) return 0;
+
+  const rates = LANDSCAPE_RATES[type]?.[lod];
+  if (!rates) return 0;
+
+  let rate: number;
+  if (acres <= 5) rate = rates.tier1;
+  else if (acres <= 20) rate = rates.tier2;
+  else if (acres <= 50) rate = rates.tier3;
+  else if (acres <= 100) rate = rates.tier4;
+  else rate = rates.tier5;
+
+  const total = rate * acres;
+  return Math.max(total, LANDSCAPE_MINIMUM);
+}
+
 // Base rates per sqft by building type and discipline (LOD 200)
 // Format: { buildingTypeId: { discipline: rate } }
 const BASE_RATES: Record<string, Record<string, number>> = {
@@ -264,19 +313,8 @@ const AREA_TIERS = [
   { min: 100000, max: Infinity, tier: "100k+", multiplier: 0.72 },
 ];
 
-// Landscape rates (per acre by LOD)
-const LANDSCAPE_RATES: Record<string, Record<string, number[]>> = {
-  built: {
-    "200": [875, 625, 375, 250, 160],
-    "300": [1000, 750, 500, 375, 220],
-    "350": [1250, 1000, 750, 500, 260],
-  },
-  natural: {
-    "200": [625, 375, 250, 200, 140],
-    "300": [750, 500, 375, 275, 200],
-    "350": [1000, 750, 500, 325, 240],
-  },
-};
+// Note: LANDSCAPE_RATES is now defined and exported earlier in the file
+// with tiered pricing structure (tier1, tier2, etc.)
 
 // Brooklyn Tiered Travel Logic - Gold Standard from CPQ Logic Export
 // Dispatch Location determines base fee structure, Project Size determines tier
@@ -423,20 +461,28 @@ export function getLandscapePerAcreRate(
   lod: string
 ): number {
   const landscapeKind = resolveLandscapeKind(buildingType);
-  const tierIndex = getAcreageTierIndex(acres);
-  
+
+  // Get the tier based on acreage
+  const getTierValue = (rates: { tier1: number; tier2: number; tier3: number; tier4: number; tier5: number }): number => {
+    if (acres >= 100) return rates.tier5;
+    if (acres >= 50) return rates.tier4;
+    if (acres >= 20) return rates.tier3;
+    if (acres >= 5) return rates.tier2;
+    return rates.tier1;
+  };
+
   if (landscapeKind === "mixed") {
     // Mixed uses average of built and natural rates
     const builtRates = LANDSCAPE_RATES.built[lod] || LANDSCAPE_RATES.built["200"];
     const naturalRates = LANDSCAPE_RATES.natural[lod] || LANDSCAPE_RATES.natural["200"];
-    return (builtRates[tierIndex] + naturalRates[tierIndex]) / 2;
+    return (getTierValue(builtRates) + getTierValue(naturalRates)) / 2;
   }
-  
-  const rates = landscapeKind === "built" 
-    ? LANDSCAPE_RATES.built 
+
+  const rates = landscapeKind === "built"
+    ? LANDSCAPE_RATES.built
     : LANDSCAPE_RATES.natural;
   const lodRates = rates[lod] || rates["200"];
-  return lodRates[tierIndex];
+  return getTierValue(lodRates);
 }
 
 // Helper: Get CAD package type
@@ -514,7 +560,7 @@ export function calculateTravelCost(
   if (isBrooklyn) {
     // Brooklyn tiered pricing based on project size
     let baseFee = BROOKLYN_TRAVEL_TIERS.tierC.baseFee; // Default: < 10k sqft
-    
+
     if (projectTotalSqft >= BROOKLYN_TRAVEL_TIERS.tierA.minSqft) {
       baseFee = BROOKLYN_TRAVEL_TIERS.tierA.baseFee; // >= 50k: $0
     } else if (projectTotalSqft >= BROOKLYN_TRAVEL_TIERS.tierB.minSqft) {
@@ -579,7 +625,7 @@ export function calculatePricing(
   marginTarget?: number
 ): PricingResult {
   const items: PricingLineItem[] = [];
-  
+
   // Separate tracking for risk-eligible vs risk-exempt costs
   let architectureBaseTotal = 0;  // Architecture discipline ONLY - eligible for risk premiums
   let mepfTotal = 0;              // MEP/F discipline - EXCLUDED from risk premiums
@@ -604,10 +650,10 @@ export function calculatePricing(
     const disciplines = isLandscape
       ? ["site"]
       : isACT
-      ? ["mepf"]
-      : area.disciplines.length > 0
-      ? area.disciplines
-      : [];
+        ? ["mepf"]
+        : area.disciplines.length > 0
+          ? area.disciplines
+          : [];
 
     disciplines.forEach((discipline) => {
       // Get per-discipline LoD if available, otherwise use default area LoD
@@ -634,25 +680,25 @@ export function calculatePricing(
       } else {
         const sqft = Math.max(inputValue, 3000);
         const scopeMultiplier = SCOPE_MULTIPLIERS[disciplineScope] || SCOPE_MULTIPLIERS.full;
-        
+
         // Check for mixed LOD scenario (separate interior/exterior LODs)
         const hasInteriorLod = area.mixedInteriorLod || area.interiorLod;
         const hasExteriorLod = area.mixedExteriorLod || area.exteriorLod;
         const isMixedLod = hasInteriorLod && hasExteriorLod && hasInteriorLod !== hasExteriorLod;
-        
+
         if (isMixedLod && scopeMultiplier.interior > 0 && scopeMultiplier.exterior > 0) {
           // Mixed LOD: Calculate interior and exterior portions separately
           const interiorLod = hasInteriorLod || lod;
           const exteriorLod = hasExteriorLod || lod;
-          
+
           const interiorRate = getPricingRate(area.buildingType, sqft, discipline, interiorLod);
           const exteriorRate = getPricingRate(area.buildingType, sqft, discipline, exteriorLod);
-          
+
           const interiorCost = sqft * interiorRate * scopeMultiplier.interior;
           const exteriorCost = sqft * exteriorRate * scopeMultiplier.exterior;
-          
+
           lineTotal = interiorCost + exteriorCost;
-          
+
           // Calculate effective per-sqft rate for display
           const effectiveRate = lineTotal / sqft;
           areaLabel = `${sqft.toLocaleString()} sqft @ $${effectiveRate.toFixed(3)}/sqft (Int ${interiorLod}/Ext ${exteriorLod})`;
@@ -713,8 +759,8 @@ export function calculatePricing(
     }
 
     // Additional elevations - NOT eligible for risk premiums
-    const additionalElevations = typeof area.additionalElevations === 'number' 
-      ? area.additionalElevations 
+    const additionalElevations = typeof area.additionalElevations === 'number'
+      ? area.additionalElevations
       : parseInt(String(area.additionalElevations || "0")) || 0;
     if (additionalElevations > 0) {
       const elevTotal = calculateAdditionalElevationsPrice(additionalElevations);
@@ -776,14 +822,14 @@ export function calculatePricing(
       if (risk) {
         // Calculate premium against Architecture base only (not against other risks)
         const individualPremium = Math.round(architectureBaseTotal * risk.premium * 100) / 100;
-        
+
         // Add line item for this risk
         items.push({
           label: `Risk Premium: ${risk.label} (Architecture only)`,
           value: individualPremium,
           upteamCost: 0, // Risk premiums are pure profit margin
         });
-        
+
         // Accumulate premium total (using same rounded value as line item)
         riskPremiumTotal += individualPremium;
       }
@@ -812,7 +858,7 @@ export function calculatePricing(
     if (travelCost > 0) {
       const isBrooklyn = (travel.dispatchLocation || "").toLowerCase().includes("brooklyn");
       let travelLabel = `Travel (${travel.distance} mi from ${travel.dispatchLocation}`;
-      
+
       if (isBrooklyn) {
         // Brooklyn: Show tier and mileage breakdown
         const tierLabel = projectTotalSqft >= 50000 ? "Tier A" : projectTotalSqft >= 10000 ? "Tier B" : "Tier C";
@@ -827,7 +873,7 @@ export function calculatePricing(
         travelLabel += ` @ $${OTHER_DISPATCH_PER_MILE_RATE}/mi`;
       }
       travelLabel += ")";
-      
+
       items.push({
         label: travelLabel,
         value: travelCost,
@@ -846,11 +892,11 @@ export function calculatePricing(
   const hotelPerDiemDays = Math.max(0, scanDays - 1);
   const hotelPerDiemCost = hotelPerDiemDays * HOTEL_PER_DIEM_DAILY;
   const totalScanningCost = baseScanningCost + hotelPerDiemCost;
-  
+
   // Add scanning cost to internal (upteam) costs - this is our cost, not client-facing
   // Scanning is 100% internal cost (no markup in this line)
   upteamCost += totalScanningCost;
-  
+
   const scanningEstimate = {
     totalSqft: projectTotalSqft,
     scanDays,
@@ -930,22 +976,22 @@ export function calculatePricing(
   let totalClientPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
   const totalUpteamCost = Math.round(upteamCost * 100) / 100;
   let profitMargin = totalClientPrice - totalUpteamCost;
-  
+
   // Margin target support: when marginTarget is provided, recalculate client price to achieve target margin
   // Formula: clientPrice = cost / (1 - marginTarget)
   const marginWarnings: MarginWarning[] = [];
   const MARGIN_GUARDRAIL = 0.45; // 45% minimum recommended margin
   const MARGIN_FLOOR = FY26_GOALS.MARGIN_FLOOR; // 40% hard floor
-  
+
   if (marginTarget !== undefined) {
     // Validate margin target range (0.35 - 0.60)
     const validMarginTarget = Math.max(0.35, Math.min(0.60, marginTarget));
-    
+
     // Calculate new client price to achieve target margin
     // margin = (clientPrice - cost) / clientPrice = marginTarget
     // clientPrice = cost / (1 - marginTarget)
     const adjustedClientPrice = Math.round((totalUpteamCost / (1 - validMarginTarget)) * 100) / 100;
-    
+
     // Check if margin target is below guardrail (45%)
     // Use epsilon tolerance to handle floating point precision (e.g., 0.449999... should equal 0.45)
     const EPSILON = 0.0001;
@@ -957,7 +1003,7 @@ export function calculatePricing(
         calculatedMargin: validMarginTarget,
       });
     }
-    
+
     // Check if margin target is below hard floor (40%)
     if (validMarginTarget < MARGIN_FLOOR - EPSILON) {
       marginWarnings.push({
@@ -967,16 +1013,16 @@ export function calculatePricing(
         calculatedMargin: validMarginTarget,
       });
     }
-    
+
     // Update the client price and profit margin
     totalClientPrice = adjustedClientPrice;
     profitMargin = totalClientPrice - totalUpteamCost;
-    
+
     // Update the total line item with adjusted price
     // Note: We need to add a margin adjustment line item if price changed
     const originalPrice = Math.round((subtotal + paymentAdjustment) * 100) / 100;
     const priceAdjustment = adjustedClientPrice - originalPrice;
-    
+
     if (Math.abs(priceAdjustment) > 0.01) {
       items.push({
         label: `Margin Target Adjustment (${(validMarginTarget * 100).toFixed(1)}%)`,
@@ -1145,7 +1191,7 @@ export function calculateTierAPricing(
   }
 
   const clientPrice = Math.round(subtotal * margin * 100) / 100;
-  
+
   // Calculate Tier A travel
   const travelCost = calculateTierATravelCost(distanceMiles);
   const totalWithTravel = clientPrice + travelCost;
