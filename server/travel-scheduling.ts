@@ -70,20 +70,43 @@ function cleanAddress(address: string): string {
 // Generate address variations for geocoding (e.g., "New York 212" -> "NY-212")
 function generateAddressVariations(address: string): string[] {
   const variations: string[] = [address];
-  
+
   // Convert "New York XXX" to "NY-XXX" (state route format)
   const nyRouteMatch = address.match(/(.*)New York\s+(\d+)(.*)/i);
   if (nyRouteMatch) {
     variations.push(`${nyRouteMatch[1]}NY-${nyRouteMatch[2]}${nyRouteMatch[3]}`);
   }
-  
+
   // Convert "Route XXX" or "Rt XXX" to state abbreviation format
   const routeMatch = address.match(/(.*)(?:Route|Rt\.?)\s+(\d+)(.*)/i);
   if (routeMatch) {
     variations.push(`${routeMatch[1]}NY-${routeMatch[2]}${routeMatch[3]}`);
   }
-  
-  return variations;
+
+  // Try without suite/unit numbers
+  const suiteMatch = address.match(/^(.*?),?\s*(?:Suite|Ste|Unit|Apt|#)\s*\d+[A-Z]?\s*,?(.*)$/i);
+  if (suiteMatch) {
+    variations.push(`${suiteMatch[1]}${suiteMatch[2]}`.trim());
+  }
+
+  // Try with just city, state, zip (for imprecise addresses)
+  const cityStateZipMatch = address.match(/,\s*([^,]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i);
+  if (cityStateZipMatch) {
+    const simplified = `${cityStateZipMatch[1]}, ${cityStateZipMatch[2]} ${cityStateZipMatch[3]}`;
+    if (!variations.includes(simplified)) {
+      variations.push(simplified);
+    }
+  }
+
+  // Try replacing common abbreviations
+  const withAvenue = address.replace(/\bAve\b/gi, 'Avenue');
+  const withStreet = address.replace(/\bSt\b/gi, 'Street');
+  const withDrive = address.replace(/\bDr\b/gi, 'Drive');
+  if (withAvenue !== address) variations.push(withAvenue);
+  if (withStreet !== address) variations.push(withStreet);
+  if (withDrive !== address) variations.push(withDrive);
+
+  return Array.from(new Set(variations)); // Remove duplicates
 }
 
 // Helper to geocode an address to get the formatted address
@@ -91,25 +114,25 @@ async function geocodeAddress(address: string, apiKey: string): Promise<string |
   try {
     // First try with cleaned address (remove parenthetical annotations)
     const cleanedAddress = cleanAddress(address);
-    
+
     // Generate variations to try (e.g., "New York 212" -> "NY-212")
     const variations = generateAddressVariations(cleanedAddress);
-    
+
     for (const variation of variations) {
       const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
       url.searchParams.set("address", variation);
       url.searchParams.set("key", apiKey);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
+
       try {
         const response = await fetch(url.toString(), { signal: controller.signal });
         clearTimeout(timeoutId);
         const data = await response.json();
-        
+
         log(`[Geocode] Attempt for: ${variation} Status: ${data.status}`);
-        
+
         if (data.status === "OK" && data.results?.[0]?.formatted_address) {
           log(`[Geocode] Resolved: ${variation} -> ${data.results[0].formatted_address}`);
           return data.results[0].formatted_address;
@@ -119,7 +142,7 @@ async function geocodeAddress(address: string, apiKey: string): Promise<string |
         log(`ERROR: [Geocode] Fetch error for ${variation}: ${error.message}`);
       }
     }
-    
+
     log(`[Geocode] No results for any variation of: ${cleanedAddress}`);
     return null;
   } catch (error) {
@@ -179,18 +202,18 @@ export async function calculateTravelDistance(destination: string, origin?: stri
   }
 
   const from = origin || OFFICE_ADDRESS;
-  
+
   log(`[Distance Matrix] Calculating: from=${from} destination=${destination}`);
-  
+
   try {
     // First attempt with original addresses
     let result = await tryDistanceMatrix(from, destination, apiKey);
-    
+
     // If NOT_FOUND, try to geocode the destination first
     if (!result) {
       log("[Distance Matrix] First attempt failed, trying geocoded destination...");
       const formattedDestination = await geocodeAddress(destination, apiKey);
-      
+
       if (formattedDestination && formattedDestination !== destination) {
         result = await tryDistanceMatrix(from, formattedDestination, apiKey);
         if (result) {
@@ -198,12 +221,12 @@ export async function calculateTravelDistance(destination: string, origin?: stri
         }
       }
     }
-    
+
     // If still no result, try geocoding the origin (e.g., "Brooklyn, NY 11201")
     if (!result) {
       log("[Distance Matrix] Still failed, trying geocoded origin...");
       const formattedOrigin = await geocodeAddress(from, apiKey);
-      
+
       if (formattedOrigin && formattedOrigin !== from) {
         result = await tryDistanceMatrix(formattedOrigin, destination, apiKey);
         if (result) {
@@ -220,7 +243,7 @@ export async function calculateTravelDistance(destination: string, origin?: stri
         }
       }
     }
-    
+
     if (!result) {
       log(`ERROR: [Distance Matrix] Route not found for ${from} -> ${destination}`);
       return null;
@@ -291,7 +314,7 @@ export async function createScanCalendarEvent(params: CreateScanEventParams): Pr
       description += `Project ID: ${params.universalProjectId}\n`;
     }
     description += `Location: ${params.projectAddress}\n`;
-    
+
     description += `\n--- Quick Links ---\n`;
     if (params.missionBriefUrl) {
       description += `Mission Brief: ${params.missionBriefUrl}\n`;
@@ -299,7 +322,7 @@ export async function createScanCalendarEvent(params: CreateScanEventParams): Pr
     if (params.driveFolderUrl) {
       description += `Project Files: ${params.driveFolderUrl}\n`;
     }
-    
+
     if (params.travelInfo) {
       description += `\n--- Travel Info ---\n`;
       description += `From: ${params.travelInfo.origin}\n`;
@@ -356,10 +379,10 @@ export async function getTechnicianAvailability(
 ): Promise<{ busy: boolean; events: Array<{ start: string; end: string; summary: string }> }> {
   try {
     const calendar = await getCalendarClient();
-    
+
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
-    
+
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
