@@ -15,7 +15,7 @@ async function parseRSSFeed(feedUrl: string): Promise<Array<{
 }>> {
     const response = await fetch(feedUrl);
     const text = await response.text();
-    
+
     const items: Array<{
         title: string;
         link: string;
@@ -23,28 +23,28 @@ async function parseRSSFeed(feedUrl: string): Promise<Array<{
         pubDate: Date | null;
         source: string;
     }> = [];
-    
+
     // Simple regex-based XML parsing for RSS items
     const itemMatches = text.match(/<item>[\s\S]*?<\/item>/g) || [];
-    
+
     for (const itemXml of itemMatches.slice(0, 20)) { // Limit to 20 items per sync
-        const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/s);
-        const linkMatch = itemXml.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/s);
-        const descMatch = itemXml.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/s);
+        const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/);
+        const linkMatch = itemXml.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/);
+        const descMatch = itemXml.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/);
         const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/);
         const sourceMatch = itemXml.match(/<source[^>]*>(.*?)<\/source>/);
-        
+
         const title = titleMatch?.[1]?.trim().replace(/<[^>]*>/g, '') || '';
         const link = linkMatch?.[1]?.trim() || '';
         const description = descMatch?.[1]?.trim().replace(/<[^>]*>/g, '').substring(0, 500) || '';
         const pubDate = pubDateMatch?.[1] ? new Date(pubDateMatch[1]) : null;
         const source = sourceMatch?.[1]?.trim() || 'RSS Feed';
-        
+
         if (title && link) {
             items.push({ title, link, description, pubDate, source });
         }
     }
-    
+
     return items;
 }
 
@@ -213,25 +213,25 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                     break;
                 }
                 case "rss": {
-                    const config = (source.config || {}) as { 
-                        feedUrl?: string; 
+                    const config = (source.config || {}) as {
+                        feedUrl?: string;
                         targetType?: string;
                         keywords?: string[];
                     };
-                    
+
                     if (!config.feedUrl) {
                         syncResult = { success: false, message: "No feed URL configured", itemsProcessed: 0 };
                         break;
                     }
-                    
+
                     // Fetch and parse RSS feed
                     const feedItems = await parseRSSFeed(config.feedUrl);
                     let itemsAdded = 0;
-                    
+
                     // Map targetType to IntelNewsType
                     const typeMap: Record<string, IntelNewsType> = {
                         opportunity: "opportunity",
-                        policy: "policy", 
+                        policy: "policy",
                         competitor: "competitor",
                         project: "project",
                         technology: "technology",
@@ -241,7 +241,7 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                         market: "market",
                     };
                     const newsType = typeMap[config.targetType || "market"] || "market";
-                    
+
                     for (const item of feedItems) {
                         // Check if item already exists (by URL)
                         const existing = await db
@@ -249,7 +249,7 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                             .from(intelNewsItems)
                             .where(eq(intelNewsItems.sourceUrl, item.link))
                             .limit(1);
-                        
+
                         if (existing.length === 0) {
                             // Add new item
                             await db.insert(intelNewsItems).values({
@@ -265,13 +265,13 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                             itemsAdded++;
                         }
                     }
-                    
-                    syncResult = { 
-                        success: true, 
-                        message: `RSS feed sync completed. Found ${feedItems.length} items, added ${itemsAdded} new.`, 
-                        itemsProcessed: itemsAdded 
+
+                    syncResult = {
+                        success: true,
+                        message: `RSS feed sync completed. Found ${feedItems.length} items, added ${itemsAdded} new.`,
+                        itemsProcessed: itemsAdded
                     };
-                    
+
                     // Trigger automatic agent processing for new items (runs in background)
                     if (itemsAdded > 0) {
                         processUnprocessedItems(itemsAdded).then(result => {
@@ -321,125 +321,136 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
 // POST /intel-source-config/seed-defaults - Seed 9 default feed configurations (CEO only)
 router.post("/seed-defaults", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
-        const defaultFeeds = [
-            // 1. Bidding Opportunities
-            {
-                name: "Bidding Opportunities",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=RFP+construction+scanning+OR+BIM",
-                    targetType: "opportunity",
-                    searchPrompt: `(RFP OR "request for proposal" OR bid OR "invitation to bid" OR procurement) AND ("3D scanning" OR "laser scanning" OR "LiDAR" OR "as-built" OR "Scan-to-BIM" OR "point cloud" OR "building survey" OR "existing conditions")`,
-                    keywords: ["RFP", "bid", "procurement", "3D scanning", "laser scanning", "Scan-to-BIM", "as-built"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 60,
+        const defaultFeeds: Array<{
+            name: string;
+            type: IntelSourceType;
+            config: {
+                feedUrl: string;
+                targetType: IntelNewsType;
+                searchPrompt: string;
+                keywords: string[];
+                excludeKeywords: string[];
+                syncIntervalMinutes: number;
+            };
+        }> = [
+                // 1. Bidding Opportunities
+                {
+                    name: "Bidding Opportunities",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=RFP+construction+scanning+OR+BIM",
+                        targetType: "opportunity" as IntelNewsType,
+                        searchPrompt: `(RFP OR "request for proposal" OR bid OR "invitation to bid" OR procurement) AND ("3D scanning" OR "laser scanning" OR "LiDAR" OR "as-built" OR "Scan-to-BIM" OR "point cloud" OR "building survey" OR "existing conditions")`,
+                        keywords: ["RFP", "bid", "procurement", "3D scanning", "laser scanning", "Scan-to-BIM", "as-built"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 60,
+                    },
                 },
-            },
-            // 2. Policy & Regulatory
-            {
-                name: "Policy & Regulatory Updates",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=NYC+building+code+OR+construction+regulation",
-                    targetType: "policy",
-                    searchPrompt: `("Local Law 97" OR "LL97" OR "building emissions" OR "carbon reporting" OR "energy audit" OR "DOB filing" OR "landmark preservation" OR "historic district" OR "building code update") AND (NYC OR "New York" OR construction)`,
-                    keywords: ["Local Law 97", "DOB", "OSHA", "building code", "regulation", "compliance", "permit"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 360,
+                // 2. Policy & Regulatory
+                {
+                    name: "Policy & Regulatory Updates",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=NYC+building+code+OR+construction+regulation",
+                        targetType: "policy",
+                        searchPrompt: `("Local Law 97" OR "LL97" OR "building emissions" OR "carbon reporting" OR "energy audit" OR "DOB filing" OR "landmark preservation" OR "historic district" OR "building code update") AND (NYC OR "New York" OR construction)`,
+                        keywords: ["Local Law 97", "DOB", "OSHA", "building code", "regulation", "compliance", "permit"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 360,
+                    },
                 },
-            },
-            // 3. Competitor Intelligence
-            {
-                name: "Competitor Intelligence",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=3D+scanning+company+OR+Scan-to-BIM+services",
-                    targetType: "competitor",
-                    searchPrompt: `("3D scanning company" OR "Scan-to-BIM" OR "laser scanning services" OR "point cloud modeling" OR "reality capture") AND (acquires OR merger OR partnership OR expands OR funding OR "wins contract") NOT "Scan2Plan"`,
-                    keywords: ["acquires", "merger", "partnership", "expands", "wins contract", "new office"],
-                    excludeKeywords: ["Scan2Plan", "scan2plan.io"],
-                    syncIntervalMinutes: 240,
+                // 3. Competitor Intelligence
+                {
+                    name: "Competitor Intelligence",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=3D+scanning+company+OR+Scan-to-BIM+services",
+                        targetType: "competitor",
+                        searchPrompt: `("3D scanning company" OR "Scan-to-BIM" OR "laser scanning services" OR "point cloud modeling" OR "reality capture") AND (acquires OR merger OR partnership OR expands OR funding OR "wins contract") NOT "Scan2Plan"`,
+                        keywords: ["acquires", "merger", "partnership", "expands", "wins contract", "new office"],
+                        excludeKeywords: ["Scan2Plan", "scan2plan.io"],
+                        syncIntervalMinutes: 240,
+                    },
                 },
-            },
-            // 4. Project Opportunities
-            {
-                name: "New Construction Projects",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=NYC+construction+project+OR+renovation+project",
-                    targetType: "project",
-                    searchPrompt: `("construction start" OR "groundbreaking" OR "renovation project" OR "building permit" OR "design contract" OR "tenant improvement") AND (NYC OR Manhattan OR Brooklyn OR Albany OR "Capital Region") AND ("square feet" OR architect OR "general contractor")`,
-                    keywords: ["construction", "renovation", "groundbreaking", "building permit", "tenant improvement"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 120,
+                // 4. Project Opportunities
+                {
+                    name: "New Construction Projects",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=NYC+construction+project+OR+renovation+project",
+                        targetType: "project",
+                        searchPrompt: `("construction start" OR "groundbreaking" OR "renovation project" OR "building permit" OR "design contract" OR "tenant improvement") AND (NYC OR Manhattan OR Brooklyn OR Albany OR "Capital Region") AND ("square feet" OR architect OR "general contractor")`,
+                        keywords: ["construction", "renovation", "groundbreaking", "building permit", "tenant improvement"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 120,
+                    },
                 },
-            },
-            // 5. Technology & Innovation
-            {
-                name: "Scanning & BIM Technology",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=LiDAR+technology+OR+BIM+software+OR+reality+capture",
-                    targetType: "technology",
-                    searchPrompt: `("LiDAR" OR "Trimble" OR "NavVis" OR "reality capture" OR "point cloud" OR "BIM software" OR "Revit" OR "digital twin") AND (release OR update OR new OR innovation OR AI)`,
-                    keywords: ["LiDAR", "Trimble", "NavVis", "BIM", "Revit", "point cloud", "AI", "reality capture"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 480,
+                // 5. Technology & Innovation
+                {
+                    name: "Scanning & BIM Technology",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=LiDAR+technology+OR+BIM+software+OR+reality+capture",
+                        targetType: "technology",
+                        searchPrompt: `("LiDAR" OR "Trimble" OR "NavVis" OR "reality capture" OR "point cloud" OR "BIM software" OR "Revit" OR "digital twin") AND (release OR update OR new OR innovation OR AI)`,
+                        keywords: ["LiDAR", "Trimble", "NavVis", "BIM", "Revit", "point cloud", "AI", "reality capture"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 480,
+                    },
                 },
-            },
-            // 6. Funding & Grants
-            {
-                name: "Funding & Grant Opportunities",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=construction+grant+OR+historic+preservation+funding",
-                    targetType: "funding",
-                    searchPrompt: `(grant OR funding OR "federal program" OR "state program" OR "tax credit") AND ("historic preservation" OR "energy efficiency" OR "infrastructure" OR "capital improvement" OR "adaptive reuse")`,
-                    keywords: ["grant", "funding", "tax credit", "historic preservation", "SHPO", "energy efficiency"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 720,
+                // 6. Funding & Grants
+                {
+                    name: "Funding & Grant Opportunities",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=construction+grant+OR+historic+preservation+funding",
+                        targetType: "funding",
+                        searchPrompt: `(grant OR funding OR "federal program" OR "state program" OR "tax credit") AND ("historic preservation" OR "energy efficiency" OR "infrastructure" OR "capital improvement" OR "adaptive reuse")`,
+                        keywords: ["grant", "funding", "tax credit", "historic preservation", "SHPO", "energy efficiency"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 720,
+                    },
                 },
-            },
-            // 7. Industry Events
-            {
-                name: "Industry Events & Conferences",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=AEC+conference+OR+construction+expo+OR+BIM+summit",
-                    targetType: "event",
-                    searchPrompt: `(conference OR summit OR expo OR webinar OR "trade show") AND (AEC OR construction OR BIM OR scanning OR architecture OR engineering)`,
-                    keywords: ["conference", "summit", "expo", "AIA", "AGC", "BOMA", "Autodesk University"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 1440,
+                // 7. Industry Events
+                {
+                    name: "Industry Events & Conferences",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=AEC+conference+OR+construction+expo+OR+BIM+summit",
+                        targetType: "event",
+                        searchPrompt: `(conference OR summit OR expo OR webinar OR "trade show") AND (AEC OR construction OR BIM OR scanning OR architecture OR engineering)`,
+                        keywords: ["conference", "summit", "expo", "AIA", "AGC", "BOMA", "Autodesk University"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 1440,
+                    },
                 },
-            },
-            // 8. Talent & Hiring
-            {
-                name: "Talent & Hiring Trends",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=BIM+jobs+OR+construction+hiring+OR+scanning+technician",
-                    targetType: "talent",
-                    searchPrompt: `(hiring OR "job market" OR "labor shortage" OR "skilled trades" OR salaries) AND (BIM OR scanning OR construction OR "reality capture" OR Revit)`,
-                    keywords: ["hiring", "jobs", "labor shortage", "BIM modeler", "scan technician", "salaries"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 1440,
+                // 8. Talent & Hiring
+                {
+                    name: "Talent & Hiring Trends",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=BIM+jobs+OR+construction+hiring+OR+scanning+technician",
+                        targetType: "talent",
+                        searchPrompt: `(hiring OR "job market" OR "labor shortage" OR "skilled trades" OR salaries) AND (BIM OR scanning OR construction OR "reality capture" OR Revit)`,
+                        keywords: ["hiring", "jobs", "labor shortage", "BIM modeler", "scan technician", "salaries"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 1440,
+                    },
                 },
-            },
-            // 9. Market Analysis
-            {
-                name: "Market Trends & Analysis",
-                type: "rss" as IntelSourceType,
-                config: {
-                    feedUrl: "https://news.google.com/rss/search?q=construction+industry+trends+OR+AEC+market+forecast",
-                    targetType: "market",
-                    searchPrompt: `("market trends" OR forecast OR "industry report" OR analysis OR growth) AND (construction OR AEC OR "real estate" OR scanning OR BIM) AND (2025 OR 2026 OR outlook)`,
-                    keywords: ["market trends", "forecast", "industry report", "growth", "outlook", "construction spending"],
-                    excludeKeywords: [],
-                    syncIntervalMinutes: 1440,
+                // 9. Market Analysis
+                {
+                    name: "Market Trends & Analysis",
+                    type: "rss" as IntelSourceType,
+                    config: {
+                        feedUrl: "https://news.google.com/rss/search?q=construction+industry+trends+OR+AEC+market+forecast",
+                        targetType: "market",
+                        searchPrompt: `("market trends" OR forecast OR "industry report" OR analysis OR growth) AND (construction OR AEC OR "real estate" OR scanning OR BIM) AND (2025 OR 2026 OR outlook)`,
+                        keywords: ["market trends", "forecast", "industry report", "growth", "outlook", "construction spending"],
+                        excludeKeywords: [],
+                        syncIntervalMinutes: 1440,
+                    },
                 },
-            },
-        ];
+            ];
 
         let created = 0;
         let skipped = 0;

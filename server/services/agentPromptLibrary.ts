@@ -352,18 +352,23 @@ OUTPUT: Return ONLY the improved prompt text, nothing else.`
 export async function extractMarketingIntel(
     intelItems: Array<{ type: string; title: string; summary?: string; region?: string }>
 ): Promise<MarketingIntel[]> {
-    if (!genAI || intelItems.length === 0) {
+    if (!openai || intelItems.length === 0) {
         return [];
     }
 
     const context = await buildRAGContext();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     try {
-        const result = await model.generateContent(`
-You are analyzing market intelligence for Scan2Plan.
-
-INTEL ITEMS:
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are analyzing market intelligence for Scan2Plan. Return valid JSON arrays only."
+                },
+                {
+                    role: "user",
+                    content: `INTEL ITEMS:
 ${JSON.stringify(intelItems.slice(0, 10), null, 2)}
 
 COMPANY CONTEXT:
@@ -385,10 +390,14 @@ OUTPUT FORMAT (JSON array):
         "actionItems": ["Action 1", "Action 2"],
         "confidence": 85
     }
-]
-`);
+]`
+                }
+            ],
+            temperature: 0.5,
+            max_tokens: 1000,
+        });
 
-        const text = result.response.text();
+        const text = response.choices[0]?.message?.content || "";
         const jsonMatch = text.match(/\[[\s\S]*\]/);
 
         if (jsonMatch) {
