@@ -2048,6 +2048,62 @@ export const insertIntelNewsItemSchema = createInsertSchema(intelNewsItems).omit
 export type InsertIntelNewsItem = z.infer<typeof insertIntelNewsItemSchema>;
 export type IntelNewsItem = typeof intelNewsItems.$inferSelect;
 
+// === INTEL PIPELINE PROCESSING (Automatic Agent Processing) ===
+export const PIPELINE_STATUSES = ["pending", "running", "completed", "failed", "skipped"] as const;
+export type PipelineStatus = typeof PIPELINE_STATUSES[number];
+
+export const AGENT_TYPES = ["scout", "analyst", "strategist", "composer", "auditor"] as const;
+export type AgentType = typeof AGENT_TYPES[number];
+
+// Tracks each intel item's processing run through the 5-agent pipeline
+export const intelPipelineRuns = pgTable("intel_pipeline_runs", {
+  id: serial("id").primaryKey(),
+  intelItemId: integer("intel_item_id").notNull(), // FK to intel_news_items
+  status: text("status").notNull().$type<PipelineStatus>().default("pending"),
+  currentAgent: text("current_agent").$type<AgentType>(), // Which agent is currently processing
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  error: text("error"), // Error message if failed
+  retryCount: integer("retry_count").default(0),
+  // Final synthesized outputs
+  executiveSummary: text("executive_summary"), // AI-generated summary
+  recommendedActions: jsonb("recommended_actions").$type<string[]>(), // Priority action items
+  draftEmail: text("draft_email"), // Composer's draft outreach
+  auditScore: integer("audit_score"), // Auditor's quality score (0-100)
+  auditVerdict: text("audit_verdict"), // "approved" | "needs_revision" | "rejected"
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertIntelPipelineRunSchema = createInsertSchema(intelPipelineRuns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertIntelPipelineRun = z.infer<typeof insertIntelPipelineRunSchema>;
+export type IntelPipelineRun = typeof intelPipelineRuns.$inferSelect;
+
+// Stores individual agent outputs for each pipeline run
+export const intelAgentOutputs = pgTable("intel_agent_outputs", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull(), // FK to intel_pipeline_runs
+  agent: text("agent").notNull().$type<AgentType>(),
+  output: jsonb("output"), // Agent's structured output
+  durationMs: integer("duration_ms"), // How long the agent took
+  confidence: integer("confidence"), // Agent's confidence score (0-100)
+  status: text("status").notNull().$type<"pending" | "running" | "completed" | "failed">().default("pending"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIntelAgentOutputSchema = createInsertSchema(intelAgentOutputs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertIntelAgentOutput = z.infer<typeof insertIntelAgentOutputSchema>;
+export type IntelAgentOutput = typeof intelAgentOutputs.$inferSelect;
+
 // === X.COM (TWITTER) INTEGRATION ===
 export const xConnections = pgTable("x_connections", {
   id: serial("id").primaryKey(),
