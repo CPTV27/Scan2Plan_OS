@@ -900,9 +900,10 @@ export default function DealWorkspace() {
         </div>
 
         {/* Lead Details Tab - Consolidated form with bordered sections */}
-        <TabsContent value="lead" className="flex-1 overflow-hidden m-0 flex flex-col">
-          <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
-            <LeadDetailsTab
+        <TabsContent value="lead" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
+              <LeadDetailsTab
               lead={lead}
               leadId={leadId}
               form={form}
@@ -913,12 +914,13 @@ export default function DealWorkspace() {
               toast={toast}
               documents={documents}
               uploadDocumentMutation={uploadDocumentMutation}
-            />
-          </ErrorBoundary>
+              />
+            </ErrorBoundary>
+          </div>
         </TabsContent>
 
         {/* Quote Builder Tab */}
-        <TabsContent value="quote" className="flex-1 overflow-hidden m-0 flex flex-col">
+        <TabsContent value="quote" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
           {/* Mode Toggle */}
           <div className="flex items-center justify-center gap-4 p-3 border-b bg-muted/30">
             <div className="inline-flex rounded-lg border p-1 bg-background shadow-sm">
@@ -994,49 +996,57 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Version History Tab */}
-        <TabsContent value="history" className="flex-1 overflow-hidden m-0 flex flex-col">
-          <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
-            <VersionHistoryTab
-              quotes={quotes}
-              quotesLoading={quotesLoading}
-              onViewQuote={setViewingQuote}
-              onNavigateToQuoteBuilder={() => setActiveTab("quote")}
-            />
-          </ErrorBoundary>
+        <TabsContent value="history" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
+              <VersionHistoryTab
+                quotes={quotes}
+                quotesLoading={quotesLoading}
+                onViewQuote={setViewingQuote}
+                onNavigateToQuoteBuilder={() => setActiveTab("quote")}
+              />
+            </ErrorBoundary>
+          </div>
         </TabsContent>
 
         {/* Proposal Tab - Evidence Vault + AI Assistant */}
-        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0 flex flex-col">
-          <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
-            <ProposalTab lead={lead} />
-          </ErrorBoundary>
+        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
+              <ProposalTab lead={lead} />
+            </ErrorBoundary>
+          </div>
         </TabsContent>
 
         {/* Documents Tab */}
-        <TabsContent value="documents" className="flex-1 overflow-hidden m-0 flex flex-col">
-          <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
-            <DocumentsTab
-              documents={documents}
-              documentsLoading={documentsLoading}
-              uploadDocumentMutation={uploadDocumentMutation}
-              deleteDocumentMutation={deleteDocumentMutation}
-            />
-          </ErrorBoundary>
+        <TabsContent value="documents" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
+              <DocumentsTab
+                documents={documents}
+                documentsLoading={documentsLoading}
+                uploadDocumentMutation={uploadDocumentMutation}
+                deleteDocumentMutation={deleteDocumentMutation}
+              />
+            </ErrorBoundary>
+          </div>
         </TabsContent>
 
         {/* PandaDoc Tab - Document editing and signature */}
-        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0 flex flex-col">
-          <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
-            <PandaDocTab
-              pandaDocId={lead?.pandaDocId || null}
-              documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
-              leadId={leadId}
-              quoteId={latestQuote?.id}
-              queryClient={queryClient}
-              onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
-              proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
-            />
-          </ErrorBoundary>
+        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
+              <PandaDocTab
+                pandaDocId={lead?.pandaDocId || null}
+                documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
+                leadId={leadId}
+                quoteId={latestQuote?.id}
+                queryClient={queryClient}
+                onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
+                proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
+              />
+            </ErrorBoundary>
+          </div>
         </TabsContent>
 
       </Tabs>
