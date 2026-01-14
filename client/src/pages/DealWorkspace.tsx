@@ -241,6 +241,32 @@ export default function DealWorkspace() {
 
   const latestQuote = quotes?.find((q) => q.isLatest);
 
+  // Initialize shared config from lead data when lead loads (only if not already set)
+  useEffect(() => {
+    if (lead) {
+      setSharedConfig(prev => {
+        const updates: Partial<SharedQuoteConfig> = {};
+        
+        // Set project location from lead's project address if not already set
+        if (!prev.projectLocation && lead.projectAddress) {
+          updates.projectLocation = lead.projectAddress;
+        }
+        
+        // Set first area's name from lead's project name if it's still the default
+        if (prev.areas.length > 0 && prev.areas[0].name === "Main Building" && lead.projectName) {
+          updates.areas = prev.areas.map((area, index) => 
+            index === 0 ? { ...area, name: lead.projectName || area.name } : area
+          );
+        }
+        
+        // Only update if there are changes
+        if (Object.keys(updates).length > 0) {
+          return { ...prev, ...updates };
+        }
+        return prev;
+      });
+    }
+  }, [lead]);
 
   const deleteLeadMutation = useMutation({
     mutationFn: async () => {
