@@ -327,12 +327,23 @@ export default function RegionalIntel() {
 
   const syncMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/intel-sources/${id}/sync`);
+      const res = await apiRequest("POST", `/api/intel-sources/${id}/sync`);
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { success: boolean; message: string; itemsProcessed: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/intel-sources"] });
-      toast({ title: "Sync started", description: "Fetching latest intel..." });
+      if (data.itemsProcessed > 0) {
+        toast({ 
+          title: "Sync Complete", 
+          description: `Found ${data.itemsProcessed} new items!` 
+        });
+      } else {
+        toast({ 
+          title: "Sync Complete", 
+          description: data.message || "No new items found." 
+        });
+      }
     },
     onError: () => {
       toast({ title: "Sync failed", description: "Could not sync feed.", variant: "destructive" });
