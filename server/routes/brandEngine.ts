@@ -1,6 +1,16 @@
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../middleware/errorHandler";
-import { isAuthenticated } from "../replit_integrations/auth";
+import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { db } from "../db";
+import {
+  brandPersonas,
+  governanceRedLines,
+  standardDefinitions,
+  insertBrandPersonaSchema,
+  insertGovernanceRedLineSchema,
+  insertStandardDefinitionSchema,
+} from "@shared/schema";
+import { eq } from "drizzle-orm";
 import {
   generateExecutiveBrief,
   getAuditLogs,
@@ -11,10 +21,9 @@ import {
   PrimaryPain,
   AuthorMode,
 } from "../lib/brand_engine";
+import { aiClient } from "../services/ai/aiClient";
 import { z } from "zod";
-import { db } from "../db";
-import { brandValues, insertBrandValueSchema, standardDefinitions, insertStandardDefinitionSchema } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { log } from "../lib/logger";
 
 const router = Router();
 
@@ -28,14 +37,14 @@ const GenerateRequestSchema = z.object({
 // Map BP codes to buyer modes for the engine
 function mapBuyerType(buyerType: string): BuyerMode {
   const mapping: Record<string, BuyerMode> = {
-    "BP1": "A_Principal",  // Engineer -> Principal
-    "BP2": "B_OwnerDev",   // GC/Contractor -> Owner/Dev
-    "BP3": "B_OwnerDev",   // Owner's Rep -> Owner/Dev
-    "BP4": "A_Principal",  // PM -> Principal
-    "BP5": "A_Principal",  // Architect -> Principal
-    "BP6": "B_OwnerDev",   // Developer/Owner -> Owner/Dev
-    "BP7": "A_Principal",  // Sustainability Lead -> Principal
-    "BP8": "A_Principal",  // Tech Leader -> Principal
+    "BP1": "A_Principal",
+    "BP2": "B_OwnerDev",
+    "BP3": "B_OwnerDev",
+    "BP4": "A_Principal",
+    "BP5": "A_Principal",
+    "BP6": "B_OwnerDev",
+    "BP7": "A_Principal",
+    "BP8": "A_Principal",
     "A_Principal": "A_Principal",
     "B_OwnerDev": "B_OwnerDev",
     "C_Unknown": "C_Unknown",
@@ -43,12 +52,16 @@ function mapBuyerType(buyerType: string): BuyerMode {
   return mapping[buyerType] || "C_Unknown";
 }
 
+// ============================================
+// GENERATION ENDPOINTS (existing)
+// ============================================
+
 router.post(
   "/generate/executive-brief",
   isAuthenticated,
   asyncHandler(async (req: Request, res: Response) => {
     const parsed = GenerateRequestSchema.safeParse(req.body);
-    
+
     if (!parsed.success) {
       return res.status(400).json({
         error: "Invalid request",
@@ -82,95 +95,9 @@ router.get(
   })
 );
 
-router.get(
-  "/standards",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const definitions = await db.select().from(standardDefinitions).orderBy(standardDefinitions.category, standardDefinitions.term);
-    return res.json({ success: true, data: definitions });
-  })
-);
-
-router.post(
-  "/standards",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const parsed = insertStandardDefinitionSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
-    }
-    const [standard] = await db.insert(standardDefinitions).values(parsed.data).returning();
-    return res.json({ success: true, data: standard });
-  })
-);
-
-router.put(
-  "/standards/:id",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    const { term, definition, guaranteeText, category, active } = req.body;
-    const [updated] = await db
-      .update(standardDefinitions)
-      .set({ term, definition, guaranteeText, category, active })
-      .where(eq(standardDefinitions.id, id))
-      .returning();
-    return res.json({ success: true, data: updated });
-  })
-);
-
-router.delete(
-  "/standards/:id",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    await db.delete(standardDefinitions).where(eq(standardDefinitions.id, id));
-    return res.json({ success: true });
-  })
-);
-
-router.post(
-  "/standards/seed",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const seedData = [
-      { category: "scanning_loa", term: "LoA 40 (Measured Accuracy)", definition: "Tolerance: 0–1/8 inch. Point clouds generated directly from laser scans, providing high-precision scan data aligned with real-world conditions.", guaranteeText: "Validated via B-Validation (overlapping scan alignment) and C-Validation (control points aligned with survey data)." },
-      { category: "scanning_loa", term: "LoA 30 (Modeled Accuracy)", definition: "Tolerance: 0–1/2 inch. BIM/CAD models derived from point clouds, ensuring modeled geometry reflects scanned data for construction-ready deliverables.", guaranteeText: null },
-      { category: "scanning_devices", term: "Trimble X7", definition: "Accuracy: ±2mm. Features colorized scans and real-time registration for high-precision surveying.", guaranteeText: null },
-      { category: "scanning_devices", term: "NavVis VLX 2", definition: "Accuracy: Up to 6mm. Mobile SLAM scanning for dynamic environments and large-scale capture.", guaranteeText: null },
-      { category: "scanning_process", term: "Pre-Scan Protocol", definition: "Conduct site surveys to identify access points and conditions. Ensure comprehensive planning to cover all required areas.", guaranteeText: null },
-      { category: "scanning_process", term: "On-Site Execution", definition: "Perform live review to verify completeness of scan coverage. Address missing data before leaving the site.", guaranteeText: null },
-      { category: "modeling_lod", term: "LoD 200", definition: "Schematic massing, basic geometry for feasibility studies.", guaranteeText: null },
-      { category: "modeling_lod", term: "LoD 300", definition: "Construction-ready elements, accurate geometry and dimensions.", guaranteeText: null },
-      { category: "modeling_lod", term: "LoD 350", definition: "Detailed construction-ready models with joint and connection details.", guaranteeText: null },
-      { category: "modeling_lod", term: "LoD 350+ (HBIM)", definition: "Custom detail for historic preservation, including carvings and ornate features.", guaranteeText: null },
-      { category: "modeling_disciplines", term: "Architecture", definition: "Elements: Walls, doors, windows, ceilings, and floors. Special Features: Custom details for historic and high-profile projects (LoD 350+).", guaranteeText: null },
-      { category: "modeling_disciplines", term: "Structure", definition: "Elements: Beams, columns, trusses, and foundations. Special Features: Detailed connections supporting structural analysis.", guaranteeText: null },
-      { category: "modeling_disciplines", term: "MEPF", definition: "Mechanical, Electrical, Plumbing, Fire. Elements: Ducts, pipes, conduits, and sprinkler systems. Special Features: Fully clash-detectable layouts compatible with multidisciplinary coordination.", guaranteeText: null },
-      { category: "modeling_disciplines", term: "Landscape", definition: "Elements: Topography, pathways, and foliage. Special Features: Georeferenced models for landscape design and historic preservation at LoD 350+.", guaranteeText: null },
-      { category: "quality_control", term: "3-Stage QC Process", definition: "Stage 1: Dedicated BIM Modeling and CAD drafting teams. Stage 2: Dedicated BIM and CAD QC teams. Stage 3: Senior Engineer Review.", guaranteeText: "Every deliverable passes through our rigorous 3-stage quality control process." },
-    ];
-    
-    for (const item of seedData) {
-      const existing = await db.select().from(standardDefinitions).where(eq(standardDefinitions.term, item.term));
-      if (existing.length === 0) {
-        await db.insert(standardDefinitions).values(item);
-      }
-    }
-    
-    const allStandards = await db.select().from(standardDefinitions).orderBy(standardDefinitions.category, standardDefinitions.term);
-    return res.json({ success: true, data: allStandards });
-  })
-);
-
-router.get(
-  "/red-lines",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const redLines = await getRedLines();
-    return res.json({ success: true, data: redLines });
-  })
-);
+// ============================================
+// PERSONAS CRUD
+// ============================================
 
 router.get(
   "/personas",
@@ -181,90 +108,285 @@ router.get(
   })
 );
 
-// Brand Values CRUD
-router.get(
-  "/values",
-  isAuthenticated,
-  asyncHandler(async (req: Request, res: Response) => {
-    const values = await db.select().from(brandValues).orderBy(brandValues.category, brandValues.sortOrder);
-    return res.json({ success: true, data: values });
-  })
-);
-
 router.post(
-  "/values",
+  "/personas",
   isAuthenticated,
+  requireRole("ceo"),
   asyncHandler(async (req: Request, res: Response) => {
-    const parsed = insertBrandValueSchema.safeParse(req.body);
+    const parsed = insertBrandPersonaSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+      return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
     }
-    const [value] = await db.insert(brandValues).values(parsed.data).returning();
-    return res.json({ success: true, data: value });
+
+    const [persona] = await db.insert(brandPersonas).values(parsed.data).returning();
+    return res.status(201).json({ success: true, data: persona });
   })
 );
 
 router.put(
-  "/values/:id",
+  "/personas/:id",
   isAuthenticated,
+  requireRole("ceo"),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    const { title, content, category, sortOrder, isActive } = req.body;
-    const [updated] = await db
-      .update(brandValues)
-      .set({ title, content, category, sortOrder, isActive, updatedAt: new Date() })
-      .where(eq(brandValues.id, id))
+    const { id } = req.params;
+    const { name, coreIdentity, voiceMode, mantra, directives, active } = req.body;
+
+    const [updated] = await db.update(brandPersonas)
+      .set({ name, coreIdentity, voiceMode, mantra, directives, active, updatedAt: new Date() })
+      .where(eq(brandPersonas.id, parseInt(id)))
       .returning();
+
     if (!updated) {
-      return res.status(404).json({ error: "Brand value not found" });
+      return res.status(404).json({ error: "Persona not found" });
     }
+
     return res.json({ success: true, data: updated });
   })
 );
 
 router.delete(
-  "/values/:id",
+  "/personas/:id",
   isAuthenticated,
+  requireRole("ceo"),
   asyncHandler(async (req: Request, res: Response) => {
-    const id = parseInt(req.params.id);
-    await db.delete(brandValues).where(eq(brandValues.id, id));
+    const { id } = req.params;
+    await db.delete(brandPersonas).where(eq(brandPersonas.id, parseInt(id)));
     return res.json({ success: true });
   })
 );
 
-// Seed initial brand values if empty
-router.post(
-  "/values/seed",
+// ============================================
+// RED LINES CRUD
+// ============================================
+
+router.get(
+  "/red-lines",
   isAuthenticated,
   asyncHandler(async (req: Request, res: Response) => {
-    const existing = await db.select().from(brandValues);
-    if (existing.length > 0) {
-      return res.json({ success: true, message: "Brand values already seeded", data: existing });
+    const redLines = await getRedLines();
+    return res.json({ success: true, data: redLines });
+  })
+);
+
+router.post(
+  "/red-lines",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = insertGovernanceRedLineSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
     }
 
-    const initialValues = [
-      { category: "mission", title: "Mission Statement", content: "To deliver trust, confidence, and integrity on every project.", sortOrder: 0 },
-      { category: "vision", title: "Vision Statement", content: "Scan2Plan is the measure of excellence for Architects and Engineers.", sortOrder: 0 },
-      { category: "core_values", title: "We Care", content: "Emphasizing empathy and client-first service.", sortOrder: 0 },
-      { category: "core_values", title: "Can Do", content: "A solutions-driven mindset to overcome challenges.", sortOrder: 1 },
-      { category: "core_values", title: "Continual Improvement", content: "Relentless pursuit of innovation and refinement.", sortOrder: 2 },
-      { category: "three_uniques", title: "The Measure of Excellence", content: "Industry-leading LoD, LoA, accuracy, and quality control.", sortOrder: 0 },
-      { category: "three_uniques", title: "Tailored to Your Needs", content: "Flexible deliverables customized for client workflows.", sortOrder: 1 },
-      { category: "three_uniques", title: "Ready When You Are", content: "High-touch service with fast and consistent results.", sortOrder: 2 },
-      { category: "guarantee", title: "Price Match", content: "We will match any price that aligns with our standards.", sortOrder: 0 },
-      { category: "guarantee", title: "LoD & LoA Definition", content: "We define and deliver LoD & LoA on every project.", sortOrder: 1 },
-      { category: "guarantee", title: "Unlimited Support", content: "Unlimited support within scope.", sortOrder: 2 },
-      { category: "sustainability", title: "Environmental Impact", content: "Adaptive reuse minimizes waste, conserves embodied energy, and reduces emissions. At Scan2Plan, our services preserve cultural heritage while mitigating environmental impact.", sortOrder: 0 },
-      { category: "empowerment", title: "Empower Visionaries", content: "We empower architects, designers, and innovators to focus on design, enabling greener futures.", sortOrder: 0 },
-      { category: "empowerment", title: "Grant Access", content: "High-end BIM solutions accessible to all partners, fostering innovation in adaptive reuse.", sortOrder: 1 },
-      { category: "empowerment", title: "Innovate to Collaborate", content: "Your success is our priority. We adapt, innovate, and exceed expectations.", sortOrder: 2 },
-      { category: "taglines", title: "Primary Tagline", content: "The Measure of Excellence.", sortOrder: 0 },
-      { category: "taglines", title: "Secondary Tagline", content: "Focus on Design.", sortOrder: 1 },
-      { category: "taglines", title: "Tertiary Tagline", content: "Certainty lies in good data.", sortOrder: 2 },
-    ];
+    const [redLine] = await db.insert(governanceRedLines).values(parsed.data).returning();
+    return res.status(201).json({ success: true, data: redLine });
+  })
+);
 
-    const inserted = await db.insert(brandValues).values(initialValues).returning();
-    return res.json({ success: true, data: inserted });
+router.put(
+  "/red-lines/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { ruleContent, violationCategory, correctionInstruction, severity, active } = req.body;
+
+    const [updated] = await db.update(governanceRedLines)
+      .set({ ruleContent, violationCategory, correctionInstruction, severity, active })
+      .where(eq(governanceRedLines.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Red line not found" });
+    }
+
+    return res.json({ success: true, data: updated });
+  })
+);
+
+router.delete(
+  "/red-lines/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await db.delete(governanceRedLines).where(eq(governanceRedLines.id, parseInt(id)));
+    return res.json({ success: true });
+  })
+);
+
+// ============================================
+// STANDARD DEFINITIONS CRUD
+// ============================================
+
+router.get(
+  "/standards",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const definitions = await getStandardDefinitions();
+    return res.json({ success: true, data: definitions });
+  })
+);
+
+router.post(
+  "/standards",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = insertStandardDefinitionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
+    }
+
+    const [std] = await db.insert(standardDefinitions).values(parsed.data).returning();
+    return res.status(201).json({ success: true, data: std });
+  })
+);
+
+router.put(
+  "/standards/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { term, definition, guaranteeText, category, active } = req.body;
+
+    const [updated] = await db.update(standardDefinitions)
+      .set({ term, definition, guaranteeText, category, active })
+      .where(eq(standardDefinitions.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Standard not found" });
+    }
+
+    return res.json({ success: true, data: updated });
+  })
+);
+
+router.delete(
+  "/standards/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await db.delete(standardDefinitions).where(eq(standardDefinitions.id, parseInt(id)));
+    return res.json({ success: true });
+  })
+);
+
+// ============================================
+// AI EXPAND - Auto-generate brand data
+// ============================================
+
+router.post(
+  "/ai-expand",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { type, context, count = 3 } = req.body;
+
+    if (!type || !["persona", "redline", "standard"].includes(type)) {
+      return res.status(400).json({ error: "type must be persona, redline, or standard" });
+    }
+
+    let systemPrompt = "";
+    let userPrompt = "";
+
+    if (type === "persona") {
+      systemPrompt = `You are a brand strategist for Scan2Plan, a laser scanning and BIM company. Create brand personas that define voice, tone, and identity for content generation. Each persona should have: name, coreIdentity (1-2 sentences), mantra (short phrase), and directives (guidance for AI). Return JSON array.`;
+      userPrompt = `Generate ${count} new brand personas for: ${context || "B2B construction technology sales"}\n\nReturn ONLY valid JSON array like: [{"name": "...", "coreIdentity": "...", "mantra": "...", "directives": "..."}]`;
+    } else if (type === "redline") {
+      systemPrompt = `You are a content governance expert for Scan2Plan, ensuring all marketing content avoids hype, unsubstantiated claims, and competitor comparisons. Create red-line rules that content must not violate. Each rule has: ruleContent (what to avoid), violationCategory (V1-Hype, V2-Comparison, V3-Guarantee, etc.), correctionInstruction, severity (1-5). Return JSON array.`;
+      userPrompt = `Generate ${count} new governance red-lines for: ${context || "B2B construction marketing compliance"}\n\nReturn ONLY valid JSON array like: [{"ruleContent": "...", "violationCategory": "...", "correctionInstruction": "...", "severity": 3}]`;
+    } else if (type === "standard") {
+      systemPrompt = `You are a terminology expert for Scan2Plan, a laser scanning and BIM company. Create standard definitions for canonical terms used in proposals and marketing. Each standard has: term, definition, category (delivery, quality, process, etc.), and optional guaranteeText (if term can be guaranteed). Return JSON array.`;
+      userPrompt = `Generate ${count} new standard definitions for: ${context || "laser scanning and BIM services"}\n\nReturn ONLY valid JSON array like: [{"term": "...", "definition": "...", "category": "...", "guaranteeText": null}]`;
+    }
+
+    try {
+      const response = await aiClient.generateText(systemPrompt, userPrompt);
+
+      if (!response) {
+        return res.status(500).json({ error: "AI generation failed" });
+      }
+
+      // Parse JSON response
+      let suggestions: any[] = [];
+      try {
+        const jsonStr = response.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        suggestions = JSON.parse(jsonStr);
+      } catch (e) {
+        log(`WARN: Failed to parse AI suggestions: ${e}`);
+        return res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+      return res.json({
+        success: true,
+        type,
+        suggestions,
+        message: `Generated ${suggestions.length} ${type} suggestions. Review and save the ones you want.`
+      });
+    } catch (error) {
+      log(`ERROR: AI expand failed: ${error}`);
+      return res.status(500).json({ error: "AI generation failed" });
+    }
+  })
+);
+
+// ============================================
+// BATCH SAVE AI SUGGESTIONS
+// ============================================
+
+router.post(
+  "/ai-expand/save",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { type, items } = req.body;
+
+    if (!type || !items || !Array.isArray(items)) {
+      return res.status(400).json({ error: "type and items array required" });
+    }
+
+    let saved = 0;
+
+    if (type === "persona") {
+      for (const item of items) {
+        await db.insert(brandPersonas).values({
+          name: item.name,
+          coreIdentity: item.coreIdentity,
+          mantra: item.mantra,
+          directives: item.directives,
+          active: true,
+        });
+        saved++;
+      }
+    } else if (type === "redline") {
+      for (const item of items) {
+        await db.insert(governanceRedLines).values({
+          ruleContent: item.ruleContent,
+          violationCategory: item.violationCategory,
+          correctionInstruction: item.correctionInstruction,
+          severity: item.severity || 3,
+          active: true,
+        });
+        saved++;
+      }
+    } else if (type === "standard") {
+      for (const item of items) {
+        await db.insert(standardDefinitions).values({
+          term: item.term,
+          definition: item.definition,
+          category: item.category,
+          guaranteeText: item.guaranteeText,
+          active: true,
+        });
+        saved++;
+      }
+    }
+
+    return res.json({ success: true, saved, message: `Saved ${saved} ${type}(s)` });
   })
 );
 

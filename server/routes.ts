@@ -40,6 +40,7 @@ import { githubActionsRouter } from "./routes/githubActions";
 import { sequencesRouter, initSequenceScheduler } from "./routes/sequences";
 import intelFeedsRouter from "./routes/intel-feeds";
 import xIntegrationRouter from "./routes/x-integration";
+import rfpAutomationRouter from "./routes/rfp-automation";
 
 
 export async function registerRoutes(
@@ -139,6 +140,9 @@ export async function registerRoutes(
 
   // X.com Integration
   app.use("/api/x", xIntegrationRouter);
+
+  // RFP Response Automation
+  app.use("/api/rfp", rfpAutomationRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

@@ -2087,3 +2087,55 @@ export const insertXSavedSearchSchema = createInsertSchema(xSavedSearches).omit(
 });
 export type InsertXSavedSearch = z.infer<typeof insertXSavedSearchSchema>;
 export type XSavedSearch = typeof xSavedSearches.$inferSelect;
+
+// === RFP RESPONSE AUTOMATION ===
+export const RFP_STATUSES = ["pending", "extracting", "extracted", "generating", "proposal_ready", "approved", "sent", "rejected"] as const;
+export type RfpStatus = typeof RFP_STATUSES[number];
+
+export const rfpSubmissions = pgTable("rfp_submissions", {
+  id: serial("id").primaryKey(),
+  status: text("status").notNull().$type<RfpStatus>().default("pending"),
+  // Original document
+  originalFileName: text("original_file_name"),
+  fileUrl: text("file_url"), // Uploaded file URL
+  fileType: text("file_type"), // pdf, docx, email
+  // Extracted data
+  extractedData: jsonb("extracted_data").$type<{
+    projectName?: string;
+    clientName?: string;
+    projectAddress?: string;
+    scope?: string;
+    requirements?: string[];
+    deadline?: string;
+    budget?: string;
+    contacts?: { name: string; email: string; phone?: string }[];
+    buildingType?: string;
+    sqft?: number;
+    disciplines?: string[];
+    specialRequirements?: string[];
+  }>(),
+  // Generated entities
+  generatedLeadId: integer("generated_lead_id").references(() => leads.id),
+  generatedQuoteId: integer("generated_quote_id"),
+  generatedProposalId: integer("generated_proposal_id").references(() => generatedProposals.id),
+  // Review workflow
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  // PandaDoc
+  pandaDocDocumentId: text("pandadoc_document_id"),
+  sentAt: timestamp("sent_at"),
+  sentTo: text("sent_to"),
+  // Tracking
+  uploadedBy: text("uploaded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRfpSubmissionSchema = createInsertSchema(rfpSubmissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertRfpSubmission = z.infer<typeof insertRfpSubmissionSchema>;
+export type RfpSubmission = typeof rfpSubmissions.$inferSelect;
