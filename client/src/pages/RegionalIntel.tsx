@@ -20,7 +20,7 @@ interface CompetitorData {
 
 export default function RegionalIntel() {
   const queryClient = useQueryClient();
-  
+
   const { data: leads, isLoading: leadsLoading } = useQuery<Lead[]>({
     queryKey: ["/api/leads"],
   });
@@ -169,8 +169,8 @@ export default function RegionalIntel() {
                       </div>
                     ) : opportunityItems.length > 0 ? (
                       opportunityItems.map((item) => (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={`p-3 rounded-lg border border-green-500/20 bg-green-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-green-500/40' : ''}`}
                           onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
                           data-testid={`intel-item-${item.id}`}
@@ -197,9 +197,9 @@ export default function RegionalIntel() {
                               </span>
                             )}
                             {item.sourceUrl && (
-                              <a 
-                                href={item.sourceUrl} 
-                                target="_blank" 
+                              <a
+                                href={item.sourceUrl}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -247,8 +247,8 @@ export default function RegionalIntel() {
                       </div>
                     ) : policyItems.length > 0 ? (
                       policyItems.map((item) => (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={`p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-amber-500/40' : ''}`}
                           onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
                           data-testid={`intel-item-${item.id}`}
@@ -272,9 +272,9 @@ export default function RegionalIntel() {
                               <Badge variant="outline" className="text-xs">{item.region}</Badge>
                             )}
                             {item.sourceUrl && (
-                              <a 
-                                href={item.sourceUrl} 
-                                target="_blank" 
+                              <a
+                                href={item.sourceUrl}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -322,8 +322,8 @@ export default function RegionalIntel() {
                       </div>
                     ) : competitorItems.length > 0 ? (
                       competitorItems.map((item) => (
-                        <div 
-                          key={item.id} 
+                        <div
+                          key={item.id}
                           className={`p-3 rounded-lg border border-red-500/20 bg-red-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-red-500/40' : ''}`}
                           onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
                           data-testid={`intel-item-${item.id}`}
@@ -345,9 +345,9 @@ export default function RegionalIntel() {
                               {formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}
                             </span>
                             {item.sourceUrl && (
-                              <a 
-                                href={item.sourceUrl} 
-                                target="_blank" 
+                              <a
+                                href={item.sourceUrl}
+                                target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -376,24 +376,38 @@ export default function RegionalIntel() {
             </div>
 
             {/* AI Market Analysis */}
-            {insightsData?.insights && (
-              <Card data-testid="card-ai-analysis">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    AI Market Analysis
-                  </CardTitle>
-                  <CardDescription>
-                    Generated {insightsData.generatedAt ? format(new Date(insightsData.generatedAt), "MMM d, yyyy 'at' h:mm a") : ""}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+            <Card data-testid="card-ai-analysis">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  AI Market Analysis
+                </CardTitle>
+                <CardDescription>
+                  {insightsData?.generatedAt
+                    ? `Generated ${format(new Date(insightsData.generatedAt), "MMM d, yyyy 'at' h:mm a")}`
+                    : "Click 'Generate Insights' to analyze market data"
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isFetching ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
+                    <span className="text-muted-foreground">Analyzing market data with AI...</span>
+                  </div>
+                ) : insightsData?.insights ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
                     {insightsData.insights}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <p>No insights generated yet.</p>
+                    <p className="text-sm mt-2">Click the button above to analyze intel feeds, leads, and projects.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Client Tier Distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
