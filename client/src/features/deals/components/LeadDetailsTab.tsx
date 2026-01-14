@@ -242,7 +242,7 @@ export function LeadDetailsTab({
                       name="value"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Deal Value ($)</FormLabel>
+                          <FormLabel>Estimated Deal Value</FormLabel>
                           <FormControl>
                             <Input type="number" {...field} data-testid="input-value" />
                           </FormControl>
@@ -280,6 +280,28 @@ export function LeadDetailsTab({
                       )}
                     />
                   </div>
+
+                  <FormField
+                    control={form.control}
+                    name="timeline"
+                    render={({ field }) => (
+                      <HungryField
+                        fieldKey="timeline"
+                        question={HUNGRY_FIELD_QUESTIONS.timeline}
+                        onUnknownChange={(isUnknown) => toggleMissingInfo("timeline", isUnknown)}
+                        isUnknown={isFieldUnknown("timeline")}
+                      >
+                        <FormItem>
+                          <FormLabel>Project Timeline</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Q1 2026, Urgent, etc." {...field} value={field.value || ""} data-testid="input-timeline" />
+                          </FormControl>
+                          <FormDescription className="text-xs">First impression of client's timeline expectations</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      </HungryField>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -678,27 +700,6 @@ export function LeadDetailsTab({
                   <CardDescription>Track marketing touchpoints for this lead</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="timeline"
-                    render={({ field }) => (
-                      <HungryField
-                        fieldKey="timeline"
-                        question={HUNGRY_FIELD_QUESTIONS.timeline}
-                        onUnknownChange={(isUnknown) => toggleMissingInfo("timeline", isUnknown)}
-                        isUnknown={isFieldUnknown("timeline")}
-                      >
-                        <FormItem>
-                          <FormLabel>Project Timeline</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Q1 2026, Urgent, etc." {...field} value={field.value || ""} data-testid="input-timeline" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      </HungryField>
-                    )}
-                  />
-
                   <FormField
                     control={form.control}
                     name="proofLinks"
