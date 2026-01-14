@@ -58,6 +58,15 @@ export function ProposalPreview({
                 <div className="bg-white dark:bg-zinc-900 min-h-full">
                     {/* Proposal Document */}
                     <div className="max-w-3xl mx-auto py-8 px-12">
+                        {/* Document Header with Logo */}
+                        <div className="flex justify-center mb-8 pb-6 border-b">
+                            <img
+                                src="/logo-stacked.webp"
+                                alt="Scan2Plan"
+                                className="h-20 object-contain"
+                            />
+                        </div>
+
                         {includedSections.map((section, index) => (
                             <div
                                 key={section.id}
