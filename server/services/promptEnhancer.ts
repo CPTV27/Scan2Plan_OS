@@ -11,9 +11,9 @@ import { eq, desc, ilike, or } from "drizzle-orm";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { findSimilarProjects, isChromaDBAvailable } from "./vectorStore";
 
-// Initialize Gemini (using Replit AI integration)
-const genAI = process.env.AI_INTEGRATIONS_GEMINI_API_KEY
-    ? new GoogleGenerativeAI(process.env.AI_INTEGRATIONS_GEMINI_API_KEY)
+// Initialize Gemini (using Replit's integration with fallback)
+const genAI = (process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY)
+    ? new GoogleGenerativeAI(process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "")
     : null;
 
 // Types
