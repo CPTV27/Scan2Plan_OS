@@ -193,7 +193,7 @@ export const DISCIPLINES = [
   { id: "architecture", label: "Architecture" },
   { id: "mepf", label: "MEP/F" },
   { id: "structure", label: "Structure" },
-  { id: "site", label: "Site" },
+  { id: "site", label: "Grade" },
 ];
 
 export const LOD_OPTIONS = [
