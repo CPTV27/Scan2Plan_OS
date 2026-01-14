@@ -45,13 +45,13 @@ const STAGE_COLORS: Record<Stage, string> = {
 function IntegrityAuditBadge({ lead }: { lead: Lead }) {
   const status = (lead as any).integrityStatus;
   const overrideApproved = (lead as any).overrideApproved;
-  
+
   if (!status) return null;
-  
+
   if (status === 'pass') {
     return (
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className="text-xs bg-green-500/20 text-green-400 border-green-500/30 gap-1"
         data-testid={`badge-audit-${lead.id}`}
         title="Quote audit passed"
@@ -61,11 +61,11 @@ function IntegrityAuditBadge({ lead }: { lead: Lead }) {
       </Badge>
     );
   }
-  
+
   if (status === 'warning') {
     return (
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className="text-xs bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1"
         data-testid={`badge-audit-${lead.id}`}
         title="Quote has audit warnings"
@@ -75,12 +75,12 @@ function IntegrityAuditBadge({ lead }: { lead: Lead }) {
       </Badge>
     );
   }
-  
+
   if (status === 'blocked') {
     if (overrideApproved) {
       return (
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30 gap-1"
           data-testid={`badge-audit-${lead.id}`}
           title="CEO override approved"
@@ -91,8 +91,8 @@ function IntegrityAuditBadge({ lead }: { lead: Lead }) {
       );
     }
     return (
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className="text-xs bg-red-500/20 text-red-400 border-red-500/30 gap-1"
         data-testid={`badge-audit-${lead.id}`}
         title="Quote blocked - requires CEO override"
@@ -102,7 +102,7 @@ function IntegrityAuditBadge({ lead }: { lead: Lead }) {
       </Badge>
     );
   }
-  
+
   return null;
 }
 
@@ -110,13 +110,13 @@ function QBOImportBadge({ lead }: { lead: Lead }) {
   const importSource = (lead as any).importSource;
   const qboEstimateStatus = (lead as any).qboEstimateStatus;
   const qboHasLinkedInvoice = (lead as any).qboHasLinkedInvoice;
-  
+
   if (importSource !== 'qbo_sync') return null;
-  
+
   return (
     <div className="flex gap-1 flex-shrink-0">
-      <Badge 
-        variant="outline" 
+      <Badge
+        variant="outline"
         className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30"
         data-testid={`badge-qbo-import-${lead.id}`}
         title="Imported from QuickBooks"
@@ -124,7 +124,7 @@ function QBOImportBadge({ lead }: { lead: Lead }) {
         QBO
       </Badge>
       {qboEstimateStatus && (
-        <Badge 
+        <Badge
           variant="outline"
           className={clsx(
             "text-xs",
@@ -140,8 +140,8 @@ function QBOImportBadge({ lead }: { lead: Lead }) {
         </Badge>
       )}
       {qboHasLinkedInvoice && (
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className="text-xs bg-green-500/20 text-green-400 border-green-500/30"
           data-testid={`badge-qbo-invoiced-${lead.id}`}
           title="Has linked invoice in QuickBooks"
@@ -155,7 +155,7 @@ function QBOImportBadge({ lead }: { lead: Lead }) {
 
 function ProbabilityBadge({ lead }: { lead: Lead }) {
   const probability = lead.probability ?? 0;
-  
+
   const getColorClass = () => {
     if (probability >= 60) return 'bg-green-500/20 text-green-400 border-green-500/30';
     if (probability >= 40) return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
@@ -171,8 +171,8 @@ function ProbabilityBadge({ lead }: { lead: Lead }) {
   }
 
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={clsx("text-xs flex-shrink-0", getColorClass())}
       data-testid={`badge-probability-${lead.id}`}
       title={`Win probability: ${probability}%`}
@@ -182,9 +182,9 @@ function ProbabilityBadge({ lead }: { lead: Lead }) {
   );
 }
 
-function DealCard({ 
-  lead, 
-  onEdit, 
+function DealCard({
+  lead,
+  onEdit,
   onMove,
   onDelete,
   onOpenCPQ,
@@ -192,8 +192,8 @@ function DealCard({
   isDeleting,
   isSelected,
   onToggleSelect
-}: { 
-  lead: Lead; 
+}: {
+  lead: Lead;
   onEdit: () => void;
   onMove: (direction: 'prev' | 'next') => void;
   onDelete: () => void;
@@ -210,7 +210,7 @@ function DealCard({
   const canMoveRight = stageIndex < STAGES.length - 1 && lead.dealStage !== "Closed Won" && lead.dealStage !== "Closed Lost";
 
   return (
-    <Card 
+    <Card
       className={clsx(
         "mb-3 border-l-4 transition-all overflow-hidden",
         STAGE_COLORS[lead.dealStage as Stage] || "border-l-muted",
@@ -263,17 +263,17 @@ function DealCard({
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className={clsx(
                 "w-3 h-3",
-                i < (lead.leadPriority || 3) 
-                  ? (lead.leadPriority || 3) >= 4 
-                    ? "text-yellow-500 fill-yellow-500" 
+                i < (lead.leadPriority || 3)
+                  ? (lead.leadPriority || 3) >= 4
+                    ? "text-yellow-500 fill-yellow-500"
                     : "text-muted-foreground fill-muted-foreground"
                   : "text-muted-foreground/30"
               )} />
             ))}
           </div>
           {lead.leadSource && (
-            <Badge 
-              variant="secondary" 
+            <Badge
+              variant="secondary"
               className="text-xs flex-shrink-0 max-w-[80px] truncate"
               data-testid={`badge-source-${lead.id}`}
             >
@@ -314,9 +314,9 @@ function DealCard({
 
         {lead.quoteUrl && (
           <div className="flex items-center gap-1.5 flex-wrap overflow-hidden">
-            <a 
-              href={lead.quoteUrl} 
-              target="_blank" 
+            <a
+              href={lead.quoteUrl}
+              target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
               data-testid={`link-quote-${lead.id}`}
@@ -325,8 +325,8 @@ function DealCard({
               <span>View Quote</span>
             </a>
             {lead.quoteVersion && (
-              <Badge 
-                variant="outline" 
+              <Badge
+                variant="outline"
                 className="text-xs font-mono flex-shrink-0"
                 data-testid={`badge-version-${lead.id}`}
               >
@@ -424,10 +424,10 @@ const STAGE_ICONS: Record<Stage, typeof Target> = {
   "Closed Lost": XCircle,
 };
 
-function StageColumn({ 
-  stage, 
-  leads, 
-  onEdit, 
+function StageColumn({
+  stage,
+  leads,
+  onEdit,
   onMove,
   onDelete,
   onOpenCPQ,
@@ -435,8 +435,8 @@ function StageColumn({
   deletingLeadId,
   selectedLeads,
   onToggleSelect
-}: { 
-  stage: Stage; 
+}: {
+  stage: Stage;
   leads: Lead[];
   onEdit: (lead: Lead) => void;
   onMove: (leadId: number, direction: 'prev' | 'next') => void;
@@ -464,7 +464,7 @@ function StageColumn({
           ${columnValue.toLocaleString()}
         </p>
       </div>
-      
+
       <div className="flex-1 min-h-[200px]">
         {isEmpty ? (
           <div className="h-full min-h-[200px] border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center gap-3 p-4">
@@ -519,6 +519,7 @@ export default function Sales() {
   const [filterSource, setFilterSource] = useState<string>("all");
   const [filterQboStatus, setFilterQboStatus] = useState<string>("all");
   const [filterHasInvoice, setFilterHasInvoice] = useState<string>("all");
+  const [filterHotLeads, setFilterHotLeads] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -667,16 +668,16 @@ export default function Sales() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
       setSelectedLeads([]);
-      toast({ 
-        title: "Leads Updated", 
-        description: data.message || `Updated ${data.updated} leads` 
+      toast({
+        title: "Leads Updated",
+        description: data.message || `Updated ${data.updated} leads`
       });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Update Failed", 
-        description: error.message || "Could not update leads.", 
-        variant: "destructive" 
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update leads.",
+        variant: "destructive"
       });
     },
   });
@@ -684,10 +685,10 @@ export default function Sales() {
   const handleMove = (leadId: number, direction: 'prev' | 'next') => {
     const lead = leads?.find(l => l.id === leadId);
     if (!lead) return;
-    
+
     const currentIndex = STAGES.indexOf(lead.dealStage as Stage);
     const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-    
+
     if (newIndex >= 0 && newIndex < STAGES.length) {
       moveMutation.mutate({ lead, newStage: STAGES[newIndex] });
     }
@@ -703,25 +704,30 @@ export default function Sales() {
       (l.contactEmail && l.contactEmail.toLowerCase().includes(searchLower)) ||
       (l.contactPhone && l.contactPhone.toLowerCase().includes(searchLower))
     );
-    
+
     // Import source filter
     const leadSource = (l as any).importSource || 'manual';
     const matchesSource = filterSource === 'all' || leadSource === filterSource;
-    
+
     // QBO status filter (only applies when source filter is qbo_sync)
     const qboStatus = (l as any).qboEstimateStatus;
-    const matchesQboStatus = filterSource !== 'qbo_sync' || 
-      filterQboStatus === 'all' || 
+    const matchesQboStatus = filterSource !== 'qbo_sync' ||
+      filterQboStatus === 'all' ||
       qboStatus === filterQboStatus;
-    
+
     // Has invoice filter (only applies when source filter is qbo_sync)
     const hasInvoice = (l as any).qboHasLinkedInvoice;
-    const matchesInvoice = filterSource !== 'qbo_sync' || 
-      filterHasInvoice === 'all' || 
+    const matchesInvoice = filterSource !== 'qbo_sync' ||
+      filterHasInvoice === 'all' ||
       (filterHasInvoice === 'yes' && hasInvoice) ||
       (filterHasInvoice === 'no' && !hasInvoice);
-    
-    return matchesSearch && matchesSource && matchesQboStatus && matchesInvoice;
+
+    // Hot leads filter: high value OR high priority, not closed
+    const isHot = (Number(l.value) >= 10000 || (l.leadPriority || 0) >= 4) &&
+      l.dealStage !== 'Closed Won' && l.dealStage !== 'Closed Lost';
+    const matchesHot = !filterHotLeads || isHot;
+
+    return matchesSearch && matchesSource && matchesQboStatus && matchesInvoice && matchesHot;
   });
 
   const totalValue = leads?.reduce((sum, lead) => sum + Number(lead.value), 0) || 0;
@@ -740,288 +746,305 @@ export default function Sales() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
         <main className="flex-1 flex flex-col overflow-hidden">
           <header className="p-4 md:p-6 border-b border-border bg-card/50 backdrop-blur-sm flex-shrink-0">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-display font-bold">Sales Pipeline</h2>
-                <p className="text-muted-foreground text-sm mt-1">Manage deals through your sales funnel</p>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <NotificationBell />
-                <AIAssistant />
-                <Button 
-                  variant="outline" 
-                  onClick={() => batchSyncMutation.mutate()}
-                  disabled={batchSyncMutation.isPending || selectedLeads.length === 0}
-                  data-testid="button-batch-sync"
-                  title={selectedLeads.length === 0 ? "Select leads to sync" : `Sync ${selectedLeads.length} lead(s) to GoHighLevel`}
-                >
-                  {batchSyncMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4 mr-2" />
-                  )}
-                  Sync to GHL {selectedLeads.length > 0 && `(${selectedLeads.length})`}
-                </Button>
-                <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" data-testid="button-import-leads">
-                      <Upload className="w-4 h-4 mr-2" /> Import CSV
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Import Leads from Spreadsheet</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="bg-muted/50 rounded-lg p-4 space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <FileSpreadsheet className="w-4 h-4" />
-                          CSV Format Requirements
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-display font-bold">Sales Pipeline</h2>
+                  <p className="text-muted-foreground text-sm mt-1">Manage deals through your sales funnel</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant={filterHotLeads ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterHotLeads(!filterHotLeads)}
+                    data-testid="button-hot-leads"
+                    className={filterHotLeads ? "bg-orange-500 hover:bg-orange-600" : ""}
+                  >
+                    🔥 Hot Leads
+                    {filterHotLeads && leads && (
+                      <Badge variant="secondary" className="ml-1 bg-white/20">
+                        {leads.filter(l =>
+                          (Number(l.value) >= 10000 || (l.leadPriority || 0) >= 4) &&
+                          l.dealStage !== 'Closed Won' && l.dealStage !== 'Closed Lost'
+                        ).length}
+                      </Badge>
+                    )}
+                  </Button>
+                  <NotificationBell />
+                  <AIAssistant />
+                  <Button
+                    variant="outline"
+                    onClick={() => batchSyncMutation.mutate()}
+                    disabled={batchSyncMutation.isPending || selectedLeads.length === 0}
+                    data-testid="button-batch-sync"
+                    title={selectedLeads.length === 0 ? "Select leads to sync" : `Sync ${selectedLeads.length} lead(s) to GoHighLevel`}
+                  >
+                    {batchSyncMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 mr-2" />
+                    )}
+                    Sync to GHL {selectedLeads.length > 0 && `(${selectedLeads.length})`}
+                  </Button>
+                  <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" data-testid="button-import-leads">
+                        <Upload className="w-4 h-4 mr-2" /> Import CSV
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Import Leads from Spreadsheet</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <FileSpreadsheet className="w-4 h-4" />
+                            CSV Format Requirements
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Your CSV file must include these columns:
+                          </p>
+                          <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
+                            <li><strong>Client</strong> or <strong>Client Name</strong> (required)</li>
+                            <li><strong>Address</strong> or <strong>Project Address</strong> (optional)</li>
+                            <li><strong>Value</strong> or <strong>Amount</strong> (optional)</li>
+                            <li><strong>Contact Name</strong>, <strong>Email</strong>, <strong>Phone</strong> (optional)</li>
+                            <li><strong>Source</strong>, <strong>Priority</strong>, <strong>Notes</strong> (optional)</li>
+                          </ul>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Your CSV file must include these columns:
-                        </p>
-                        <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-                          <li><strong>Client</strong> or <strong>Client Name</strong> (required)</li>
-                          <li><strong>Address</strong> or <strong>Project Address</strong> (optional)</li>
-                          <li><strong>Value</strong> or <strong>Amount</strong> (optional)</li>
-                          <li><strong>Contact Name</strong>, <strong>Email</strong>, <strong>Phone</strong> (optional)</li>
-                          <li><strong>Source</strong>, <strong>Priority</strong>, <strong>Notes</strong> (optional)</li>
-                        </ul>
+                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-lg p-8 gap-3">
+                          <Upload className="w-8 h-8 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">Select a CSV file to import</p>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept=".csv"
+                              className="hidden"
+                              onChange={handleFileUpload}
+                              disabled={importMutation.isPending}
+                              data-testid="input-import-file"
+                            />
+                            <Button
+                              variant="default"
+                              className="pointer-events-none"
+                              disabled={importMutation.isPending}
+                            >
+                              {importMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Importing...
+                                </>
+                              ) : (
+                                <>Choose File</>
+                              )}
+                            </Button>
+                          </label>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-lg p-8 gap-3">
-                        <Upload className="w-8 h-8 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Select a CSV file to import</p>
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            accept=".csv"
-                            className="hidden"
-                            onChange={handleFileUpload}
-                            disabled={importMutation.isPending}
-                            data-testid="input-import-file"
-                          />
-                          <Button 
-                            variant="default" 
-                            className="pointer-events-none"
-                            disabled={importMutation.isPending}
-                          >
-                            {importMutation.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Importing...
-                              </>
-                            ) : (
-                              <>Choose File</>
-                            )}
-                          </Button>
-                        </label>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsPdfImportOpen(true)}
-                  data-testid="button-pdf-import"
-                >
-                  <FileText className="w-4 h-4 mr-2" /> Import PDFs
-                </Button>
-                <GHLImport />
-                <Button 
-                  variant="ghost"
-                  onClick={() => navigate("/sales/trash")}
-                  data-testid="button-view-trash"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> Trash
-                </Button>
-                <Button 
-                  data-testid="button-new-lead"
-                  onClick={() => createDraftMutation.mutate()}
-                  disabled={createDraftMutation.isPending}
-                >
-                  {createDraftMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
-                  New Deal
-                </Button>
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsPdfImportOpen(true)}
+                    data-testid="button-pdf-import"
+                  >
+                    <FileText className="w-4 h-4 mr-2" /> Import PDFs
+                  </Button>
+                  <GHLImport />
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate("/sales/trash")}
+                    data-testid="button-view-trash"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Trash
+                  </Button>
+                  <Button
+                    data-testid="button-new-lead"
+                    onClick={() => createDraftMutation.mutate()}
+                    disabled={createDraftMutation.isPending}
+                  >
+                    {createDraftMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4 mr-2" />
+                    )}
+                    New Deal
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input 
-                  className="pl-9 bg-card border-border" 
-                  placeholder="Search deals..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="input-search-deals"
-                />
-              </div>
-              
-              {/* QBO Filters */}
-              <Select value={filterSource} onValueChange={(val) => {
-                setFilterSource(val);
-                // Reset QBO-specific filters when switching away from QBO
-                if (val !== 'qbo_sync') {
-                  setFilterQboStatus('all');
-                  setFilterHasInvoice('all');
-                }
-              }}>
-                <SelectTrigger className="w-[130px]" data-testid="select-filter-source">
-                  <SelectValue placeholder="Source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sources</SelectItem>
-                  <SelectItem value="qbo_sync">QBO Import</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="hubspot">HubSpot</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              {filterSource === 'qbo_sync' && (
-                <>
-                  <Select value={filterQboStatus} onValueChange={setFilterQboStatus}>
-                    <SelectTrigger className="w-[120px]" data-testid="select-filter-qbo-status">
-                      <SelectValue placeholder="QBO Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Accepted">Accepted</SelectItem>
-                      <SelectItem value="Closed">Closed</SelectItem>
-                      <SelectItem value="Rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={filterHasInvoice} onValueChange={setFilterHasInvoice}>
-                    <SelectTrigger className="w-[110px]" data-testid="select-filter-has-invoice">
-                      <SelectValue placeholder="Invoice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Any</SelectItem>
-                      <SelectItem value="yes">Has Invoice</SelectItem>
-                      <SelectItem value="no">No Invoice</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
-              
-              {(filterSource !== 'all' || filterQboStatus !== 'all' || filterHasInvoice !== 'all') && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => {
-                    setFilterSource('all');
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    className="pl-9 bg-card border-border"
+                    placeholder="Search deals..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    data-testid="input-search-deals"
+                  />
+                </div>
+
+                {/* QBO Filters */}
+                <Select value={filterSource} onValueChange={(val) => {
+                  setFilterSource(val);
+                  // Reset QBO-specific filters when switching away from QBO
+                  if (val !== 'qbo_sync') {
                     setFilterQboStatus('all');
                     setFilterHasInvoice('all');
-                  }}
-                  data-testid="button-clear-filters"
-                >
-                  Clear Filters
-                </Button>
-              )}
-              
-              <div className="flex items-center gap-4">
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Pipeline: </span>
-                  <span className="font-mono font-semibold text-primary" data-testid="text-total-pipeline">
-                    ${totalValue.toLocaleString()}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Forecast: </span>
-                  <span className="font-mono font-semibold text-accent" data-testid="text-weighted-forecast">
-                    ${Math.round(weightedValue).toLocaleString()}
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Deals: </span>
-                  <span className="font-mono font-semibold" data-testid="text-deal-count">
-                    {leads?.length || 0}
-                  </span>
+                  }
+                }}>
+                  <SelectTrigger className="w-[130px]" data-testid="select-filter-source">
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    <SelectItem value="qbo_sync">QBO Import</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="hubspot">HubSpot</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {filterSource === 'qbo_sync' && (
+                  <>
+                    <Select value={filterQboStatus} onValueChange={setFilterQboStatus}>
+                      <SelectTrigger className="w-[120px]" data-testid="select-filter-qbo-status">
+                        <SelectValue placeholder="QBO Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="Pending">Pending</SelectItem>
+                        <SelectItem value="Accepted">Accepted</SelectItem>
+                        <SelectItem value="Closed">Closed</SelectItem>
+                        <SelectItem value="Rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={filterHasInvoice} onValueChange={setFilterHasInvoice}>
+                      <SelectTrigger className="w-[110px]" data-testid="select-filter-has-invoice">
+                        <SelectValue placeholder="Invoice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Any</SelectItem>
+                        <SelectItem value="yes">Has Invoice</SelectItem>
+                        <SelectItem value="no">No Invoice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+
+                {(filterSource !== 'all' || filterQboStatus !== 'all' || filterHasInvoice !== 'all') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterSource('all');
+                      setFilterQboStatus('all');
+                      setFilterHasInvoice('all');
+                    }}
+                    data-testid="button-clear-filters"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+
+                <div className="flex items-center gap-4">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Pipeline: </span>
+                    <span className="font-mono font-semibold text-primary" data-testid="text-total-pipeline">
+                      ${totalValue.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Forecast: </span>
+                    <span className="font-mono font-semibold text-accent" data-testid="text-weighted-forecast">
+                      ${Math.round(weightedValue).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Deals: </span>
+                    <span className="font-mono font-semibold" data-testid="text-deal-count">
+                      {leads?.length || 0}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* Bulk Action Bar */}
-        {selectedLeads.length > 0 && (
-          <div className="bg-primary/10 border-b px-6 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium" data-testid="text-selected-count">
-                {selectedLeads.length} selected
-              </span>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setSelectedLeads([])}
-                data-testid="button-clear-selection"
-              >
-                Clear Selection
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Move to:</span>
-              {STAGES.map((stage) => (
+          {/* Bulk Action Bar */}
+          {selectedLeads.length > 0 && (
+            <div className="bg-primary/10 border-b px-6 py-3 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium" data-testid="text-selected-count">
+                  {selectedLeads.length} selected
+                </span>
                 <Button
-                  key={stage}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => bulkUpdateStageMutation.mutate({ leadIds: selectedLeads, stage })}
-                  disabled={bulkUpdateStageMutation.isPending}
-                  data-testid={`button-bulk-move-${stage.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={() => setSelectedLeads([])}
+                  data-testid="button-clear-selection"
                 >
-                  {stage}
+                  Clear Selection
                 </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-hidden p-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <ScrollArea className="h-full">
-              <div className="flex gap-4 pb-4 min-w-max">
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Move to:</span>
                 {STAGES.map((stage) => (
-                  <StageColumn
+                  <Button
                     key={stage}
-                    stage={stage}
-                    leads={getLeadsByStage(stage)}
-                    onEdit={setSelectedLead}
-                    onMove={handleMove}
-                    onDelete={(leadId) => deleteMutation.mutate(leadId)}
-                    onOpenCPQ={handleOpenCPQ}
-                    movingLeadId={movingLeadId}
-                    deletingLeadId={deleteMutation.isPending ? (deleteMutation.variables as number) : null}
-                    selectedLeads={selectedLeads}
-                    onToggleSelect={(leadId) => {
-                      setSelectedLeads(prev => 
-                        prev.includes(leadId) 
-                          ? prev.filter(id => id !== leadId)
-                          : [...prev, leadId]
-                      );
-                    }}
-                  />
+                    variant="outline"
+                    size="sm"
+                    onClick={() => bulkUpdateStageMutation.mutate({ leadIds: selectedLeads, stage })}
+                    disabled={bulkUpdateStageMutation.isPending}
+                    data-testid={`button-bulk-move-${stage.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {stage}
+                  </Button>
                 ))}
               </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+            </div>
           )}
+
+          <div className="flex-1 overflow-hidden p-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <ScrollArea className="h-full">
+                <div className="flex gap-4 pb-4 min-w-max">
+                  {STAGES.map((stage) => (
+                    <StageColumn
+                      key={stage}
+                      stage={stage}
+                      leads={getLeadsByStage(stage)}
+                      onEdit={setSelectedLead}
+                      onMove={handleMove}
+                      onDelete={(leadId) => deleteMutation.mutate(leadId)}
+                      onOpenCPQ={handleOpenCPQ}
+                      movingLeadId={movingLeadId}
+                      deletingLeadId={deleteMutation.isPending ? (deleteMutation.variables as number) : null}
+                      selectedLeads={selectedLeads}
+                      onToggleSelect={(leadId) => {
+                        setSelectedLeads(prev =>
+                          prev.includes(leadId)
+                            ? prev.filter(id => id !== leadId)
+                            : [...prev, leadId]
+                        );
+                      }}
+                    />
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            )}
           </div>
         </main>
 
@@ -1031,8 +1054,8 @@ export default function Sales() {
               <DialogTitle>Edit Deal</DialogTitle>
             </DialogHeader>
             {selectedLead && (
-              <LeadForm 
-                lead={selectedLead} 
+              <LeadForm
+                lead={selectedLead}
                 onSuccess={() => setSelectedLead(null)}
                 onOpenCPQ={() => {
                   setSelectedLead(null);
@@ -1063,7 +1086,7 @@ export default function Sales() {
         {commLead && (
           <Dialog open={!!commLead} onOpenChange={(open) => !open && setCommLead(null)}>
             <DialogContent className="max-w-2xl max-h-[85vh] p-0">
-              <CommunicationCenter 
+              <CommunicationCenter
                 lead={commLead}
                 onClose={() => setCommLead(null)}
               />
