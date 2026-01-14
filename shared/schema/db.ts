@@ -1994,7 +1994,17 @@ export type GeneratedProposal = typeof generatedProposals.$inferSelect;
 // Products / Services catalog (synced from QuickBooks)
 
 // === INTEL NEWS ITEMS (Regional Intel News Feeds) ===
-export const INTEL_NEWS_TYPES = ["opportunity", "policy", "competitor"] as const;
+export const INTEL_NEWS_TYPES = [
+  "opportunity",      // Bidding opportunities (RFPs, ITBs)
+  "policy",          // Regulatory & policy updates
+  "competitor",      // Competitor intelligence
+  "project",         // New construction/renovation projects
+  "technology",      // Scanning/BIM industry tech news
+  "funding",         // Grant & funding opportunities
+  "event",           // Industry conferences & networking
+  "talent",          // Hiring trends & talent market
+  "market",          // Market trends & analysis
+] as const;
 export type IntelNewsType = typeof INTEL_NEWS_TYPES[number];
 
 export const INTEL_REGIONS = ["Northeast", "Mid-Atlantic", "Southeast", "Midwest", "Southwest", "West", "National"] as const;
@@ -2207,6 +2217,10 @@ export const intelFeedSources = pgTable("intel_feed_sources", {
     webhookSecret?: string;
     filters?: Record<string, any>;
     syncIntervalMinutes?: number;
+    searchPrompt?: string;  // Editable search/filter prompt
+    keywords?: string[];     // Keywords to match
+    excludeKeywords?: string[]; // Keywords to exclude
+    targetType?: IntelNewsType; // What type of intel this source produces
   }>(),
   isActive: boolean("is_active").default(true),
   lastSyncAt: timestamp("last_sync_at"),

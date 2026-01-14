@@ -208,4 +208,157 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
     }
 });
 
+// POST /intel-source-config/seed-defaults - Seed 9 default feed configurations (CEO only)
+router.post("/seed-defaults", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const defaultFeeds = [
+            // 1. Bidding Opportunities
+            {
+                name: "Bidding Opportunities",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=RFP+construction+scanning+OR+BIM",
+                    targetType: "opportunity",
+                    searchPrompt: `(RFP OR "request for proposal" OR bid OR "invitation to bid" OR procurement) AND ("3D scanning" OR "laser scanning" OR "LiDAR" OR "as-built" OR "Scan-to-BIM" OR "point cloud" OR "building survey" OR "existing conditions")`,
+                    keywords: ["RFP", "bid", "procurement", "3D scanning", "laser scanning", "Scan-to-BIM", "as-built"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 60,
+                },
+            },
+            // 2. Policy & Regulatory
+            {
+                name: "Policy & Regulatory Updates",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=NYC+building+code+OR+construction+regulation",
+                    targetType: "policy",
+                    searchPrompt: `("Local Law 97" OR "LL97" OR "building emissions" OR "carbon reporting" OR "energy audit" OR "DOB filing" OR "landmark preservation" OR "historic district" OR "building code update") AND (NYC OR "New York" OR construction)`,
+                    keywords: ["Local Law 97", "DOB", "OSHA", "building code", "regulation", "compliance", "permit"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 360,
+                },
+            },
+            // 3. Competitor Intelligence
+            {
+                name: "Competitor Intelligence",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=3D+scanning+company+OR+Scan-to-BIM+services",
+                    targetType: "competitor",
+                    searchPrompt: `("3D scanning company" OR "Scan-to-BIM" OR "laser scanning services" OR "point cloud modeling" OR "reality capture") AND (acquires OR merger OR partnership OR expands OR funding OR "wins contract") NOT "Scan2Plan"`,
+                    keywords: ["acquires", "merger", "partnership", "expands", "wins contract", "new office"],
+                    excludeKeywords: ["Scan2Plan", "scan2plan.io"],
+                    syncIntervalMinutes: 240,
+                },
+            },
+            // 4. Project Opportunities
+            {
+                name: "New Construction Projects",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=NYC+construction+project+OR+renovation+project",
+                    targetType: "project",
+                    searchPrompt: `("construction start" OR "groundbreaking" OR "renovation project" OR "building permit" OR "design contract" OR "tenant improvement") AND (NYC OR Manhattan OR Brooklyn OR Albany OR "Capital Region") AND ("square feet" OR architect OR "general contractor")`,
+                    keywords: ["construction", "renovation", "groundbreaking", "building permit", "tenant improvement"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 120,
+                },
+            },
+            // 5. Technology & Innovation
+            {
+                name: "Scanning & BIM Technology",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=LiDAR+technology+OR+BIM+software+OR+reality+capture",
+                    targetType: "technology",
+                    searchPrompt: `("LiDAR" OR "Trimble" OR "NavVis" OR "reality capture" OR "point cloud" OR "BIM software" OR "Revit" OR "digital twin") AND (release OR update OR new OR innovation OR AI)`,
+                    keywords: ["LiDAR", "Trimble", "NavVis", "BIM", "Revit", "point cloud", "AI", "reality capture"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 480,
+                },
+            },
+            // 6. Funding & Grants
+            {
+                name: "Funding & Grant Opportunities",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=construction+grant+OR+historic+preservation+funding",
+                    targetType: "funding",
+                    searchPrompt: `(grant OR funding OR "federal program" OR "state program" OR "tax credit") AND ("historic preservation" OR "energy efficiency" OR "infrastructure" OR "capital improvement" OR "adaptive reuse")`,
+                    keywords: ["grant", "funding", "tax credit", "historic preservation", "SHPO", "energy efficiency"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 720,
+                },
+            },
+            // 7. Industry Events
+            {
+                name: "Industry Events & Conferences",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=AEC+conference+OR+construction+expo+OR+BIM+summit",
+                    targetType: "event",
+                    searchPrompt: `(conference OR summit OR expo OR webinar OR "trade show") AND (AEC OR construction OR BIM OR scanning OR architecture OR engineering)`,
+                    keywords: ["conference", "summit", "expo", "AIA", "AGC", "BOMA", "Autodesk University"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 1440,
+                },
+            },
+            // 8. Talent & Hiring
+            {
+                name: "Talent & Hiring Trends",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=BIM+jobs+OR+construction+hiring+OR+scanning+technician",
+                    targetType: "talent",
+                    searchPrompt: `(hiring OR "job market" OR "labor shortage" OR "skilled trades" OR salaries) AND (BIM OR scanning OR construction OR "reality capture" OR Revit)`,
+                    keywords: ["hiring", "jobs", "labor shortage", "BIM modeler", "scan technician", "salaries"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 1440,
+                },
+            },
+            // 9. Market Analysis
+            {
+                name: "Market Trends & Analysis",
+                type: "rss" as IntelSourceType,
+                config: {
+                    feedUrl: "https://news.google.com/rss/search?q=construction+industry+trends+OR+AEC+market+forecast",
+                    targetType: "market",
+                    searchPrompt: `("market trends" OR forecast OR "industry report" OR analysis OR growth) AND (construction OR AEC OR "real estate" OR scanning OR BIM) AND (2025 OR 2026 OR outlook)`,
+                    keywords: ["market trends", "forecast", "industry report", "growth", "outlook", "construction spending"],
+                    excludeKeywords: [],
+                    syncIntervalMinutes: 1440,
+                },
+            },
+        ];
+
+        let created = 0;
+        let skipped = 0;
+
+        for (const feed of defaultFeeds) {
+            try {
+                await db.insert(intelFeedSources).values(feed);
+                created++;
+            } catch (e: any) {
+                // Skip if already exists (unique constraint)
+                if (e.code === "23505") {
+                    skipped++;
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            created,
+            skipped,
+            total: defaultFeeds.length,
+            message: `Created ${created} intel feed configurations (${skipped} already existed)`
+        });
+    } catch (error) {
+        console.error("Error seeding default feeds:", error);
+        res.status(500).json({ message: "Failed to seed default feeds" });
+    }
+});
+
 export default router;
