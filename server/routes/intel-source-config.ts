@@ -1,8 +1,51 @@
 import { Router } from "express";
 import { db } from "../db";
-import { intelFeedSources, insertIntelFeedSourceSchema, type IntelSourceType } from "@shared/schema";
+import { intelFeedSources, intelNewsItems, insertIntelFeedSourceSchema, type IntelSourceType, type IntelNewsType, type IntelRegion } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+
+// Simple RSS parser helper
+async function parseRSSFeed(feedUrl: string): Promise<Array<{
+    title: string;
+    link: string;
+    description: string;
+    pubDate: Date | null;
+    source: string;
+}>> {
+    const response = await fetch(feedUrl);
+    const text = await response.text();
+    
+    const items: Array<{
+        title: string;
+        link: string;
+        description: string;
+        pubDate: Date | null;
+        source: string;
+    }> = [];
+    
+    // Simple regex-based XML parsing for RSS items
+    const itemMatches = text.match(/<item>[\s\S]*?<\/item>/g) || [];
+    
+    for (const itemXml of itemMatches.slice(0, 20)) { // Limit to 20 items per sync
+        const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/s);
+        const linkMatch = itemXml.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/s);
+        const descMatch = itemXml.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/s);
+        const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/);
+        const sourceMatch = itemXml.match(/<source[^>]*>(.*?)<\/source>/);
+        
+        const title = titleMatch?.[1]?.trim().replace(/<[^>]*>/g, '') || '';
+        const link = linkMatch?.[1]?.trim() || '';
+        const description = descMatch?.[1]?.trim().replace(/<[^>]*>/g, '').substring(0, 500) || '';
+        const pubDate = pubDateMatch?.[1] ? new Date(pubDateMatch[1]) : null;
+        const source = sourceMatch?.[1]?.trim() || 'RSS Feed';
+        
+        if (title && link) {
+            items.push({ title, link, description, pubDate, source });
+        }
+    }
+    
+    return items;
+}
 
 const router = Router();
 
@@ -169,7 +212,64 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                     break;
                 }
                 case "rss": {
-                    syncResult = { success: true, message: "RSS feed sync completed", itemsProcessed: 0 };
+                    const config = (source.config || {}) as { 
+                        feedUrl?: string; 
+                        targetType?: string;
+                        keywords?: string[];
+                    };
+                    
+                    if (!config.feedUrl) {
+                        syncResult = { success: false, message: "No feed URL configured", itemsProcessed: 0 };
+                        break;
+                    }
+                    
+                    // Fetch and parse RSS feed
+                    const feedItems = await parseRSSFeed(config.feedUrl);
+                    let itemsAdded = 0;
+                    
+                    // Map targetType to IntelNewsType
+                    const typeMap: Record<string, IntelNewsType> = {
+                        opportunity: "opportunity",
+                        policy: "policy", 
+                        competitor: "competitor",
+                        project: "project",
+                        technology: "technology",
+                        funding: "funding",
+                        event: "event",
+                        talent: "talent",
+                        market: "market",
+                    };
+                    const newsType = typeMap[config.targetType || "market"] || "market";
+                    
+                    for (const item of feedItems) {
+                        // Check if item already exists (by URL)
+                        const existing = await db
+                            .select()
+                            .from(intelNewsItems)
+                            .where(eq(intelNewsItems.sourceUrl, item.link))
+                            .limit(1);
+                        
+                        if (existing.length === 0) {
+                            // Add new item
+                            await db.insert(intelNewsItems).values({
+                                type: newsType,
+                                title: item.title.substring(0, 255),
+                                summary: item.description || item.title,
+                                sourceUrl: item.link,
+                                sourceName: item.source || source.name,
+                                publishedAt: item.pubDate || new Date(),
+                                relevanceScore: 50, // Default score
+                                createdBy: "system",
+                            });
+                            itemsAdded++;
+                        }
+                    }
+                    
+                    syncResult = { 
+                        success: true, 
+                        message: `RSS feed sync completed. Found ${feedItems.length} items, added ${itemsAdded} new.`, 
+                        itemsProcessed: itemsAdded 
+                    };
                     break;
                 }
                 case "webhook": {
