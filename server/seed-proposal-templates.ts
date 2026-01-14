@@ -452,123 +452,207 @@ Scan2Plan's liability is limited to the contract value. We are not responsible f
         variables: [],
         content: `## Scan2Plan Terms & Conditions
 
-### Responsibilities of Scan2Plan
+### 1. Definitions
 
-Scan2Plan (referred to as "S2P") will assign a dedicated point of contact to each project. This designated representative will be consistently accessible to the client ("Client"). S2P retains the prerogative to modify the point of contact, with advance notice provided to the Client.
-
----
-
-### Responsibilities of the Client
-
-1. **Compensation**: The Client is obligated to compensate S2P in accordance with the payment terms outlined in the Proposal.
-
-2. **Designation of Representative**: The Client may appoint an authorized representative with the capacity to act on its behalf. This representative may remain in consistent and prompt communication with S2P.
-
-3. **Cooperation with S2P**: The Client is required to collaborate with S2P by:
-   - Providing comprehensive information about the conditions and requisites of the engaged project ("the Project")
-   - Responding to S2P's information and approval requests within a reasonable timeframe
-   - Diligently reviewing S2P's work to ensure accuracy and compliance with the Project's requirements. Any issues or concerns shall be promptly communicated to S2P
-   - Facilitating suitable coordination for on-site Project visits and other relevant matters
-
-4. **Access for Scanning Technician**: During the designated scanning period, the Scanning Technician necessitates unrestricted access to all relevant spaces, including rooms, floors, roof, closets, and more.
-
-5. **Client Preparation and Shoot Conditions**: The Client shall ensure thorough preparation for the shoot, including:
-   - Adequate lighting and tidiness in shoot areas
-   - Removal of clutter and excess furniture, ensuring well-lit and tidy spaces
-   - Ensuring clear line of sight for the LiDAR scanners, which require unobstructed views of features to be documented
-   - Acknowledgment that areas with poor visibility due to obstacles may need to be assumed in the documentation
-
-6. **Timeliness and Shoot Readiness**: The Scanning Technician may wait no more than 30 minutes for the Client and shoot area to be ready upon arrival on site. Delays beyond this period may incur a charge of $150.00 per hour or portion thereof.
-
-7. **Access and Rescheduling**: If the Scanning Technician cannot access a required scanning area, the shoot may be rescheduled, and the Client may be subject to a $1,500.00 re-shoot fee.
-
-8. **Cancellation Policy**:
-   - Cancellations made within 48 hours of the scheduled scanning start time may result in a $450.00 cancellation fee, alongside compensation for nonrefundable expenses
-   - Cancellations communicated over 48 hours prior to the scheduled scanning start time may not incur a cancellation fee but may still involve charges for nonrefundable expenses (if applicable)
+- **"S2P"** means Scan2Plan.
+- **"Client"** means the party accepting the Proposal.
+- **"Services"** means the work described in the Proposal, including reality capture, processing, and production of deliverables.
+- **"Deliverables"** means the files and outputs identified in the Proposal (e.g., point cloud, BIM model, CAD drawings).
+- **"Project Site"** means the location(s) where S2P performs on-site Services.
+- **"Non-Recoverable Expenses"** means costs incurred or committed by S2P that cannot be canceled or refunded (including travel, lodging, shipping, permits, third-party fees, and mobilization costs).
 
 ---
 
-### Non-Solicitation
+### 2. Responsibilities of Scan2Plan
 
-As a recognition of the substantial effort and resources invested by S2P in cultivating its expertise and training authorized service partners, the Client hereby agrees that throughout its association with S2P, and for a duration of at least two (2) years thereafter, the Client shall refrain, directly or indirectly, on behalf of itself or any other entity, from:
-
-1. Initiating contact, solicitation, disruption, or any attempt to allure customers or potential customers away from S2P or its affiliated entities.
-
-2. Inducing or endeavoring to induce any employee of S2P or its affiliated entities to terminate their employment, or engaging in any activity that could disrupt such employment relationships.
-
-3. Encouraging or attempting to encourage any consultant or contractor currently engaged with S2P or its affiliated entities to discontinue their collaboration, or engaging in any conduct that may disrupt such working relationships.
+S2P will assign a dedicated point of contact to each project. This designated representative will be accessible to Client. S2P may change the point of contact with advance notice.
 
 ---
 
-### Property Rights
+### 3. Responsibilities of the Client
 
-1. The Client acknowledges that these General Terms and Conditions, the Proposal, and any other agreement or disclosure of Confidential Information shall not be interpreted as conferring any license or right to the Client or its Affiliates concerning any of the disclosed Confidential Information.
+**3.1 Compensation**
+Client shall compensate S2P in accordance with the payment terms in the Proposal.
 
-2. With the exception of stipulations stated here, any work-product produced by S2P during the execution of the Services will continue to be the sole property of S2P. S2P retains the authority to charge any potential user, apart from the client, for utilizing such work-product or the final product mentioned below.
+**3.2 Authorized Representative**
+Client may appoint an authorized representative empowered to act on Client's behalf and remain in prompt communication with S2P.
 
-3. The final product slated for delivery to the Client will become the property of the Client upon full payment for the Services.
+**3.3 Cooperation**
+Client shall cooperate with S2P by:
+- Providing complete and accurate information regarding Project Site conditions and project requirements.
+- Responding to S2P requests for information, decisions, and approvals within a reasonable timeframe.
+- Reviewing Deliverables promptly for conformance to the Proposal and promptly notifying S2P of any issues.
+- Coordinating access, escorts, keys, and site logistics necessary for on-site work.
 
----
+**3.4 Site Access for Scanning Technician**
+During the scheduled scanning period, the scanning technician requires access to all areas required by the Proposal, including rooms, floors, roof areas, closets, mechanical spaces, and other relevant locations.
 
-### Limitation of Liability
+**3.5 Client Preparation and Shoot Conditions**
+Client shall ensure the Project Site is prepared for scanning, including:
+- Adequate lighting and general tidiness in scanning areas.
+- Removal of clutter and moveable obstructions as reasonably required.
+- Maintaining clear line-of-sight where feasible; Client acknowledges LiDAR capture requires unobstructed visibility of surfaces and features.
+- Client acknowledges areas with limited visibility due to obstructions, locked rooms, safety restrictions, or inaccessibility may require assumptions, exclusions, or later rescheduling.
 
-1. The Services, including those arranged by S2P from third-party providers on behalf of the Client, are provided without any form of warranty, whether explicit or implied. There is no assurance that these Services may fulfill the Client's requirements or expectations, or that they may be effective, accurate, or reliable.
+**3.6 Timeliness and Shoot Readiness**
+S2P may wait up to 30 minutes after arrival for Client access and scan readiness. Delays beyond 30 minutes may be billed at $150.00 per hour (or portion thereof).
 
-2. All work-product produced by S2P during the provision of the Services is intended solely for the Client's use. S2P assumes no responsibility for the use of such work-product by any other individual or entity.
-
-3. Topographic services are exclusively provided for design purposes. The documentation delivered is conceptual and not intended as a land survey.
-
-4. To the fullest extent permitted by applicable law, neither S2P nor its Affiliates shall be held liable for:
-   - Indirect, incidental, punitive, special, consequential, or exemplary damages, or any form of loss arising from the Client's use of the Services, or from content, information, materials, or products made available through the Services
-   - Damages exceeding the actual payment made by the Client for the Services
-   - The provision or omission of BIM models, construction documents, or environmental, electrical, mechanical, or structural engineering services
-   - Delays or circumstances beyond the reasonable control of S2P or its Affiliates
-   - Inaccurate information supplied by the Client or reliable sources
-   - Project site conditions not communicated to S2P or its Affiliates
-   - Presence of hazardous materials or toxic substances at the Project site
-   - Specification of equipment or products for purposes consistent with the manufacturer's published literature
-   - Decisions made by others, encompassing equipment and materials
-   - Construction means, methods, techniques, sequences, or procedures
-   - Adherence to condition investigation or construction safety programs
-   - Timeliness or quality of contractor performance, or failure of any contractor to adhere to the Project's construction documents
-   - Actions or inactions of others, including consultants, utility companies, and governmental agencies
+**3.7 Safety, Hazardous Conditions, and Site Rules**
+Client is responsible for ensuring the Project Site is safe and compliant with applicable site rules and safety requirements. Client shall disclose known hazardous materials or unsafe conditions prior to mobilization. S2P may suspend or stop on-site work if conditions are unsafe or access is restricted; any resulting delay, remobilization, or rescheduling fees may apply.
 
 ---
 
-### Warranties Regarding Drawings, Specifications, and Documents
+### 4. Payment, Delinquency, and Collection
 
-S2P affirms and guarantees that the drawings, specifications, surveys, reports, recommendations, and other documents crafted for the client and/or owner as part of its services will be suitably comprehensive for their intended purposes, with the exception of any inadequacies attributable to imprecise survey control or data provided by the client, owner, or third parties on their behalf.
+Payment is due as stated in the Proposal unless otherwise agreed in writing.
 
-S2P does not extend any assurances or warranties concerning such survey control or data. The client and/or owner acknowledges that S2P bears no responsibility for inaccuracies in said survey control or data.
+Any amounts not paid when due are delinquent. S2P reserves the right, at its discretion, to charge interest on delinquent balances up to the maximum rate permitted by applicable law, calculated from the due date until paid in full.
 
-Unless S2P possesses verifiable knowledge of substantial inconsistencies, discrepancies, or omissions in the survey control or data, S2P is entitled to rely on the accuracy of the survey control or data provided by the client, owner, or third parties acting on their behalf. S2P reliance on such information shall not breach the established standard of care for S2P.
+Client shall reimburse S2P for reasonable costs of collection, including attorney's fees and court costs.
 
-These terms and conditions, as well as any other agreement pertaining to S2P's services, do not impose any obligation on S2P to conduct inquiries or investigations into the accuracy of the survey control or data. This Agreement and any associated documents, reports, opinions, or otherwise, do not include or imply any other representation, express or implied, nor any warranty or guarantee.
-
----
-
-### Indemnification
-
-1. The Client undertakes to indemnify and hold harmless S2P and its Affiliates from any and all costs, losses, liabilities, expenses (including reasonable attorney fees), judgments, fines, and settlement payments actually and reasonably incurred in relation to third-party claims against S2P (collectively referred to as "Losses") arising from:
-   - Any action or omission by S2P or on its behalf within the scope of its duties under these General Terms and Conditions, the Proposal, or any other agreement with the Client, except when:
-     - The action or omission amounts to negligence, willful misconduct, or breach of fiduciary duty. In such cases, S2P may not be entitled to indemnification, or
-     - The Losses are covered by insurance.
-
-2. Indemnification also extends to any action or omission involving negligence, willful misconduct, or breach of fiduciary duty by the Client or one of its Affiliates in connection with these General Terms and Conditions, the Proposal, or any other agreement with S2P.
+S2P may suspend Services and/or withhold Deliverables until all outstanding balances are paid in full.
 
 ---
 
-### Governing Law
+### 5. Scheduling, Rescheduling, Reshoots, and Cancellations
 
-1. These General Terms and Conditions, along with the Proposal and any transactions envisaged by them, shall be subject to governance by, interpretation and construction in accordance with the laws of the State of New York. This application may be without regard to the choice-of-law principles of the state.
+**5.1 Access Failures**
+If the scanning technician cannot access required areas due to Client-caused conditions (including lack of keys/escort, restricted access, site not ready, or inaccurate site representations), the visit may be rescheduled and reshoot/cancellation fees may apply as set forth below.
 
-2. Any legal or equitable action seeking relief arising from or concerning these General Terms and Conditions, the Proposal, and any transactions envisaged by them shall exclusively be brought in the New York County Supreme Court or the US District Court for the Northern District of New York situated in Albany, New York.
+**5.2 Project Tiers, Reshoot, and Cancellation Fees**
+
+*Project Tier Definitions:*
+- **Tier A Projects:** Large-scale or complex projects with a daily field value typically ranging from $3,500 to $7,000 per day, including multi-day scans, large facilities, or projects requiring specialized coordination.
+- **Tier B and Tier C Projects:** Projects not meeting Tier A criteria.
+
+S2P reserves the right to designate the applicable tier in the Proposal or prior to scheduling.
+
+*Reshoot Fees (Client-Caused):*
+If a reshoot is required due to Client-caused conditions:
+- **Tier A:** Reshoot fee equal to 100% of the scheduled daily field rate for the affected day(s), plus Non-Recoverable Expenses.
+- **Tier B/C:** $1,500.00 plus Non-Recoverable Expenses.
+
+*Cancellation Fees (Client-Caused):*
+- **Tier A:**
+  - Within 72 hours of scheduled start: 100% of the scheduled daily field rate for affected day(s), plus Non-Recoverable Expenses.
+  - More than 72 hours prior: Non-Recoverable Expenses only.
+- **Tier B/C:**
+  - Within 48 hours of scheduled start: $450.00 plus Non-Recoverable Expenses.
+  - More than 48 hours prior: Non-Recoverable Expenses only.
 
 ---
 
-### Modification of Terms and Conditions
+### 6. Scope Control and Change Orders
 
-S2P retains the right to modify these General Terms and Conditions periodically. As revisions come into effect, the Client acknowledges that continued utilization of S2P's services may signify consent to adhere to these revised terms upon receipt from S2P.
+Services are limited to those expressly stated in the Proposal. Items not expressly included are excluded, including destructive investigation, concealed conditions, code compliance determinations, engineering design, construction means/methods, fabrication-level detailing, or licensed land surveying.
+
+Any change to scope, assumptions, schedule, access conditions, deliverable formats, level of detail, or added areas shall require written authorization and may require a change order and additional fees.
+
+---
+
+### 7. Client Review and Acceptance
+
+Client shall review Deliverables within a reasonable time after delivery. If Client believes Deliverables do not conform to the Proposal, Client shall notify S2P in writing with sufficient detail to evaluate the issue. S2P will have a reasonable opportunity to verify and address verified nonconformance within the scope of the Proposal.
+
+---
+
+### 8. Non-Solicitation
+
+During the term of the engagement and for two (2) years thereafter, Client shall not, directly or indirectly, solicit for employment or engagement any S2P employee, consultant, or contractor who was materially involved in the Services during the preceding twelve (12) months, without S2P's prior written consent.
+
+---
+
+### 9. Property Rights and Use
+
+Client acknowledges that these Terms, the Proposal, and any disclosure of confidential information do not grant Client any license or right to S2P confidential information except as necessary to receive the Services.
+
+Except as stated here, all work-product created by S2P while performing Services remains S2P property until payment is received in full.
+
+Upon full payment, the Deliverables identified in the Proposal become Client property for Client's internal business purposes. Client may not permit third parties to rely on the Deliverables as instruments of professional service without S2P's prior written consent.
+
+S2P may charge fees to any user other than Client for use of the work-product or Deliverables, unless S2P agrees otherwise in writing.
+
+---
+
+### 10. Third-Party Reliance Prohibition
+
+Deliverables are prepared solely for Client and the uses stated in the Proposal. No third party may rely on the Deliverables without S2P's prior written consent. Client shall indemnify and hold harmless S2P from third-party claims arising from unauthorized distribution or reliance.
+
+---
+
+### 11. Digital Model and No-Survey Disclaimer
+
+BIM models, CAD files, and point clouds are instruments of service for design and coordination purposes only. They are not construction documents and shall not be used for construction means/methods, safety planning, fabrication, or layout.
+
+Any topographic or site documentation is for design purposes only and is not a land survey. S2P does not provide licensed surveying services unless expressly stated in writing in the Proposal.
+
+---
+
+### 12. Force Majeure
+
+S2P is not liable for delay or failure to perform due to events beyond its reasonable control, including weather, site shutdowns, labor disputes, governmental actions, utility outages, security restrictions, or unsafe site conditions. Timelines shall be extended accordingly.
+
+---
+
+### 13. Limitation of Liability
+
+Services are provided without any warranty, express or implied, except as expressly stated in these Terms. S2P does not warrant that Services will meet Client's requirements beyond the scope stated in the Proposal.
+
+To the fullest extent permitted by applicable law, S2P and its affiliates shall not be liable for indirect, incidental, punitive, special, consequential, or exemplary damages, or any loss arising from Client's use of the Services or Deliverables.
+
+S2P's total liability arising out of or related to the Services shall not exceed the total fees actually paid by Client to S2P for the Services giving rise to the claim.
+
+S2P is not responsible for inaccurate information supplied by Client or third parties, undisclosed site conditions, hazardous materials, or the actions/inactions of contractors, consultants, utilities, or governmental agencies.
+
+---
+
+### 14. Standard of Care; Reliance on Client-Provided Data
+
+S2P will perform Services in a professional manner consistent with generally accepted industry standards for services of a similar type and scope.
+
+Client acknowledges S2P may rely on survey control, benchmarks, control networks, reference points, existing drawings, and other information supplied by Client, owner, or third parties. S2P is not responsible for inaccuracies in such information unless S2P has verifiable knowledge of substantial inconsistencies.
+
+No other warranty or guarantee is made or implied.
+
+---
+
+### 15. Indemnification
+
+Client shall indemnify and hold harmless S2P and its affiliates from and against losses, damages, liabilities, costs, and expenses (including reasonable attorney's fees) arising out of or relating to third-party claims to the extent caused by:
+- Client's breach of these Terms or the Proposal;
+- Client's negligence or willful misconduct;
+- Hazardous conditions at the Project Site not disclosed to S2P;
+- Unauthorized distribution, reliance, or use of Deliverables by third parties.
+
+S2P shall remain responsible for its own negligence or willful misconduct to the extent required by applicable law.
+
+---
+
+### 16. Governing Law and Venue
+
+These Terms and the Proposal shall be governed by and construed in accordance with the laws of the State of New York, without regard to conflict-of-law principles.
+
+Any legal action, claim, or proceeding arising out of or relating to these Terms, the Proposal, or the Services shall be brought exclusively in the state or federal courts located in Rensselaer County, New York, and the parties consent to such jurisdiction and venue, including for small claims proceedings to the extent permitted.
+
+---
+
+### 17. Entire Agreement; Order of Precedence; Changes
+
+These Terms and the Proposal constitute the entire agreement between the parties regarding the Services and supersede prior discussions or understandings.
+
+In the event of conflict, the Proposal controls scope and pricing; these Terms control all other matters.
+
+Any modification must be in writing and signed by both parties. If S2P issues updated terms, such updates apply only to future proposals unless expressly incorporated into an existing signed agreement.
+
+---
+
+### 18. Severability; Waiver; Assignment
+
+If any provision is held unenforceable, the remaining provisions remain in effect. Failure to enforce any provision is not a waiver. Client may not assign this agreement without S2P's prior written consent.
+
+---
+
+*S2P retains the right to modify these General Terms and Conditions periodically. As revisions come into effect, the Client acknowledges that continued utilization of S2P's services may signify consent to adhere to these revised terms upon receipt from S2P.*
 `,
     },
     {
