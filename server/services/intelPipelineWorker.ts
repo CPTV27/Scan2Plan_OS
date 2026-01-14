@@ -24,18 +24,21 @@ function ensureInitialized() {
 }
 
 /**
- * Find intel items that haven't been processed yet
+ * Find intel items that haven't been processed yet OR have failed runs that can be retried
+ * Only considers items without any completed/running runs
  */
 async function findUnprocessedItems(limit: number = 5): Promise<number[]> {
-  const processedItemIds = db
+  // Find items that have a completed or running pipeline run - we skip these
+  const completedOrRunningItemIds = db
     .select({ id: intelPipelineRuns.intelItemId })
-    .from(intelPipelineRuns);
+    .from(intelPipelineRuns)
+    .where(sql`${intelPipelineRuns.status} IN ('completed', 'running')`);
 
   const items = await db
     .select({ id: intelNewsItems.id })
     .from(intelNewsItems)
     .where(
-      sql`${intelNewsItems.id} NOT IN (SELECT ${intelPipelineRuns.intelItemId} FROM ${intelPipelineRuns})`
+      sql`${intelNewsItems.id} NOT IN (${completedOrRunningItemIds})`
     )
     .orderBy(desc(intelNewsItems.createdAt))
     .limit(limit);
@@ -45,6 +48,7 @@ async function findUnprocessedItems(limit: number = 5): Promise<number[]> {
 
 /**
  * Process a single intel item through the full pipeline
+ * Reuses existing failed/pending runs instead of creating duplicates
  */
 async function processItem(itemId: number): Promise<{
   success: boolean;
@@ -63,15 +67,43 @@ async function processItem(itemId: number): Promise<{
     return { success: false, error: "Item not found" };
   }
 
-  const [run] = await db
-    .insert(intelPipelineRuns)
-    .values({
-      intelItemId: itemId,
-      status: "running",
-      currentAgent: "scout",
-      startedAt: new Date(),
-    })
-    .returning();
+  // Check for existing failed/pending runs - reuse instead of creating new
+  const [existingRun] = await db
+    .select()
+    .from(intelPipelineRuns)
+    .where(and(
+      eq(intelPipelineRuns.intelItemId, itemId),
+      sql`${intelPipelineRuns.status} IN ('pending', 'failed')`
+    ))
+    .limit(1);
+
+  let run;
+  if (existingRun) {
+    // Update existing run instead of creating new
+    [run] = await db
+      .update(intelPipelineRuns)
+      .set({
+        status: "running",
+        currentAgent: "scout",
+        startedAt: new Date(),
+        error: null,
+        retryCount: (existingRun.retryCount || 0) + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(intelPipelineRuns.id, existingRun.id))
+      .returning();
+  } else {
+    // Create new run only if no existing run
+    [run] = await db
+      .insert(intelPipelineRuns)
+      .values({
+        intelItemId: itemId,
+        status: "running",
+        currentAgent: "scout",
+        startedAt: new Date(),
+      })
+      .returning();
+  }
 
   try {
     const rawContent = [
@@ -104,6 +136,10 @@ async function processItem(itemId: number): Promise<{
     const composerOutput = messages.find(m => m.from === "composer")?.payload;
     const auditorOutput = messages.find(m => m.from === "auditor")?.payload;
 
+    // Only set auditScore/auditVerdict if auditor actually returned values
+    const auditScore = auditorOutput?.score ?? auditorOutput?.qualityScore ?? null;
+    const auditVerdict = auditorOutput?.verdict ?? auditorOutput?.result ?? null;
+
     await db
       .update(intelPipelineRuns)
       .set({
@@ -113,8 +149,8 @@ async function processItem(itemId: number): Promise<{
         executiveSummary: scoutOutput?.summary || strategistOutput?.summary || null,
         recommendedActions: strategistOutput?.actions || strategistOutput?.recommendations || null,
         draftEmail: composerOutput?.email || composerOutput?.content || composerOutput?.draft || null,
-        auditScore: auditorOutput?.score || auditorOutput?.qualityScore || 75,
-        auditVerdict: auditorOutput?.verdict || auditorOutput?.result || "approved",
+        auditScore,
+        auditVerdict,
         updatedAt: new Date(),
       })
       .where(eq(intelPipelineRuns.id, run.id));

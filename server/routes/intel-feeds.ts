@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db";
 import { intelNewsItems, intelPipelineRuns, intelAgentOutputs, type IntelNewsType, type IntelRegion, INTEL_NEWS_TYPES, INTEL_REGIONS } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { isAuthenticated } from "../replit_integrations/auth";
+import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { processUnprocessedItems, getProcessedIntelItems, getPipelineResult, markPipelineRunRead } from "../services/intelPipelineWorker";
 
 const router = Router();
@@ -234,7 +234,7 @@ router.post("/seed-demo", isAuthenticated, async (req, res) => {
 // === PROCESSED INTEL ENDPOINTS (Agent Pipeline Results) ===
 
 // GET /api/intel-feeds/processed - List all processed intel with agent summaries
-router.get("/processed", isAuthenticated, async (req, res) => {
+router.get("/processed", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const { limit = "50", unreadOnly } = req.query;
         const results = await getProcessedIntelItems({
@@ -250,7 +250,7 @@ router.get("/processed", isAuthenticated, async (req, res) => {
 });
 
 // GET /api/intel-feeds/processed/stats - Get processing stats
-router.get("/processed/stats", isAuthenticated, async (req, res) => {
+router.get("/processed/stats", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const allRuns = await db.select().from(intelPipelineRuns);
         
@@ -275,7 +275,7 @@ router.get("/processed/stats", isAuthenticated, async (req, res) => {
 });
 
 // GET /api/intel-feeds/:id/pipeline - Get full pipeline result for an intel item
-router.get("/:id/pipeline", isAuthenticated, async (req, res) => {
+router.get("/:id/pipeline", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const { id } = req.params;
         const result = await getPipelineResult(parseInt(id));
@@ -292,7 +292,7 @@ router.get("/:id/pipeline", isAuthenticated, async (req, res) => {
 });
 
 // PUT /api/intel-feeds/processed/:runId/read - Mark processed intel as read
-router.put("/processed/:runId/read", isAuthenticated, async (req, res) => {
+router.put("/processed/:runId/read", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const { runId } = req.params;
         await markPipelineRunRead(parseInt(runId));
@@ -304,7 +304,7 @@ router.put("/processed/:runId/read", isAuthenticated, async (req, res) => {
 });
 
 // POST /api/intel-feeds/process-pending - Manually trigger processing of unprocessed items
-router.post("/process-pending", isAuthenticated, async (req, res) => {
+router.post("/process-pending", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const { limit = 10 } = req.body;
         const result = await processUnprocessedItems(limit);

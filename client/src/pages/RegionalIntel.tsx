@@ -7,13 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Target, Loader2, Gavel, Eye, ExternalLink, Building, Cpu, 
   Banknote, Calendar, Users, TrendingUp, Pencil, Check, X, 
-  RefreshCw, ChevronDown, Rss, Webhook
+  RefreshCw, ChevronDown, Rss, Webhook, Bot, Mail, CheckCircle,
+  AlertCircle, Clock, Sparkles
 } from "lucide-react";
-import type { IntelNewsItem, IntelFeedSource } from "@shared/schema";
+import type { IntelNewsItem, IntelFeedSource, IntelPipelineRun } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -299,9 +301,140 @@ function FeedCard({
   );
 }
 
+interface ProcessedIntelItem {
+  item: IntelNewsItem;
+  run: IntelPipelineRun;
+}
+
+interface ProcessingStats {
+  total: number;
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+  unread: number;
+  avgAuditScore: number;
+}
+
+function ProcessedIntelCard({ 
+  processedItem, 
+  onMarkRead 
+}: { 
+  processedItem: ProcessedIntelItem;
+  onMarkRead: (runId: number) => void;
+}) {
+  const { item, run } = processedItem;
+  const config = FEED_CONFIG[item.type] || FEED_CONFIG.market;
+  const Icon = config.icon;
+  
+  const getVerdictBadge = (verdict: string | null) => {
+    switch (verdict) {
+      case "approved":
+        return <Badge className="bg-green-500/20 text-green-600 border-green-500/30"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
+      case "needs_revision":
+        return <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30"><AlertCircle className="w-3 h-3 mr-1" /> Needs Review</Badge>;
+      case "rejected":
+        return <Badge className="bg-red-500/20 text-red-600 border-red-500/30"><X className="w-3 h-3 mr-1" /> Rejected</Badge>;
+      default:
+        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
+    }
+  };
+
+  return (
+    <Card 
+      className={`cursor-pointer hover-elevate ${!run.isRead ? 'ring-2 ring-primary/40' : ''}`}
+      onClick={() => !run.isRead && onMarkRead(run.id)}
+      data-testid={`processed-intel-${run.id}`}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className={`p-1.5 rounded-md ${config.cardClass}`}>
+              <Icon className={`w-4 h-4 ${config.iconClass}`} />
+            </div>
+            <Badge variant="outline" className="text-xs">{item.type}</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {run.auditScore && (
+              <Badge variant="secondary" className="text-xs">
+                Score: {run.auditScore}
+              </Badge>
+            )}
+            {getVerdictBadge(run.auditVerdict)}
+          </div>
+        </div>
+        <CardTitle className="text-base line-clamp-2">{item.title}</CardTitle>
+        <CardDescription className="text-xs">
+          {item.sourceName} &bull; {run.completedAt && formatDistanceToNow(new Date(run.completedAt), { addSuffix: true })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {run.executiveSummary && (
+          <div className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-1 text-xs font-medium mb-1">
+              <Sparkles className="w-3 h-3 text-primary" /> AI Summary
+            </div>
+            <p className="text-sm">{run.executiveSummary}</p>
+          </div>
+        )}
+        
+        {run.recommendedActions && Array.isArray(run.recommendedActions) && run.recommendedActions.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-xs font-medium flex items-center gap-1">
+              <Target className="w-3 h-3 text-primary" /> Recommended Actions
+            </div>
+            <ul className="text-xs space-y-1">
+              {(run.recommendedActions as string[]).slice(0, 3).map((action, i) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <Check className="w-3 h-3 text-green-500 mt-0.5 shrink-0" />
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {run.draftEmail && (
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline">
+              <Mail className="w-3 h-3" /> View Draft Email
+              <ChevronDown className="w-3 h-3" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="p-3 rounded-lg bg-muted/50 text-xs whitespace-pre-wrap">
+                {run.draftEmail}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t">
+          {item.sourceUrl && (
+            <a 
+              href={item.sourceUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              <ExternalLink className="w-3 h-3" /> View Source
+            </a>
+          )}
+          {!run.isRead && (
+            <Badge variant="secondary" className="text-xs">
+              <Bot className="w-3 h-3 mr-1" /> New
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function RegionalIntel() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("feeds");
 
   const { data: feedSources = [], isLoading: sourcesLoading } = useQuery<IntelFeedSource[]>({
     queryKey: ["/api/intel-sources"],
@@ -310,6 +443,16 @@ export default function RegionalIntel() {
   const { data: intelItems = [], isLoading: itemsLoading } = useQuery<IntelNewsItem[]>({
     queryKey: ["/api/intel-feeds"],
     refetchInterval: 60000,
+  });
+
+  const { data: processedItems = [], isLoading: processedLoading } = useQuery<ProcessedIntelItem[]>({
+    queryKey: ["/api/intel-feeds/processed"],
+    refetchInterval: 30000,
+  });
+
+  const { data: processingStats } = useQuery<ProcessingStats>({
+    queryKey: ["/api/intel-feeds/processed/stats"],
+    refetchInterval: 30000,
   });
 
   const updateSourceMutation = useMutation({
@@ -359,6 +502,34 @@ export default function RegionalIntel() {
     },
   });
 
+  const markProcessedReadMutation = useMutation({
+    mutationFn: async (runId: number) => {
+      return apiRequest("PUT", `/api/intel-feeds/processed/${runId}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/processed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/processed/stats"] });
+    },
+  });
+
+  const processPendingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/intel-feeds/process-pending", { limit: 10 });
+      return res.json();
+    },
+    onSuccess: (data: { processed: number; successful: number; failed: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/processed"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/processed/stats"] });
+      toast({
+        title: "Processing Complete",
+        description: `Processed ${data.successful} of ${data.processed} items successfully.`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Processing failed", description: "Could not process items.", variant: "destructive" });
+    },
+  });
+
   const getItemsForSource = (source: IntelFeedSource) => {
     const targetType = source.config?.targetType;
     return intelItems.filter(item => item.type === targetType);
@@ -394,51 +565,139 @@ export default function RegionalIntel() {
               <div>
                 <h1 className="text-2xl font-bold" data-testid="text-page-title">Business Intelligence</h1>
                 <p className="text-muted-foreground">
-                  {feedSources.length} intel feeds configured &bull; {intelItems.filter(i => !i.isRead).length} unread items
+                  {feedSources.length} intel feeds &bull; {intelItems.filter(i => !i.isRead).length} unread &bull; {processingStats?.unread || 0} AI-processed
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    feedSources.filter(s => s.isActive).forEach(s => syncMutation.mutate(s.id));
-                  }}
-                  disabled={syncMutation.isPending}
-                  data-testid="button-sync-all"
-                >
-                  {syncMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="feeds" data-testid="tab-feeds">
+                  <Rss className="w-4 h-4 mr-2" /> Feed Sources
+                </TabsTrigger>
+                <TabsTrigger value="processed" data-testid="tab-processed">
+                  <Bot className="w-4 h-4 mr-2" /> 
+                  Processed Intel
+                  {(processingStats?.unread || 0) > 0 && (
+                    <Badge variant="secondary" className="ml-2 text-xs">{processingStats?.unread}</Badge>
                   )}
-                  Sync All Feeds
-                </Button>
-              </div>
-            </div>
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {feedSources.map((source) => (
-                <FeedCard
-                  key={source.id}
-                  source={source}
-                  items={getItemsForSource(source)}
-                  isLoading={itemsLoading}
-                  onUpdate={(id, data) => updateSourceMutation.mutate({ id, data })}
-                  onSync={(id) => syncMutation.mutate(id)}
-                  onMarkRead={(id) => markReadMutation.mutate(id)}
-                />
-              ))}
-            </div>
+              <TabsContent value="feeds" className="space-y-4">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      feedSources.filter(s => s.isActive).forEach(s => syncMutation.mutate(s.id));
+                    }}
+                    disabled={syncMutation.isPending}
+                    data-testid="button-sync-all"
+                  >
+                    {syncMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Sync All Feeds
+                  </Button>
+                </div>
 
-            {feedSources.length === 0 && (
-              <Card className="p-8 text-center">
-                <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Intel Feeds Configured</h3>
-                <p className="text-muted-foreground mb-4">
-                  Set up your intel feeds to start receiving market intelligence.
-                </p>
-              </Card>
-            )}
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {feedSources.map((source) => (
+                    <FeedCard
+                      key={source.id}
+                      source={source}
+                      items={getItemsForSource(source)}
+                      isLoading={itemsLoading}
+                      onUpdate={(id, data) => updateSourceMutation.mutate({ id, data })}
+                      onSync={(id) => syncMutation.mutate(id)}
+                      onMarkRead={(id) => markReadMutation.mutate(id)}
+                    />
+                  ))}
+                </div>
+
+                {feedSources.length === 0 && (
+                  <Card className="p-8 text-center">
+                    <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Intel Feeds Configured</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Set up your intel feeds to start receiving market intelligence.
+                    </p>
+                  </Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="processed" className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    {processingStats && (
+                      <>
+                        <Badge variant="outline" className="text-xs">
+                          <CheckCircle className="w-3 h-3 mr-1 text-green-500" /> {processingStats.completed} Completed
+                        </Badge>
+                        {processingStats.running > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" /> {processingStats.running} Running
+                          </Badge>
+                        )}
+                        {processingStats.failed > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            <AlertCircle className="w-3 h-3 mr-1" /> {processingStats.failed} Failed
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => processPendingMutation.mutate()}
+                    disabled={processPendingMutation.isPending}
+                    data-testid="button-process-pending"
+                  >
+                    {processPendingMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Process Pending Items
+                  </Button>
+                </div>
+
+                {processedLoading ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-64" />
+                    ))}
+                  </div>
+                ) : processedItems.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {processedItems.map((item) => (
+                      <ProcessedIntelCard
+                        key={item.run.id}
+                        processedItem={item}
+                        onMarkRead={(runId) => markProcessedReadMutation.mutate(runId)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="p-8 text-center">
+                    <Bot className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Processed Intel Yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Sync your feeds to get intel items, then they'll be automatically processed by AI agents.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveTab("feeds")}
+                      data-testid="button-go-to-feeds"
+                    >
+                      <Rss className="w-4 h-4 mr-2" /> Go to Feed Sources
+                    </Button>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
