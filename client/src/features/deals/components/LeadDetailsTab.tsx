@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,9 +127,8 @@ export function LeadDetailsTab({
   };
 
   return (
-    <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
-      <ScrollArea className="h-full">
-        <div className="p-4 pb-32 space-y-4">
+    <ScrollArea className="h-full">
+      <div className="p-4 pb-32 space-y-4">
           <PersonaSuggestion
             leadId={leadId}
             clientName={lead.clientName}
@@ -857,6 +855,5 @@ export function LeadDetailsTab({
           </Form>
         </div>
       </ScrollArea>
-    </TabsContent>
   );
 }

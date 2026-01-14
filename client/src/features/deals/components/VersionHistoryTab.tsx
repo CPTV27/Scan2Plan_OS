@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TabsContent } from "@/components/ui/tabs";
 import { Clock, History, Loader2, FileText, Calculator, ExternalLink, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { CpqQuote } from "@shared/schema";
@@ -21,8 +20,7 @@ export function VersionHistoryTab({
   onNavigateToQuoteBuilder 
 }: VersionHistoryTabProps) {
   return (
-    <TabsContent value="history" className="flex-1 overflow-hidden m-0">
-      <ScrollArea className="h-full">
+    <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
           <Card>
             <CardHeader>
@@ -156,6 +154,5 @@ export function VersionHistoryTab({
           </Card>
         </div>
       </ScrollArea>
-    </TabsContent>
   );
 }

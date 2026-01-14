@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TabsContent } from "@/components/ui/tabs";
 import { Download, ExternalLink, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { LeadDocument } from "@shared/schema";
@@ -22,8 +21,7 @@ export function DocumentsTab({
   deleteDocumentMutation,
 }: DocumentsTabProps) {
   return (
-    <TabsContent value="documents" className="flex-1 overflow-hidden m-0">
-      <ScrollArea className="h-full">
+    <ScrollArea className="h-full">
         <div className="p-4 space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -138,6 +136,5 @@ export function DocumentsTab({
           </Card>
         </div>
       </ScrollArea>
-    </TabsContent>
   );
 }

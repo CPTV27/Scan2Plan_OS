@@ -1,4 +1,3 @@
-import { TabsContent } from "@/components/ui/tabs";
 import { PandaDocEmbed } from "@/components/PandaDocEmbed";
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -22,21 +21,19 @@ export function PandaDocTab({
   proposalEmails,
 }: PandaDocTabProps) {
   return (
-    <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0">
-      <PandaDocEmbed
-        pandaDocId={pandaDocId}
-        documentName={documentName}
-        leadId={leadId}
-        quoteId={quoteId}
-        onDocumentCreated={() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
-        }}
-        onDocumentSent={() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
-        }}
-        onOpenSendDialog={onOpenSendDialog}
-        proposalEmails={proposalEmails}
-      />
-    </TabsContent>
+    <PandaDocEmbed
+      pandaDocId={pandaDocId}
+      documentName={documentName}
+      leadId={leadId}
+      quoteId={quoteId}
+      onDocumentCreated={() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
+      }}
+      onDocumentSent={() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/leads', leadId] });
+      }}
+      onOpenSendDialog={onOpenSendDialog}
+      proposalEmails={proposalEmails}
+    />
   );
 }

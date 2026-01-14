@@ -900,20 +900,22 @@ export default function DealWorkspace() {
         </div>
 
         {/* Lead Details Tab - Consolidated form with bordered sections */}
-        <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
-          <LeadDetailsTab
-            lead={lead}
-            leadId={leadId}
-            form={form}
-            onSubmit={onSubmit}
-            isPending={isPending}
-            queryClient={queryClient}
-            updateMutation={updateMutation}
-            toast={toast}
-            documents={documents}
-            uploadDocumentMutation={uploadDocumentMutation}
-          />
-        </ErrorBoundary>
+        <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
+          <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
+            <LeadDetailsTab
+              lead={lead}
+              leadId={leadId}
+              form={form}
+              onSubmit={onSubmit}
+              isPending={isPending}
+              queryClient={queryClient}
+              updateMutation={updateMutation}
+              toast={toast}
+              documents={documents}
+              uploadDocumentMutation={uploadDocumentMutation}
+            />
+          </ErrorBoundary>
+        </TabsContent>
 
         {/* Quote Builder Tab */}
         <TabsContent value="quote" className="flex-1 overflow-hidden m-0 flex flex-col">
@@ -992,42 +994,50 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Version History Tab */}
-        <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
-          <VersionHistoryTab
-            quotes={quotes}
-            quotesLoading={quotesLoading}
-            onViewQuote={setViewingQuote}
-            onNavigateToQuoteBuilder={() => setActiveTab("quote")}
-          />
-        </ErrorBoundary>
+        <TabsContent value="history" className="flex-1 overflow-hidden m-0">
+          <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
+            <VersionHistoryTab
+              quotes={quotes}
+              quotesLoading={quotesLoading}
+              onViewQuote={setViewingQuote}
+              onNavigateToQuoteBuilder={() => setActiveTab("quote")}
+            />
+          </ErrorBoundary>
+        </TabsContent>
 
         {/* Proposal Tab - Evidence Vault + AI Assistant */}
-        <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
-          <ProposalTab lead={lead} />
-        </ErrorBoundary>
+        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
+          <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
+            <ProposalTab lead={lead} />
+          </ErrorBoundary>
+        </TabsContent>
 
         {/* Documents Tab */}
-        <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
-          <DocumentsTab
-            documents={documents}
-            documentsLoading={documentsLoading}
-            uploadDocumentMutation={uploadDocumentMutation}
-            deleteDocumentMutation={deleteDocumentMutation}
-          />
-        </ErrorBoundary>
+        <TabsContent value="documents" className="flex-1 overflow-hidden m-0">
+          <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
+            <DocumentsTab
+              documents={documents}
+              documentsLoading={documentsLoading}
+              uploadDocumentMutation={uploadDocumentMutation}
+              deleteDocumentMutation={deleteDocumentMutation}
+            />
+          </ErrorBoundary>
+        </TabsContent>
 
         {/* PandaDoc Tab - Document editing and signature */}
-        <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
-          <PandaDocTab
-            pandaDocId={lead?.pandaDocId || null}
-            documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
-            leadId={leadId}
-            quoteId={latestQuote?.id}
-            queryClient={queryClient}
-            onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
-            proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
-          />
-        </ErrorBoundary>
+        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0">
+          <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
+            <PandaDocTab
+              pandaDocId={lead?.pandaDocId || null}
+              documentName={lead?.projectName ? `Proposal - ${lead.projectName}` : undefined}
+              leadId={leadId}
+              quoteId={latestQuote?.id}
+              queryClient={queryClient}
+              onOpenSendDialog={latestQuote ? () => setShowProposalDialog(true) : undefined}
+              proposalEmails={proposalEmails?.map(e => ({ openCount: e.openCount, sentAt: e.sentAt }))}
+            />
+          </ErrorBoundary>
+        </TabsContent>
 
       </Tabs>
 
