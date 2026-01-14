@@ -5,9 +5,9 @@ import { log } from "../lib/logger";
 // ChromaDB client - connects to local or remote instance
 const CHROMA_URL = process.env.CHROMA_URL || "http://localhost:8000";
 
-// Google AI for embeddings
-const genAI = process.env.GEMINI_API_KEY
-    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Google AI for embeddings (using Replit AI integration)
+const genAI = process.env.AI_INTEGRATIONS_GEMINI_API_KEY
+    ? new GoogleGenerativeAI(process.env.AI_INTEGRATIONS_GEMINI_API_KEY)
     : null;
 
 let client: ChromaClient | null = null;
@@ -51,7 +51,7 @@ export function isChromaDBAvailable(): boolean {
  */
 async function generateEmbedding(text: string): Promise<number[]> {
     if (!genAI) {
-        throw new Error("GEMINI_API_KEY not configured");
+        throw new Error("AI_INTEGRATIONS_GEMINI_API_KEY not configured");
     }
 
     const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
