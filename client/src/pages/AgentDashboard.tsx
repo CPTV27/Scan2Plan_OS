@@ -148,31 +148,37 @@ export default function AgentDashboard() {
     // Fetch prompts
     const { data: prompts, isLoading: promptsLoading } = useQuery<AgentPrompt[]>({
         queryKey: ["/api/agent/prompts"],
+        select: (response: any) => response?.data || response || [],
     });
 
     // Fetch marketing intel
     const { data: intelData, isLoading: intelLoading } = useQuery<MarketingIntel[]>({
         queryKey: ["/api/agent/intel"],
+        select: (response: any) => response?.data || response || [],
     });
 
     // Fetch RAG context
-    const { data: ragContext, isLoading: ragLoading } = useQuery<RAGContext>({
+    const { data: ragContext, isLoading: ragLoading, error: ragError } = useQuery<RAGContext>({
         queryKey: ["/api/agent/context"],
+        select: (response: any) => response?.data || response,
     });
 
     // Fetch categories
     const { data: categories } = useQuery<Array<{ value: string; label: string }>>({
         queryKey: ["/api/agent/categories"],
+        select: (response: any) => response?.data || response || [],
     });
 
     // Fetch analytics
     const { data: analytics, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
         queryKey: ["/api/agent/analytics"],
+        select: (response: any) => response?.data || response,
     });
 
     // Fetch executive summary
     const { data: execSummary, isLoading: execLoading } = useQuery<ExecutiveSummary>({
         queryKey: ["/api/agent/executive-summary"],
+        select: (response: any) => response?.data || response,
     });
 
     // Generate prompts mutation
