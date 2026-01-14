@@ -33,6 +33,16 @@ import {
     DollarSign,
     LayoutTemplate,
 } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import type { Lead, CpqQuote, ProposalTemplate, ProposalTemplateGroup } from "@shared/schema";
 import { SectionPanel } from "./SectionPanel";
 import { ProposalPreview } from "./ProposalPreview";
@@ -86,6 +96,11 @@ export function ProposalLayoutEditor({
     const [sections, setSections] = useState<ProposalSection[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+
+    // Edit section dialog state
+    const [editingSection, setEditingSection] = useState<ProposalSection | null>(null);
+    const [editedContent, setEditedContent] = useState("");
+    const [editedName, setEditedName] = useState("");
 
     // Fetch template groups
     const { data: templateGroups = [], isLoading: groupsLoading } = useTemplateGroups();
@@ -164,6 +179,25 @@ export function ProposalLayoutEditor({
         } finally {
             setIsDownloading(false);
         }
+    };
+
+    // Handle edit section
+    const handleEditSection = (section: ProposalSection) => {
+        setEditingSection(section);
+        setEditedContent(section.content);
+        setEditedName(section.name);
+    };
+
+    // Handle save edited section
+    const handleSaveSection = () => {
+        if (!editingSection) return;
+        const updated = sections.map(s =>
+            s.id === editingSection.id
+                ? { ...s, content: editedContent, name: editedName }
+                : s
+        );
+        setSections(updated);
+        setEditingSection(null);
     };
 
     // Sort grouped templates by category order
@@ -295,6 +329,7 @@ export function ProposalLayoutEditor({
                                 onSectionsChange={handleSectionsChange}
                                 groupedTemplates={sortedGroupedTemplates}
                                 onSectionClick={handleSectionClick}
+                                onEditSection={handleEditSection}
                                 activeSectionId={activeSectionId}
                             />
                         </div>
@@ -313,6 +348,44 @@ export function ProposalLayoutEditor({
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>
+
+            {/* Edit Section Dialog */}
+            <Dialog open={!!editingSection} onOpenChange={(open) => !open && setEditingSection(null)}>
+                <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Edit Section</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 space-y-4 overflow-hidden">
+                        <div className="space-y-2">
+                            <Label htmlFor="section-name">Section Name</Label>
+                            <Input
+                                id="section-name"
+                                value={editedName}
+                                onChange={(e) => setEditedName(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2 flex-1 flex flex-col">
+                            <Label htmlFor="section-content">Content (Markdown)</Label>
+                            <Textarea
+                                id="section-content"
+                                value={editedContent}
+                                onChange={(e) => setEditedContent(e.target.value)}
+                                className="flex-1 min-h-[300px] font-mono text-sm"
+                                placeholder="Enter content in markdown format..."
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setEditingSection(null)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSaveSection}>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

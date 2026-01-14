@@ -33,6 +33,7 @@ import {
     MoreVertical,
     FileText,
     ChevronDown,
+    Pencil,
 } from "lucide-react";
 import type { ProposalTemplate } from "@shared/schema";
 import { ProposalSection, CATEGORY_LABELS } from "../hooks/useProposalTemplates";
@@ -42,6 +43,7 @@ interface SectionPanelProps {
     onSectionsChange: (sections: ProposalSection[]) => void;
     groupedTemplates: Record<string, ProposalTemplate[]>;
     onSectionClick: (sectionId: string) => void;
+    onEditSection?: (section: ProposalSection) => void;
     activeSectionId?: string;
 }
 
@@ -50,6 +52,7 @@ export function SectionPanel({
     onSectionsChange,
     groupedTemplates,
     onSectionClick,
+    onEditSection,
     activeSectionId,
 }: SectionPanelProps) {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -222,6 +225,12 @@ export function SectionPanel({
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
+                                            <DropdownMenuItem
+                                                onClick={() => onEditSection?.(section)}
+                                            >
+                                                <Pencil className="h-3 w-3 mr-2" />
+                                                Edit section
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => toggleSection(section.id)}>
                                                 {section.included ? "Exclude from proposal" : "Include in proposal"}
                                             </DropdownMenuItem>
