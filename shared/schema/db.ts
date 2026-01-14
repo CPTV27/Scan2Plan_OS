@@ -2223,3 +2223,37 @@ export const insertIntelFeedSourceSchema = createInsertSchema(intelFeedSources).
 });
 export type InsertIntelFeedSource = z.infer<typeof insertIntelFeedSourceSchema>;
 export type IntelFeedSource = typeof intelFeedSources.$inferSelect;
+
+// === HELP CENTER ARTICLES ===
+export const HELP_ARTICLE_CATEGORIES = [
+  "getting-started",
+  "sales",
+  "cpq",
+  "production",
+  "fieldhub",
+  "ai-tools",
+  "settings",
+  "faq",
+] as const;
+export type HelpArticleCategory = typeof HELP_ARTICLE_CATEGORIES[number];
+
+export const helpArticles = pgTable("help_articles", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(),
+  category: text("category").notNull().$type<HelpArticleCategory>(),
+  content: text("content").notNull(), // Markdown content
+  sortOrder: integer("sort_order").default(0),
+  isPublished: boolean("is_published").default(true),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
+export type HelpArticle = typeof helpArticles.$inferSelect;

@@ -45,6 +45,7 @@ import rfpAutomationRouter from "./routes/rfp-automation";
 import signaturesRouter from "./routes/signatures";
 import vectorsRouter from "./routes/vectors";
 import mauticRouter from "./routes/mautic";
+import helpCenterRouter from "./routes/help-center";
 
 
 export async function registerRoutes(
@@ -159,6 +160,9 @@ export async function registerRoutes(
 
   // Marketing Automation (Mautic)
   app.use("/api/mautic", mauticRouter);
+
+  // Help Center (Editable Articles)
+  app.use("/api/help", helpCenterRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

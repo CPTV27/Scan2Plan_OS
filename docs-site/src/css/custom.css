@@ -1,30 +1,61 @@
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Scan2Plan Academy Custom Styles
+ * Brand Colors: Blue (#0066CC) and White
  */
 
-/* You can override the default Infima variables here. */
+/* Scan2Plan Blue Brand Colors */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary: #0066CC;
+  --ifm-color-primary-dark: #005BB8;
+  --ifm-color-primary-darker: #0055AD;
+  --ifm-color-primary-darkest: #00448F;
+  --ifm-color-primary-light: #0077E6;
+  --ifm-color-primary-lighter: #0080F5;
+  --ifm-color-primary-lightest: #1A8FFF;
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --docusaurus-highlighted-code-line-bg: rgba(0, 102, 204, 0.1);
+  
+  /* Hero banner */
+  --ifm-hero-background-color: #0066CC;
+  --ifm-hero-text-color: #ffffff;
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* Dark mode - lighter blue for visibility */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #4DA6FF;
+  --ifm-color-primary-dark: #3399FF;
+  --ifm-color-primary-darker: #1A8CFF;
+  --ifm-color-primary-darkest: #0080FF;
+  --ifm-color-primary-light: #66B3FF;
+  --ifm-color-primary-lighter: #80C0FF;
+  --ifm-color-primary-lightest: #99CCFF;
+  --docusaurus-highlighted-code-line-bg: rgba(77, 166, 255, 0.2);
+}
+
+/* Hero banner styling */
+.hero--primary {
+  background: linear-gradient(135deg, #0066CC 0%, #004499 100%);
+}
+
+/* Cards styling */
+.card {
+  border: 1px solid rgba(0, 102, 204, 0.2);
+  border-radius: 8px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Button enhancements */
+.button--primary {
+  background-color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+}
+
+.button--primary:hover {
+  background-color: var(--ifm-color-primary-dark);
+  border-color: var(--ifm-color-primary-dark);
 }

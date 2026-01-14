@@ -31,7 +31,7 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/CPTV27/Scan2Plan_OS/tree/main/docs-site/',
-          routeBasePath: '/', // Serve docs at root
+          // Serve docs at /docs/ path (not root)
         },
         blog: false, // Disable blog
         theme: {
@@ -85,24 +85,24 @@ const config: Config = {
         {
           title: 'Documentation',
           items: [
-            { label: 'Getting Started', to: '/' },
-            { label: 'Sales Pipeline', to: '/academy/sales-pipeline' },
-            { label: 'CPQ Builder', to: '/academy/cpq-quote-builder' },
+            { label: 'Getting Started', to: '/docs/academy/intro' },
+            { label: 'Sales Pipeline', to: '/docs/academy/sales-pipeline' },
+            { label: 'CPQ Builder', to: '/docs/academy/cpq-quote-builder' },
           ],
         },
         {
           title: 'Features',
           items: [
-            { label: 'Proposal Builder', to: '/academy/proposal-builder' },
-            { label: 'FieldHub Mobile', to: '/academy/fieldhub-mobile' },
-            { label: 'AI Features', to: '/academy/ai-features' },
+            { label: 'Proposal Builder', to: '/docs/academy/proposal-builder' },
+            { label: 'FieldHub Mobile', to: '/docs/academy/fieldhub-mobile' },
+            { label: 'AI Features', to: '/docs/academy/ai-features' },
           ],
         },
         {
           title: 'Resources',
           items: [
-            { label: 'User Manual', to: '/manual/overview' },
-            { label: 'Troubleshooting', to: '/faq/troubleshooting' },
+            { label: 'User Manual', to: '/docs/manual/overview' },
+            { label: 'Troubleshooting', to: '/docs/faq/troubleshooting' },
             { label: 'API Docs', href: '/api-docs' },
           ],
         },

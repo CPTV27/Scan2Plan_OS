@@ -2,8 +2,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle, Settings, GitBranch, Play, Palette } from "lucide-react";
+import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle, Settings, GitBranch, Play, Palette, Library } from "lucide-react";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
+import DynamicHelpArticles from "@/components/DynamicHelpArticles";
 
 export default function HelpCenter() {
   return (
@@ -36,6 +37,10 @@ export default function HelpCenter() {
                 </TabsTrigger>
                 <TabsTrigger value="strategy" data-testid="tab-strategy">The Strategy</TabsTrigger>
                 <TabsTrigger value="faq" data-testid="tab-faq">FAQ</TabsTrigger>
+                <TabsTrigger value="knowledge-base" data-testid="tab-kb" className="gap-1">
+                  <Library className="h-4 w-4" />
+                  Knowledge Base
+                </TabsTrigger>
               </TabsList>
 
               {/* AI & Tools Tab - New comprehensive documentation */}
@@ -1246,6 +1251,11 @@ export default function HelpCenter() {
                     </Accordion>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Knowledge Base - Database-driven editable articles */}
+              <TabsContent value="knowledge-base" className="space-y-4">
+                <DynamicHelpArticles />
               </TabsContent>
             </Tabs>
           </div>
