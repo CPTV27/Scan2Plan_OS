@@ -178,6 +178,9 @@ export const leads = pgTable("leads", {
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
+  // Mautic Marketing Automation
+  mauticContactId: text("mautic_contact_id"), // Mautic Contact ID for marketing sync
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

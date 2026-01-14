@@ -79,7 +79,7 @@ router.post(
         } else {
             // Sync leads with email that aren't synced yet (mauticContactId is null)
             leadsToSync = await db.select().from(leads)
-                .where(isNull(leads.mauticContactId as any))
+                .where(isNull(leads.mauticContactId))
                 .limit(100);
         }
 
@@ -117,7 +117,7 @@ router.post(
                     const data = await response.json();
                     // Update lead with Mautic contact ID
                     await db.update(leads)
-                        .set({ mauticContactId: String(data.contact?.id) } as any)
+                        .set({ mauticContactId: String(data.contact?.id) })
                         .where(eq(leads.id, lead.id));
                     synced++;
                 } else {
