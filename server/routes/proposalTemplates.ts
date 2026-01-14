@@ -32,6 +32,32 @@ proposalTemplatesRouter.get("/", async (req: Request, res: Response) => {
     }
 });
 
+// GET templates grouped by category (for dropdown menus)
+proposalTemplatesRouter.get("/grouped", async (req: Request, res: Response) => {
+    try {
+        const templates = await db
+            .select()
+            .from(proposalTemplates)
+            .where(eq(proposalTemplates.isActive, true))
+            .orderBy(asc(proposalTemplates.category), asc(proposalTemplates.sortOrder));
+
+        // Group templates by category
+        const grouped: Record<string, typeof templates> = {};
+        for (const template of templates) {
+            const cat = template.category || "other";
+            if (!grouped[cat]) {
+                grouped[cat] = [];
+            }
+            grouped[cat].push(template);
+        }
+
+        res.json(grouped);
+    } catch (error) {
+        console.error("Failed to fetch grouped templates:", error);
+        res.status(500).json({ error: "Failed to fetch templates" });
+    }
+});
+
 // GET templates by category
 proposalTemplatesRouter.get("/category/:category", async (req: Request, res: Response) => {
     try {

@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "1.0.0",
+  "exportedAt": "2026-01-14T00:55:38.117Z",
+  "quoteNumber": "Q1768338742702",
+  "projectDetails": {
+    "clientName": "McBride Architects",
+    "projectName": "4 Middle Way",
+    "projectAddress": "4 Middle Way, Old Greenwich, CT 06870",
+    "specificBuilding": "",
+    "typeOfBuilding": "",
+    "hasBasement": true,
+    "hasAttic": true,
+    "notes": "sq footage is given by client + 1,000 sqft for porches \n\nassume 2300 sqft basement (not included)"
+  },
+  "areas": [
+    {
+      "id": "1",
+      "name": "Home + Porches",
+      "buildingType": "1",
+      "squareFeet": "7830",
+      "scope": "interior",
+      "disciplines": [
+        "mepf",
+        "matterport",
+        "architecture"
+      ],
+      "disciplineLods": {
+        "mepf": "350",
+        "site": "350",
+        "structure": "350",
+        "matterport": "300",
+        "architecture": "350"
+      },
+      "gradeAroundBuilding": false,
+      "gradeLod": "300"
+    },
+    {
+      "id": "1768338754534",
+      "name": "Lot",
+      "buildingType": "14",
+      "squareFeet": "1",
+      "scope": "full",
+      "disciplines": [
+        "site"
+      ],
+      "disciplineLods": {
+        "site": "350"
+      },
+      "gradeAroundBuilding": false,
+      "gradeLod": "300"
+    }
+  ],
+  "risks": [],
+  "travel": {
+    "dispatchLocation": "woodstock",
+    "distance": 111,
+    "distanceCalculated": true,
+    "customTravelCost": null
+  },
+  "additionalServices": {},
+  "scopingData": {
+    "aboveBelowACT": "",
+    "aboveBelowACTOther": "",
+    "actSqft": "",
+    "bimDeliverable": [
+      "Revit"
+    ],
+    "bimDeliverableOther": "",
+    "bimVersion": "",
+    "customTemplate": "",
+    "customTemplateOther": "",
+    "sqftAssumptions": "given by customer",
+    "assumedGrossMargin": "40%",
+    "caveatsProfitability": "travel, bad pricing",
+    "projectNotes": "include roofed porches - landscape scope TBD\n\nnot sure if scope includes basement / attic - confirm",
+    "mixedScope": "",
+    "insuranceRequirements": "",
+    "tierAScanningCost": "",
+    "tierAScanningCostOther": "",
+    "tierAModelingCost": "",
+    "tierAMargin": "",
+    "estimatedTimeline": "3weeks",
+    "timelineOther": "",
+    "timelineNotes": "",
+    "paymentTerms": "partner",
+    "paymentTermsOther": "",
+    "paymentNotes": "",
+    "proofLinks": ""
+  },
+  "crmData": {
+    "accountContact": "Winthrop Han",
+    "accountContactEmail": "wsh@mcbride-architects.com",
+    "accountContactPhone": "646.634.1051",
+    "phoneNumber": "",
+    "designProContact": "",
+    "designProCompanyContact": "",
+    "otherContact": "",
+    "source": "Existing customer",
+    "sourceNote": "",
+    "assist": "",
+    "probabilityOfClosing": "50",
+    "projectStatus": "proposal",
+    "projectStatusOther": ""
+  },
+  "attachments": {
+    "customTemplateFiles": [],
+    "sqftAssumptionsFiles": [
+      {
+        "name": "Screenshot 2026-01-13 at 3.22.14 PM.png",
+        "url": "/objects/uploads/ec2b2ff9-a6fa-468e-9aac-5ffc92278774"
+      },
+      {
+        "name": "Screenshot 2026-01-13 at 3.21.41 PM.png",
+        "url": "/objects/uploads/2116843f-b5b1-42a2-9be4-20b08de17e25"
+      },
+      {
+        "name": "Screenshot 2026-01-13 at 3.21.13 PM.png",
+        "url": "/objects/uploads/4ca5b086-9c0e-46a9-a658-4347d043b5db"
+      },
+      {
+        "name": "Screenshot 2026-01-13 at 3.20.34 PM.png",
+        "url": "/objects/uploads/919368bd-dc7f-44a4-a6b7-e0afe9480fa4"
+      }
+    ],
+    "scopingDocuments": [
+      {
+        "name": "BR_SCHEMATIC_DESIGN_093025.pdf",
+        "url": "/objects/uploads/c4212b17-4b26-42c5-abdd-f2433e7fd9bf"
+      }
+    ],
+    "ndaFiles": []
+  },
+  "pricing": {
+    "lineItems": [
+      {
+        "label": "Mepf (7,830 sqft, LOD 350) (Interior Only -25%)",
+        "value": 616.6125,
+        "isDiscount": false,
+        "isTotal": false,
+        "upteamCost": 205.53750000000002
+      },
+      {
+        "label": "Matterport Virtual Tours (7,830 sqft)",
+        "value": 783,
+        "isDiscount": false,
+        "isTotal": false,
+        "upteamCost": 508.95000000000005
+      },
+      {
+        "label": "Architecture (7,830 sqft, LOD 350) (Interior Only -25%)",
+        "value": 7516.799999999999,
+        "isDiscount": false,
+        "isTotal": false,
+        "upteamCost": 1092.2849999999999
+      },
+      {
+        "label": "Site (1 acres (43,560 sqft), LOD 350)",
+        "value": 1250,
+        "isDiscount": false,
+        "isTotal": false,
+        "upteamCost": 812.5
+      },
+      {
+        "label": "Base Subtotal",
+        "value": 10166.412499999999,
+        "isDiscount": false,
+        "isTotal": false
+      },
+      {
+        "label": "Travel (111 mi @ $3/mi + 6 scan-days @ $300/day)",
+        "value": 2133,
+        "isDiscount": false,
+        "isTotal": false
+      },
+      {
+        "label": "Grand Total",
+        "value": 12299.412499999999,
+        "isDiscount": false,
+        "isTotal": true
+      },
+      {
+        "label": "Effective Price per Sq Ft (51,390 sqft)",
+        "value": 0.23933474411364075,
+        "isDiscount": false,
+        "isTotal": false
+      }
+    ],
+    "totalClientPrice": 12299.412499999999,
+    "totalUpteamCost": 2619.2725
+  }
+}
