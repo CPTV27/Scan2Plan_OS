@@ -48,6 +48,7 @@ import mauticRouter from "./routes/mautic";
 import helpCenterRouter from "./routes/help-center";
 import researchRouter from "./routes/research";
 import promptEngineRouter from "./routes/prompt-engine";
+import agentRouter from "./routes/agent";
 
 
 export async function registerRoutes(
@@ -171,6 +172,9 @@ export async function registerRoutes(
 
   // Dynamic Prompting Engine
   app.use("/api/prompt-engine", promptEngineRouter);
+
+  // Autonomous Agent
+  app.use("/api/agent", agentRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

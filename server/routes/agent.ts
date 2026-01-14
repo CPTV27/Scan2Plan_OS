@@ -1,0 +1,311 @@
+/**
+ * Agent Routes
+ * 
+ * API endpoints for the autonomous prompting agent
+ */
+
+import { Router, Request, Response } from "express";
+import { asyncHandler } from "../middleware/errorHandler";
+import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { db } from "../db";
+import { agentPrompts, marketingIntel, intelNewsItems, INTEL_NEWS_TYPES } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
+import {
+    buildRAGContext,
+    generateCategoryPrompts,
+    optimizePrompt,
+    extractMarketingIntel,
+    type StoredPrompt,
+} from "../services/agentPromptLibrary";
+
+const router = Router();
+
+// GET /api/agent/context - Get current RAG context
+router.get(
+    "/context",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const context = await buildRAGContext();
+        return res.json({ success: true, data: context });
+    })
+);
+
+// GET /api/agent/prompts - List all stored prompts
+router.get(
+    "/prompts",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { category, activeOnly } = req.query;
+
+        let prompts = await db.select().from(agentPrompts).orderBy(desc(agentPrompts.updatedAt));
+
+        if (category && typeof category === "string") {
+            prompts = prompts.filter(p => p.category === category);
+        }
+        if (activeOnly === "true") {
+            prompts = prompts.filter(p => p.isActive);
+        }
+
+        return res.json({ success: true, data: prompts });
+    })
+);
+
+// POST /api/agent/prompts/generate - Generate prompts for all categories
+router.post(
+    "/prompts/generate",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const prompts = await generateCategoryPrompts();
+
+        // Store generated prompts
+        const stored: any[] = [];
+        for (const prompt of prompts) {
+            try {
+                const [inserted] = await db.insert(agentPrompts).values({
+                    category: prompt.category,
+                    name: prompt.name,
+                    basePrompt: prompt.basePrompt,
+                    optimizedPrompt: prompt.optimizedPrompt,
+                    variables: prompt.variables,
+                    performance: prompt.performance,
+                    metadata: prompt.metadata,
+                    isActive: true,
+                }).returning();
+                stored.push(inserted);
+            } catch (error) {
+                console.error(`Error storing prompt for ${prompt.category}:`, error);
+            }
+        }
+
+        return res.json({
+            success: true,
+            generated: prompts.length,
+            stored: stored.length,
+            data: stored
+        });
+    })
+);
+
+// POST /api/agent/prompts - Add a user-suggested prompt
+router.post(
+    "/prompts",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { category, name, basePrompt, variables = [] } = req.body;
+
+        if (!category || !name || !basePrompt) {
+            return res.status(400).json({ error: "category, name, and basePrompt are required" });
+        }
+
+        // First, let the agent optimize the user's prompt
+        const userPrompt: StoredPrompt = {
+            category,
+            name,
+            basePrompt,
+            optimizedPrompt: basePrompt,
+            variables,
+            performance: {
+                usageCount: 0,
+                successRate: 50,
+                avgConfidence: 50,
+                lastUsed: new Date().toISOString(),
+            },
+            metadata: {
+                createdBy: "user",
+                version: 1,
+            },
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        // Optimize it
+        const optimized = await optimizePrompt(userPrompt);
+
+        // Store
+        const [inserted] = await db.insert(agentPrompts).values({
+            category: optimized.category,
+            name: optimized.name,
+            basePrompt: optimized.basePrompt,
+            optimizedPrompt: optimized.optimizedPrompt,
+            variables: optimized.variables,
+            performance: optimized.performance,
+            metadata: optimized.metadata,
+            isActive: true,
+        }).returning();
+
+        return res.status(201).json({ success: true, data: inserted });
+    })
+);
+
+// POST /api/agent/prompts/:id/optimize - Trigger optimization for a prompt
+router.post(
+    "/prompts/:id/optimize",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { id } = req.params;
+        const { accepted, userEdits } = req.body;
+
+        const [existing] = await db.select().from(agentPrompts).where(eq(agentPrompts.id, parseInt(id)));
+
+        if (!existing) {
+            return res.status(404).json({ error: "Prompt not found" });
+        }
+
+        // Convert DB record to StoredPrompt
+        const storedPrompt: StoredPrompt = {
+            id: existing.id,
+            category: existing.category,
+            name: existing.name,
+            basePrompt: existing.basePrompt,
+            optimizedPrompt: existing.optimizedPrompt,
+            variables: existing.variables || [],
+            performance: existing.performance || { usageCount: 0, successRate: 50, avgConfidence: 50, lastUsed: "" },
+            metadata: existing.metadata || { createdBy: "system", version: 1 },
+            isActive: existing.isActive ?? true,
+            createdAt: existing.createdAt?.toISOString() || new Date().toISOString(),
+            updatedAt: existing.updatedAt?.toISOString() || new Date().toISOString(),
+        };
+
+        // Optimize
+        const optimized = await optimizePrompt(storedPrompt, { accepted, userEdits });
+
+        // Update in DB
+        const [updated] = await db
+            .update(agentPrompts)
+            .set({
+                optimizedPrompt: optimized.optimizedPrompt,
+                performance: optimized.performance,
+                metadata: optimized.metadata,
+                updatedAt: new Date(),
+            })
+            .where(eq(agentPrompts.id, parseInt(id)))
+            .returning();
+
+        return res.json({ success: true, data: updated });
+    })
+);
+
+// DELETE /api/agent/prompts/:id - Delete a prompt
+router.delete(
+    "/prompts/:id",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const { id } = req.params;
+        await db.delete(agentPrompts).where(eq(agentPrompts.id, parseInt(id)));
+        return res.json({ success: true });
+    })
+);
+
+// POST /api/agent/intel/extract - Extract marketing intel from recent news
+router.post(
+    "/intel/extract",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        // Get recent unprocessed intel items
+        const recentItems = await db
+            .select()
+            .from(intelNewsItems)
+            .where(eq(intelNewsItems.isArchived, false))
+            .orderBy(desc(intelNewsItems.createdAt))
+            .limit(20);
+
+        const itemsForExtraction = recentItems.map(item => ({
+            type: item.type,
+            title: item.title,
+            summary: item.summary || undefined,
+            region: item.region || undefined,
+        }));
+
+        const extracted = await extractMarketingIntel(itemsForExtraction);
+
+        // Store extracted intel
+        const stored: any[] = [];
+        for (const intel of extracted) {
+            try {
+                const [inserted] = await db.insert(marketingIntel).values({
+                    category: intel.category,
+                    title: intel.title,
+                    summary: intel.summary,
+                    insights: intel.insights,
+                    actionItems: intel.actionItems,
+                    confidence: intel.confidence,
+                    source: intel.source,
+                    metadata: intel.metadata,
+                }).returning();
+                stored.push(inserted);
+            } catch (error) {
+                console.error("Error storing marketing intel:", error);
+            }
+        }
+
+        return res.json({
+            success: true,
+            processed: recentItems.length,
+            extracted: extracted.length,
+            stored: stored.length,
+            data: stored,
+        });
+    })
+);
+
+// GET /api/agent/intel - List marketing intel
+router.get(
+    "/intel",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { category, limit = "20" } = req.query;
+
+        let intel = await db
+            .select()
+            .from(marketingIntel)
+            .orderBy(desc(marketingIntel.createdAt))
+            .limit(parseInt(limit as string));
+
+        if (category && typeof category === "string") {
+            intel = intel.filter(i => i.category === category);
+        }
+
+        return res.json({ success: true, data: intel });
+    })
+);
+
+// POST /api/agent/intel/:id/action - Mark intel as actioned
+router.post(
+    "/intel/:id/action",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { id } = req.params;
+
+        const [updated] = await db
+            .update(marketingIntel)
+            .set({ isActioned: true })
+            .where(eq(marketingIntel.id, parseInt(id)))
+            .returning();
+
+        if (!updated) {
+            return res.status(404).json({ error: "Intel not found" });
+        }
+
+        return res.json({ success: true, data: updated });
+    })
+);
+
+// GET /api/agent/categories - List available categories
+router.get(
+    "/categories",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        return res.json({
+            success: true,
+            data: INTEL_NEWS_TYPES.map(type => ({
+                value: type,
+                label: type.charAt(0).toUpperCase() + type.slice(1),
+            })),
+        });
+    })
+);
+
+export default router;

@@ -2271,3 +2271,64 @@ export const insertHelpArticleSchema = createInsertSchema(helpArticles).omit({
 });
 export type InsertHelpArticle = z.infer<typeof insertHelpArticleSchema>;
 export type HelpArticle = typeof helpArticles.$inferSelect;
+
+// === AGENT PROMPT LIBRARY ===
+export const PROMPT_CREATOR_TYPES = ["system", "user", "agent"] as const;
+export type PromptCreatorType = typeof PROMPT_CREATOR_TYPES[number];
+
+export const agentPrompts = pgTable("agent_prompts", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(), // Intel category or use case
+  name: text("name").notNull(),         // Human-readable name
+  basePrompt: text("base_prompt").notNull(),       // Original prompt
+  optimizedPrompt: text("optimized_prompt").notNull(), // AI-refined version
+  variables: jsonb("variables").$type<string[]>().default([]), // Placeholders
+  performance: jsonb("performance").$type<{
+    usageCount: number;
+    successRate: number;
+    avgConfidence: number;
+    lastUsed: string;
+  }>().default({ usageCount: 0, successRate: 50, avgConfidence: 50, lastUsed: "" }),
+  metadata: jsonb("metadata").$type<{
+    createdBy: PromptCreatorType;
+    version: number;
+    parentId?: number;
+    optimizationNotes?: string;
+  }>().default({ createdBy: "system", version: 1 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAgentPromptSchema = createInsertSchema(agentPrompts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAgentPrompt = z.infer<typeof insertAgentPromptSchema>;
+export type AgentPrompt = typeof agentPrompts.$inferSelect;
+
+// === MARKETING INTELLIGENCE ===
+export const marketingIntel = pgTable("marketing_intel", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),   // "competitor", "market", "opportunity", etc.
+  title: text("title").notNull(),
+  summary: text("summary"),
+  insights: jsonb("insights").$type<string[]>().default([]),
+  actionItems: jsonb("action_items").$type<string[]>().default([]),
+  relatedLeads: jsonb("related_leads").$type<number[]>(),
+  relatedProjects: jsonb("related_projects").$type<number[]>(),
+  confidence: integer("confidence").default(50), // AI confidence score
+  source: text("source"),                   // Where this intel came from
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  isActioned: boolean("is_actioned").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),       // When intel becomes stale
+});
+
+export const insertMarketingIntelSchema = createInsertSchema(marketingIntel).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertMarketingIntel = z.infer<typeof insertMarketingIntelSchema>;
+export type MarketingIntelRecord = typeof marketingIntel.$inferSelect;
