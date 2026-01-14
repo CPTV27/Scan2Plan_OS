@@ -285,11 +285,11 @@ export function ProposalLayoutEditor({
             </div>
 
             {/* Split Panel Editor */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
                 <ResizablePanelGroup direction="horizontal" className="h-full">
                     {/* Left Panel: Section List */}
-                    <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-                        <div className="h-full p-3">
+                    <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="flex flex-col h-full">
+                        <div className="h-full p-3 overflow-hidden">
                             <SectionPanel
                                 sections={sections}
                                 onSectionsChange={handleSectionsChange}
@@ -303,8 +303,8 @@ export function ProposalLayoutEditor({
                     <ResizableHandle withHandle />
 
                     {/* Right Panel: Live Preview */}
-                    <ResizablePanel defaultSize={75}>
-                        <div className="h-full p-3 pl-0">
+                    <ResizablePanel defaultSize={75} className="flex flex-col h-full">
+                        <div className="h-full p-3 pl-0 overflow-hidden">
                             <ProposalPreview
                                 sections={sections}
                                 activeSectionId={activeSectionId}
