@@ -61,9 +61,9 @@ export function ProposalPreview({
                         {/* Document Header with Logo */}
                         <div className="flex justify-center mb-8 pb-6 border-b">
                             <img
-                                src="/logo-stacked.webp"
+                                src="/logo-cover.png"
                                 alt="Scan2Plan"
-                                className="h-20 object-contain"
+                                className="h-24 object-contain"
                             />
                         </div>
 
