@@ -3,6 +3,7 @@ import { db } from "../db";
 import { intelFeedSources, intelNewsItems, insertIntelFeedSourceSchema, type IntelSourceType, type IntelNewsType, type IntelRegion } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { processUnprocessedItems } from "../services/intelPipelineWorker";
 
 // Simple RSS parser helper
 async function parseRSSFeed(feedUrl: string): Promise<Array<{
@@ -270,6 +271,15 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                         message: `RSS feed sync completed. Found ${feedItems.length} items, added ${itemsAdded} new.`, 
                         itemsProcessed: itemsAdded 
                     };
+                    
+                    // Trigger automatic agent processing for new items (runs in background)
+                    if (itemsAdded > 0) {
+                        processUnprocessedItems(itemsAdded).then(result => {
+                            console.log(`[IntelPipeline] Auto-processed ${result.successful}/${result.processed} items after sync`);
+                        }).catch(err => {
+                            console.error("[IntelPipeline] Background processing error:", err);
+                        });
+                    }
                     break;
                 }
                 case "webhook": {

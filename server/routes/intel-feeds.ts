@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { db } from "../db";
-import { intelNewsItems, type IntelNewsType, type IntelRegion, INTEL_NEWS_TYPES, INTEL_REGIONS } from "@shared/schema";
+import { intelNewsItems, intelPipelineRuns, intelAgentOutputs, type IntelNewsType, type IntelRegion, INTEL_NEWS_TYPES, INTEL_REGIONS } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { processUnprocessedItems, getProcessedIntelItems, getPipelineResult, markPipelineRunRead } from "../services/intelPipelineWorker";
 
 const router = Router();
 
@@ -227,6 +228,90 @@ router.post("/seed-demo", isAuthenticated, async (req, res) => {
     } catch (error) {
         console.error("Error seeding demo data:", error);
         res.status(500).json({ message: "Failed to seed demo data" });
+    }
+});
+
+// === PROCESSED INTEL ENDPOINTS (Agent Pipeline Results) ===
+
+// GET /api/intel-feeds/processed - List all processed intel with agent summaries
+router.get("/processed", isAuthenticated, async (req, res) => {
+    try {
+        const { limit = "50", unreadOnly } = req.query;
+        const results = await getProcessedIntelItems({
+            limit: parseInt(limit as string),
+            onlyUnread: unreadOnly === "true",
+        });
+
+        res.json(results);
+    } catch (error) {
+        console.error("Error fetching processed intel:", error);
+        res.status(500).json({ message: "Failed to fetch processed intel" });
+    }
+});
+
+// GET /api/intel-feeds/processed/stats - Get processing stats
+router.get("/processed/stats", isAuthenticated, async (req, res) => {
+    try {
+        const allRuns = await db.select().from(intelPipelineRuns);
+        
+        const stats = {
+            total: allRuns.length,
+            pending: allRuns.filter(r => r.status === "pending").length,
+            running: allRuns.filter(r => r.status === "running").length,
+            completed: allRuns.filter(r => r.status === "completed").length,
+            failed: allRuns.filter(r => r.status === "failed").length,
+            unread: allRuns.filter(r => r.status === "completed" && !r.isRead).length,
+            avgAuditScore: Math.round(
+                allRuns.filter(r => r.auditScore !== null).reduce((sum, r) => sum + (r.auditScore || 0), 0) /
+                allRuns.filter(r => r.auditScore !== null).length || 0
+            ),
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error("Error fetching processing stats:", error);
+        res.status(500).json({ message: "Failed to fetch processing stats" });
+    }
+});
+
+// GET /api/intel-feeds/:id/pipeline - Get full pipeline result for an intel item
+router.get("/:id/pipeline", isAuthenticated, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await getPipelineResult(parseInt(id));
+
+        if (!result) {
+            return res.status(404).json({ message: "No pipeline run found for this item" });
+        }
+
+        res.json(result);
+    } catch (error) {
+        console.error("Error fetching pipeline result:", error);
+        res.status(500).json({ message: "Failed to fetch pipeline result" });
+    }
+});
+
+// PUT /api/intel-feeds/processed/:runId/read - Mark processed intel as read
+router.put("/processed/:runId/read", isAuthenticated, async (req, res) => {
+    try {
+        const { runId } = req.params;
+        await markPipelineRunRead(parseInt(runId));
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Error marking processed intel as read:", error);
+        res.status(500).json({ message: "Failed to mark as read" });
+    }
+});
+
+// POST /api/intel-feeds/process-pending - Manually trigger processing of unprocessed items
+router.post("/process-pending", isAuthenticated, async (req, res) => {
+    try {
+        const { limit = 10 } = req.body;
+        const result = await processUnprocessedItems(limit);
+        res.json(result);
+    } catch (error) {
+        console.error("Error processing pending items:", error);
+        res.status(500).json({ message: "Failed to process pending items" });
     }
 });
 
