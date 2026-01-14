@@ -289,11 +289,86 @@ Configure percentages in Settings.
 6. **Smart Project Matching**: Find similar past projects
 7. **Voice Transcription**: Whisper AI for voice notes
 8. **Field Note Translation**: Convert raw notes to professional scope
+9. **AI Agent Dashboard**: Autonomous prompt generation and marketing intelligence
 
 ### How do I use the AI Assistant?
 Click the **Chat** icon in the sidebar or use the Chat tab in FieldHub. Ask questions about the system, your leads, or get help with tasks.
 
+### What is the AI Agent Dashboard?
+The AI Agent Dashboard is a CEO-only feature that allows you to manage AI-generated prompts and extract marketing intelligence from business data. It uses your entire database as a Retrieval Augmented Generation (RAG) context to optimize prompts for Scan2Plan's specific market.
+
+Access it via **AI Agent** in the sidebar (CEO role only) or navigate to `/ai-agent`.
+
+### What are the main features of the AI Agent?
+
+**1. Prompt Library**
+- Store and manage AI-optimized search prompts
+- Organize prompts by category (opportunity, policy, competitor, project, technology, funding, event, talent, market)
+- Track performance metrics (usage count, success rate)
+- Self-improving prompts that learn from your feedback
+
+**2. Marketing Intelligence Extraction**
+- AI analyzes news feeds and intel items
+- Extracts actionable insights
+- Generates recommended actions
+- Tracks confidence scores
+
+**3. RAG Context Viewer**
+- See what data the AI uses to understand Scan2Plan
+- Brand personas, red lines, standards
+- Company capabilities
+- Geographic focus areas
+- Network statistics (leads, wins, building types)
+
+### How do I generate AI prompts?
+1. Navigate to **AI Agent** in the sidebar
+2. Click **Generate Prompts** button
+3. AI creates 9 category-specific prompts optimized for Scan2Plan
+4. Prompts appear in the Prompt Library tab
+5. Each prompt includes the search query, variables, and optimization notes
+
+### How do I add my own prompt ideas?
+1. In the AI Agent Dashboard, click **Add Prompt**
+2. Select a category (e.g., "opportunity", "competitor")
+3. Enter a name (e.g., "NYC Historic RFPs")
+4. Write your base prompt
+5. Click **Add & Optimize**
+6. The AI automatically refines your prompt using company context
+
+### How does prompt optimization work?
+The AI Agent tracks how prompts are used:
+- Click ✓ (Accept) when a prompt produces good results → Increases success rate
+- Click ↻ (Refine) when a prompt needs improvement → AI generates better version
+- Performance metrics track: usage count, success rate, confidence
+
+Over time, the system learns which prompts work best for your market.
+
+### How do I extract marketing intel?
+1. Click **Extract Intel** button
+2. AI analyzes recent news items from your intel feeds
+3. For each significant finding, it extracts:
+   - Key insights (what this means for Scan2Plan)
+   - Action items (recommended next steps)
+   - Confidence score (how certain the AI is)
+4. Review intel in the Marketing Intel tab
+5. Click **Mark Done** when you've acted on an insight
+
+### What is RAG Context?
+RAG (Retrieval Augmented Generation) means the AI uses your actual company data to make its responses more relevant. The AI Agent pulls from:
+
+- **Brand Engine**: Personas, red lines, terminology standards
+- **Capabilities**: All registered services and tools
+- **Geography**: Regions served, primary markets, service areas from your leads
+- **Network**: Lead counts, win history, top building types, recent wins
+- **Intel**: Active opportunities, competitors mentioned, policy alerts
+
+This ensures prompts are tailored to Scan2Plan's specific market position.
+
+### Who can access the AI Agent?
+Only users with the **CEO** role can access the AI Agent Dashboard. This is enforced by role-based access control.
+
 ---
+
 
 ## Integrations
 

@@ -886,7 +886,64 @@ Any team member can halt work if they observe unsafe conditions.
 - Files retained indefinitely`,
                 sortOrder: 4,
             },
+            // AI FEATURES
+            {
+                title: "AI Agent Dashboard",
+                slug: "ai-agent-dashboard",
+                category: "advanced-features" as HelpArticleCategory,
+                content: `# AI Agent Dashboard
+
+The **AI Agent Dashboard** is a CEO-exclusive feature for managing AI-generated prompts and extracting marketing intelligence.
+
+## Accessing the Dashboard
+Navigate to **AI Agent** in the sidebar or go to \`/ai-agent\` (CEO role only).
+
+## Main Features
+
+### 1. Prompt Library
+Manage AI-optimized search and monitoring prompts:
+
+| Category | Purpose |
+|----------|---------|
+| **Opportunity** | RFP and procurement alerts |
+| **Policy** | Regulatory and compliance changes |
+| **Competitor** | Competitor activity monitoring |
+| **Project** | Construction and renovation starts |
+| **Technology** | Industry tech developments |
+| **Funding** | Grants and incentive programs |
+| **Event** | Industry conferences and expos |
+| **Talent** | Labor market insights |
+| **Market** | Industry trends and forecasts |
+
+### 2. Marketing Intelligence
+AI extracts actionable insights from news feeds:
+- Key insights with confidence scores
+- Recommended action items
+- Track completion status
+
+### 3. RAG Context
+View the data AI uses to understand Scan2Plan:
+- Brand personas, red lines, standards
+- Company capabilities
+- Geographic markets
+- Network statistics
+
+## Quick Start
+
+1. Click **Generate Prompts** to create 9 category-specific prompts
+2. Review and accept/refine prompts in the library
+3. Click **Extract Intel** to analyze news feeds
+4. Mark insights as "Actioned" when complete
+
+## Prompt Optimization
+The system learns from your feedback:
+- **✓ Accept** = Increases success rate
+- **↻ Refine** = AI generates improved version
+- Performance metrics track usage and success`,
+                sortOrder: 5,
+            },
         ];
+
 
         let created = 0;
         let skipped = 0;
