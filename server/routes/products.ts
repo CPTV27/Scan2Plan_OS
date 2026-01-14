@@ -38,7 +38,7 @@ productsRouter.get(
     }
 
     if (active === "true") {
-      filtered = filtered.filter((p) => p.isActive);
+      filtered = filtered.filter((p) => p.active);
     }
 
     res.json(filtered);

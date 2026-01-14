@@ -246,19 +246,19 @@ export default function DealWorkspace() {
     if (lead) {
       setSharedConfig(prev => {
         const updates: Partial<SharedQuoteConfig> = {};
-        
+
         // Set project location from lead's project address if not already set
         if (!prev.projectLocation && lead.projectAddress) {
           updates.projectLocation = lead.projectAddress;
         }
-        
+
         // Set first area's name from lead's project name if it's still the default
         if (prev.areas.length > 0 && prev.areas[0].name === "Main Building" && lead.projectName) {
-          updates.areas = prev.areas.map((area, index) => 
+          updates.areas = prev.areas.map((area, index) =>
             index === 0 ? { ...area, name: lead.projectName || area.name } : area
           );
         }
-        
+
         // Only update if there are changes
         if (Object.keys(updates).length > 0) {
           return { ...prev, ...updates };
@@ -991,8 +991,8 @@ export default function DealWorkspace() {
                 onClose={() => handleTabChange("lead")}
                 importedData={importedCpqData}
                 onClearImport={() => setImportedCpqData(null)}
-                // Shared state props
-                sharedAreas={sharedConfig.areas}
+                // Shared state props - map to ensure expanded has a value
+                sharedAreas={sharedConfig.areas.map(a => ({ ...a, expanded: a.expanded ?? false }))}
                 onAreasChange={updateSharedAreas}
                 sharedLandscape={sharedConfig.landscape}
                 onLandscapeChange={updateSharedLandscape}

@@ -23,7 +23,7 @@ export async function seedProducts() {
   log("Seeding products from QB catalog...");
 
   const csvPath = path.join(__dirname, "../attached_assets/Products___Services_in_QB_October_2025_-_Sheet1_1768341995694.csv");
-  
+
   if (!fs.existsSync(csvPath)) {
     log("WARN: Products CSV not found at " + csvPath);
     return;
@@ -53,9 +53,9 @@ export async function seedProducts() {
       category: record.Category?.trim() || "Uncategorized",
       name: record["Product / Service"]?.trim() || "",
       description: record.Description?.trim() || null,
-      productType: record.Type?.trim() || "Service",
-      basePrice: record.Price ? parseFloat(record.Price) || 0 : 0,
-      isActive: true,
+      type: record.Type?.trim() || "Service",
+      price: record.Price ? record.Price : "0",
+      active: true,
     };
 
     try {
@@ -70,9 +70,9 @@ export async function seedProducts() {
             name: productData.name,
             category: productData.category,
             description: productData.description,
-            productType: productData.productType,
-            basePrice: productData.basePrice.toString(),
-            isActive: productData.isActive,
+            type: productData.type,
+            price: productData.price,
+            active: productData.active,
             updatedAt: new Date(),
           })
           .where(eq(products.id, existing.id));
