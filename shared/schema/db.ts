@@ -1962,3 +1962,108 @@ export type GeneratedProposal = typeof generatedProposals.$inferSelect;
 
 // Products / Services catalog (synced from QuickBooks)
 
+// === INTEL NEWS ITEMS (Regional Intel News Feeds) ===
+export const INTEL_NEWS_TYPES = ["opportunity", "policy", "competitor"] as const;
+export type IntelNewsType = typeof INTEL_NEWS_TYPES[number];
+
+export const INTEL_REGIONS = ["Northeast", "Mid-Atlantic", "Southeast", "Midwest", "Southwest", "West", "National"] as const;
+export type IntelRegion = typeof INTEL_REGIONS[number];
+
+export const intelNewsItems = pgTable("intel_news_items", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull().$type<IntelNewsType>(), // "opportunity", "policy", "competitor"
+  title: text("title").notNull(),
+  summary: text("summary"),
+  sourceUrl: text("source_url"),
+  sourceName: text("source_name"), // "BidNet", "NYC DOB", "LinkedIn", etc.
+  region: text("region").$type<IntelRegion>(), // Geographic region
+  // For opportunities
+  deadline: timestamp("deadline"), // Bid deadline
+  estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
+  projectType: text("project_type"), // Building type for matching
+  // For policy items
+  effectiveDate: timestamp("effective_date"),
+  agency: text("agency"), // "NYC DOB", "OSHA", "EPA", etc.
+  // For competitor items
+  competitorName: text("competitor_name"),
+  // Tracking
+  isRead: boolean("is_read").default(false),
+  isActionable: boolean("is_actionable").default(true),
+  isArchived: boolean("is_archived").default(false),
+  relevanceScore: integer("relevance_score").default(50), // 0-100
+  // Metadata
+  metadata: jsonb("metadata"), // Additional flexible data
+  publishedAt: timestamp("published_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: text("created_by"),
+});
+
+export const insertIntelNewsItemSchema = createInsertSchema(intelNewsItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertIntelNewsItem = z.infer<typeof insertIntelNewsItemSchema>;
+export type IntelNewsItem = typeof intelNewsItems.$inferSelect;
+
+// === X.COM (TWITTER) INTEGRATION ===
+export const xConnections = pgTable("x_connections", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"), // Our app user
+  xUserId: text("x_user_id"), // Twitter user ID
+  xUsername: text("x_username"), // @handle
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  scopes: text("scopes"), // Comma-separated scopes
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertXConnectionSchema = createInsertSchema(xConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertXConnection = z.infer<typeof insertXConnectionSchema>;
+export type XConnection = typeof xConnections.$inferSelect;
+
+// Competitor accounts to monitor
+export const xMonitoredAccounts = pgTable("x_monitored_accounts", {
+  id: serial("id").primaryKey(),
+  xUsername: text("x_username").notNull(), // @handle
+  xUserId: text("x_user_id"),
+  displayName: text("display_name"),
+  category: text("category").default("competitor"), // competitor, regulator, partner, influencer
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  lastCheckedAt: timestamp("last_checked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertXMonitoredAccountSchema = createInsertSchema(xMonitoredAccounts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertXMonitoredAccount = z.infer<typeof insertXMonitoredAccountSchema>;
+export type XMonitoredAccount = typeof xMonitoredAccounts.$inferSelect;
+
+// Saved hashtag searches
+export const xSavedSearches = pgTable("x_saved_searches", {
+  id: serial("id").primaryKey(),
+  query: text("query").notNull(), // "#ConstructionBids" or "scan-to-BIM"
+  category: text("category").default("opportunity"), // opportunity, policy, competitor, industry
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertXSavedSearchSchema = createInsertSchema(xSavedSearches).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertXSavedSearch = z.infer<typeof insertXSavedSearchSchema>;
+export type XSavedSearch = typeof xSavedSearches.$inferSelect;

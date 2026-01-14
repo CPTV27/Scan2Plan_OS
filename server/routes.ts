@@ -38,6 +38,8 @@ import { productsRouter } from "./routes/products";
 import { proposalTemplatesRouter, proposalTemplateGroupsRouter, generatedProposalsRouter } from "./routes/proposalTemplates";
 import { githubActionsRouter } from "./routes/githubActions";
 import { sequencesRouter, initSequenceScheduler } from "./routes/sequences";
+import intelFeedsRouter from "./routes/intel-feeds";
+import xIntegrationRouter from "./routes/x-integration";
 
 
 export async function registerRoutes(
@@ -129,10 +131,14 @@ export async function registerRoutes(
   app.use("/api/generated-proposals", generatedProposalsRouter);
   app.use(githubActionsRouter);  // CI trigger endpoints
 
-  // Sequences & Automation
   app.use(sequencesRouter);
   initSequenceScheduler();
 
+  // Intel Feeds (Regional Intel News)
+  app.use("/api/intel-feeds", intelFeedsRouter);
+
+  // X.com Integration
+  app.use("/api/x", xIntegrationRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

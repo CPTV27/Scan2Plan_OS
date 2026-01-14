@@ -22,7 +22,7 @@ const allNavigation = [
   { name: 'Financial', href: '/financial', icon: Wallet, roles: ['ceo', 'accounting'] as UserRole[] },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, roles: ['ceo'] as UserRole[] },
   { name: 'Marketing', href: '/marketing', icon: Megaphone, roles: ['ceo', 'sales'] as UserRole[] },
-  { name: 'Regional Intel', href: '/regional-intel', icon: Map, roles: ['ceo', 'sales'] as UserRole[] },
+  { name: 'Business Intelligence', href: '/regional-intel', icon: Map, roles: ['ceo', 'sales'] as UserRole[] },
   { name: 'Brand Engine', href: '/brand-engine', icon: Sparkles, roles: ['ceo', 'sales'] as UserRole[] },
   // { name: 'Airtable', href: '/airtable', icon: Database, roles: ['ceo'] as UserRole[] },
   { name: 'S2P Academy', href: '/help', icon: BookOpen, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
