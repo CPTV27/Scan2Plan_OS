@@ -1120,7 +1120,15 @@ export const cpqQuotes = pgTable("cpq_quotes", {
   pandadocCompletedAt: timestamp("pandadoc_completed_at"),
   pandadocSignedBy: text("pandadoc_signed_by"),
 
+  // E-Signature Integration (DocuSeal/universal)
+  signatureProvider: text("signature_provider").$type<"pandadoc" | "docuseal">(),
+  signatureSubmissionId: text("signature_submission_id"),
+  signatureStatus: text("signature_status").$type<"pending" | "sent" | "viewed" | "in_progress" | "signed" | "declined">(),
+  signatureSentAt: timestamp("signature_sent_at"),
+  signatureSignedAt: timestamp("signature_signed_at"),
+
   // Deliberate Affirmation Pattern (tracks explicit "N/A" decisions for data quality)
+
   fieldAffirmations: jsonb("field_affirmations").$type<Record<string, boolean>>(),
 
   createdBy: text("created_by"),
