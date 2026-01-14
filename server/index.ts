@@ -15,6 +15,9 @@ import { log } from "./lib/logger";
 import { applyStalenessPenalties } from "./staleness";
 import { performanceLoggerMiddleware } from "./middleware/performanceLogger";
 import { getEnv } from "./config/env";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./swagger";
+
 
 // Validate environment configuration on startup
 try {
@@ -51,7 +54,15 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+// Swagger API Documentation (before CSRF so it's publicly accessible)
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "Scan2Plan OS API",
+}));
+app.get("/api-docs.json", (req, res) => res.json(swaggerSpec));
+
 // CSRF protection for API routes (excludes webhooks and public endpoints)
+
 app.use("/api/", csrfProtection());
 
 app.use("/api/", apiLimiter);
