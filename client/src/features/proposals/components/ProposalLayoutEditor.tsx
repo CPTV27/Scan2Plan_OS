@@ -7,7 +7,7 @@
  */
 
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
     ResizablePanelGroup,
     ResizablePanel,
@@ -34,6 +34,7 @@ import {
     LayoutTemplate,
     AlertTriangle,
     FileText,
+    Sparkles,
 } from "lucide-react";
 import {
     Dialog,
@@ -107,6 +108,36 @@ export function ProposalLayoutEditor({
 
     // Case study picker state
     const [isCaseStudyPickerOpen, setIsCaseStudyPickerOpen] = useState(false);
+
+    // AI Rewrite state
+    const [isRewriteDialogOpen, setIsRewriteDialogOpen] = useState(false);
+    const [rewriteInstruction, setRewriteInstruction] = useState("");
+
+    const { mutate: rewriteText, isPending: isRewriting } = useMutation({
+        mutationFn: async (data: { text: string; instruction: string; leadId: number }) => {
+            const res = await fetch("/api/ai/rewrite", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error("Failed to rewrite text");
+            return res.json();
+        },
+        onSuccess: (data) => {
+            setEditedContent(data.rewritedText);
+            setIsRewriteDialogOpen(false);
+            setRewriteInstruction("");
+        },
+    });
+
+    const handleRewrite = () => {
+        if (!lead.id || !editedContent || !rewriteInstruction) return;
+        rewriteText({
+            text: editedContent,
+            instruction: rewriteInstruction,
+            leadId: lead.id,
+        });
+    };
 
     // Fetch template groups
     const { data: templateGroups = [], isLoading: groupsLoading, isError: groupsError } = useTemplateGroups();
@@ -411,7 +442,18 @@ export function ProposalLayoutEditor({
                             />
                         </div>
                         <div className="space-y-2 flex-1 flex flex-col">
-                            <Label htmlFor="section-content">Content (Markdown)</Label>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="section-content">Content (Markdown)</Label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs gap-1 text-primary"
+                                    onClick={() => setIsRewriteDialogOpen(true)}
+                                >
+                                    <Sparkles className="h-3 w-3" />
+                                    Rewrite with AI
+                                </Button>
+                            </div>
                             <Textarea
                                 id="section-content"
                                 value={editedContent}
@@ -441,11 +483,50 @@ export function ProposalLayoutEditor({
                 </DialogContent>
             </Dialog>
 
-            {/* Case Study Picker */}
+            {/* AI Rewrite Dialog */}
+            <Dialog open={isRewriteDialogOpen} onOpenChange={setIsRewriteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Rewrite with AI</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Describe how you want to change the text. The AI will use project context to rewrite it.
+                        </p>
+                        <div className="space-y-2">
+                            <Label>Instruction</Label>
+                            <Textarea
+                                value={rewriteInstruction}
+                                onChange={(e) => setRewriteInstruction(e.target.value)}
+                                placeholder="E.g., Make it more persuasive, focus on ROI, shorten it..."
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsRewriteDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleRewrite} disabled={isRewriting || !rewriteInstruction}>
+                            {isRewriting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Rewriting...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="h-4 w-4 mr-2" />
+                                    Rewrite
+                                </>
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* CaseStudyPicker */}
             <CaseStudyPicker
                 open={isCaseStudyPickerOpen}
                 onOpenChange={setIsCaseStudyPickerOpen}
                 onInsert={handleInsertCaseStudy}
+                leadId={lead.id}
             />
         </div>
     );

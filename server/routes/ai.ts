@@ -14,6 +14,9 @@ import {
   generateProposal,
   findSimilarProjects,
   createProjectSummary,
+  findMatchingCaseStudies,
+  getAIContext,
+  formatContextForPrompt,
   aiClient,
   type ChatMessage,
   type ExtractedCPQData,
@@ -218,10 +221,10 @@ export function registerAIRoutes(app: Express) {
     const buildingType = extractedData.buildingType || "1";
     // Coerce to string for comparison (handles both numeric and string values)
     const buildingTypeStr = String(buildingType);
-    const isLandscape = buildingTypeStr === "14" || buildingTypeStr === "15" || 
-                        buildingTypeStr === "landscape_built" || buildingTypeStr === "landscape_natural";
+    const isLandscape = buildingTypeStr === "14" || buildingTypeStr === "15" ||
+      buildingTypeStr === "landscape_built" || buildingTypeStr === "landscape_natural";
     const areaKind = isLandscape ? "landscape" : "standard";
-    
+
     // Normalize dispatch location to uppercase for legacy system compatibility
     const rawDispatch = extractedData.dispatchLocation || "WOODSTOCK";
     const dispatchLocation = typeof rawDispatch === 'string' ? rawDispatch.toUpperCase() : "WOODSTOCK";
@@ -368,10 +371,10 @@ export function registerAIRoutes(app: Express) {
     }
 
     const allLeads = await storage.getLeads();
-    const result = await findSimilarProjects(lead, allLeads, { maxResults: 3 });
+    const result = await findMatchingCaseStudies(lead, 3);
 
     res.json({
-      recommendations: result.recommendedCaseStudies,
+      recommendations: result.recommendations,
       pricingBenchmarks: result.pricingBenchmarks,
     });
   }));
@@ -431,7 +434,7 @@ export function registerAIRoutes(app: Express) {
       // Get context data
       const leads = await storage.getLeads();
       const projects = await storage.getProjects();
-      
+
       // Calculate metrics for context
       const openLeads = leads.filter(l => !["Closed Won", "Closed Lost"].includes(l.dealStage));
       const totalPipelineValue = openLeads.reduce((sum, l) => sum + Number(l.value || 0), 0);
@@ -463,7 +466,7 @@ Leads needing follow-up:
 ${staleLeads.slice(0, 5).map(l => `- ${l.clientName}: Last contact ${l.lastContactDate ? new Date(l.lastContactDate).toLocaleDateString() : 'never'}`).join('\n')}
 `;
 
-      const systemPrompt = `You are an AI assistant for Scan2Plan, a laser scanning and BIM services company. 
+      const systemPrompt = `You are an AI assistant for Scan2Plan, a laser scanning and BIM services company.
 You help the CEO and sales team with pipeline insights, deal analysis, and recommendations.
 Be concise and actionable in your responses. Use the context data to provide specific insights.
 
@@ -490,7 +493,7 @@ ${contextSummary}`;
   // AI feature analytics
   app.get("/api/ai/analytics", isAuthenticated, requireRole("ceo"), asyncHandler(async (req, res) => {
     const analytics = await db.select().from(aiAnalytics).limit(100);
-    
+
     const featureCounts: Record<string, number> = {};
     const actionCounts: Record<string, number> = {};
     let totalTimeTaken = 0;
@@ -707,5 +710,40 @@ Write professional, compelling content. Each section should be 100-300 words.`;
       res.write(`data: ${JSON.stringify({ error: error?.message || "Generation failed" })}\n\n`);
       res.end();
     }
+  }));
+
+  // Feature 7: Context-Aware Rewrite
+  app.post("/api/ai/rewrite", isAuthenticated, requireRole("ceo", "sales"), asyncHandler(async (req, res) => {
+    const { text, instruction, leadId } = req.body;
+
+    if (!text || !instruction) {
+      return res.status(400).json({ error: "Text and instruction are required" });
+    }
+
+    let contextPrompt = "";
+    if (leadId) {
+      try {
+        const context = await getAIContext(Number(leadId));
+        contextPrompt = formatContextForPrompt(context);
+      } catch (e) {
+        log(`WARN: Failed to get context for lead ${leadId}: ${e}`);
+      }
+    }
+
+    const systemPrompt = `You are an expert proposal editor for Scan2Plan. 
+Your goal is to rewrite the provided text based on the user's instruction and the project context.
+Maintain a professional, persuasive tone suitable for high-value B2B proposals.
+
+${contextPrompt}
+
+IMPORTANT: Return ONLY the rewritten text. Do not include quotes or explanations.`;
+
+    const result = await aiClient.generateText(
+      systemPrompt,
+      `Original Text:\n"${text}"\n\nInstruction: ${instruction}`,
+      { temperature: 0.7 }
+    );
+
+    res.json({ rewritedText: result });
   }));
 }

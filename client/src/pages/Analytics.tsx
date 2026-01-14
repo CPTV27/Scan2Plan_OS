@@ -8,12 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
+import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, AreaChart, Area
 } from "recharts";
-import { 
-  TrendingUp, TrendingDown, Target, Trophy, DollarSign, 
+import {
+  TrendingUp, TrendingDown, Target, Trophy, DollarSign,
   Clock, Users, Activity, AlertTriangle, CheckCircle2,
   ArrowUpRight, ArrowDownRight, Zap, Calendar, Brain, RefreshCw, Loader2
 } from "lucide-react";
@@ -58,7 +58,7 @@ export default function Analytics() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
         <main className="flex-1 p-4 md:p-8 overflow-auto">
@@ -147,8 +147,8 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
   }, {} as Record<string, { name: string; count: number; value: number; won: number }>);
   const sourceChartData = Object.values(leadSourceData).sort((a, b) => b.value - a.value);
 
-  const staleLeads = leads.filter(l => 
-    l.lastContactDate && 
+  const staleLeads = leads.filter(l =>
+    l.lastContactDate &&
     differenceInDays(new Date(), new Date(l.lastContactDate)) > 14 &&
     !['Closed Won', 'Closed Lost'].includes(l.dealStage)
   );
@@ -156,30 +156,30 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="Win Rate" 
-          value={`${winRate}%`} 
+        <MetricCard
+          title="Win Rate"
+          value={`${winRate}%`}
           subtitle={`${closedWon.length} won / ${totalClosed} closed`}
           icon={Trophy}
           trend={winRate >= 50 ? "positive" : "neutral"}
         />
-        <MetricCard 
-          title="Avg Deal Size" 
-          value={`$${Math.round(avgDealSize).toLocaleString()}`} 
+        <MetricCard
+          title="Avg Deal Size"
+          value={`$${Math.round(avgDealSize).toLocaleString()}`}
           subtitle="Closed won deals"
           icon={DollarSign}
           trend="neutral"
         />
-        <MetricCard 
-          title="Revenue Won" 
-          value={`$${wonValue.toLocaleString()}`} 
+        <MetricCard
+          title="Revenue Won"
+          value={`$${wonValue.toLocaleString()}`}
           subtitle="Total closed revenue"
           icon={TrendingUp}
           trend="positive"
         />
-        <MetricCard 
-          title="Revenue Lost" 
-          value={`$${lostValue.toLocaleString()}`} 
+        <MetricCard
+          title="Revenue Lost"
+          value={`$${lostValue.toLocaleString()}`}
           subtitle={`${closedLost.length} deals lost`}
           icon={TrendingDown}
           trend="negative"
@@ -195,9 +195,9 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stageData} layout="vertical">
-                <XAxis type="number" tickFormatter={(v) => `$${v/1000}k`} stroke="#64748b" fontSize={12} />
+                <XAxis type="number" tickFormatter={(v) => `$${v / 1000}k`} stroke="#64748b" fontSize={12} />
                 <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={12} width={80} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number) => [`$${value.toLocaleString()}`, 'Value']}
                 />
@@ -221,14 +221,14 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
               <AreaChart data={conversionData}>
                 <XAxis dataKey="stage" stroke="#64748b" fontSize={12} />
                 <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="leads" 
-                  stroke={CHART_COLORS.primary} 
-                  fill={CHART_COLORS.primary} 
+                <Area
+                  type="monotone"
+                  dataKey="leads"
+                  stroke={CHART_COLORS.primary}
+                  fill={CHART_COLORS.primary}
                   fillOpacity={0.3}
                 />
               </AreaChart>
@@ -246,8 +246,8 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={sourceChartData}>
                   <XAxis dataKey="name" stroke="#64748b" fontSize={11} angle={-45} textAnchor="end" height={60} />
-                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
-                  <Tooltip 
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v / 1000}k`} />
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     formatter={(value: number, name: string) => [
                       name === 'value' ? `$${value.toLocaleString()}` : value,
@@ -311,7 +311,7 @@ function SalesAnalytics({ leads }: { leads: Lead[] }) {
 
 function ProductionAnalytics({ projects }: { projects: Project[] }) {
   const stages = ['Scheduling', 'Scanning', 'Registration', 'Modeling', 'QC', 'Delivered'];
-  
+
   const stageData = stages.map(stage => ({
     name: stage,
     count: projects.filter(p => p.status === stage).length,
@@ -324,17 +324,17 @@ function ProductionAnalytics({ projects }: { projects: Project[] }) {
     { name: 'Low', count: projects.filter(p => p.priority === 'Low').length, fill: CHART_COLORS.success },
   ];
 
-  const avgProgress = projects.length > 0 
+  const avgProgress = projects.length > 0
     ? Math.round(projects.reduce((sum, p) => sum + (p.progress || 0), 0) / projects.length)
     : 0;
 
   const activeProjects = projects.filter(p => p.status !== 'Delivered');
   const deliveredProjects = projects.filter(p => p.status === 'Delivered');
-  const completionRate = projects.length > 0 
+  const completionRate = projects.length > 0
     ? Math.round((deliveredProjects.length / projects.length) * 100)
     : 0;
 
-  const overdueProjects = projects.filter(p => 
+  const overdueProjects = projects.filter(p =>
     p.dueDate && new Date(p.dueDate) < new Date() && p.status !== 'Delivered'
   );
 
@@ -345,30 +345,30 @@ function ProductionAnalytics({ projects }: { projects: Project[] }) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="Active Projects" 
-          value={activeProjects.length.toString()} 
+        <MetricCard
+          title="Active Projects"
+          value={activeProjects.length.toString()}
           subtitle="In production"
           icon={Activity}
           trend="neutral"
         />
-        <MetricCard 
-          title="Completion Rate" 
-          value={`${completionRate}%`} 
+        <MetricCard
+          title="Completion Rate"
+          value={`${completionRate}%`}
           subtitle={`${deliveredProjects.length} delivered`}
           icon={CheckCircle2}
           trend={completionRate >= 70 ? "positive" : "neutral"}
         />
-        <MetricCard 
-          title="Avg Progress" 
-          value={`${avgProgress}%`} 
+        <MetricCard
+          title="Avg Progress"
+          value={`${avgProgress}%`}
           subtitle="Across all active"
           icon={Target}
           trend="neutral"
         />
-        <MetricCard 
-          title="Overdue" 
-          value={overdueProjects.length.toString()} 
+        <MetricCard
+          title="Overdue"
+          value={overdueProjects.length.toString()}
           subtitle="Past due date"
           icon={Clock}
           trend={overdueProjects.length > 0 ? "negative" : "positive"}
@@ -386,7 +386,7 @@ function ProductionAnalytics({ projects }: { projects: Project[] }) {
               <BarChart data={stageData}>
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
                 <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -421,7 +421,7 @@ function ProductionAnalytics({ projects }: { projects: Project[] }) {
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                 />
               </PieChart>
@@ -450,8 +450,8 @@ function ProductionAnalytics({ projects }: { projects: Project[] }) {
                       </span>
                       <span className="text-muted-foreground">{stage.count} projects</span>
                     </div>
-                    <Progress 
-                      value={projects.length > 0 ? (stage.count / projects.length) * 100 : 0} 
+                    <Progress
+                      value={projects.length > 0 ? (stage.count / projects.length) * 100 : 0}
                       className="h-2"
                     />
                   </div>
@@ -525,14 +525,14 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
   const monthlyData = last6Months.map(month => {
     const monthStart = startOfMonth(month);
     const monthEnd = endOfMonth(month);
-    
+
     const monthLeads = leads.filter(l => {
       const created = new Date(l.createdAt!);
       return created >= monthStart && created <= monthEnd;
     });
-    
+
     const monthWon = monthLeads.filter(l => l.dealStage === 'Closed Won');
-    
+
     return {
       month: format(month, 'MMM'),
       pipeline: monthLeads.reduce((s, l) => s + Number(l.value), 0),
@@ -547,20 +547,20 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
     : 0;
 
   const dealVelocityData = [
-    { 
-      stage: 'New', 
+    {
+      stage: 'New',
       avgDays: Math.round(leads.filter(l => l.dealStage === 'New').reduce((s, l) => s + differenceInDays(new Date(), new Date(l.createdAt!)), 0) / (leads.filter(l => l.dealStage === 'New').length || 1)),
     },
-    { 
-      stage: 'Contacted', 
+    {
+      stage: 'Contacted',
       avgDays: Math.round(leads.filter(l => l.dealStage === 'Contacted').reduce((s, l) => s + differenceInDays(new Date(), new Date(l.createdAt!)), 0) / (leads.filter(l => l.dealStage === 'Contacted').length || 1)),
     },
-    { 
-      stage: 'Proposal', 
+    {
+      stage: 'Proposal',
       avgDays: Math.round(leads.filter(l => l.dealStage === 'Proposal').reduce((s, l) => s + differenceInDays(new Date(), new Date(l.createdAt!)), 0) / (leads.filter(l => l.dealStage === 'Proposal').length || 1)),
     },
-    { 
-      stage: 'Negotiation', 
+    {
+      stage: 'Negotiation',
       avgDays: Math.round(leads.filter(l => l.dealStage === 'Negotiation').reduce((s, l) => s + differenceInDays(new Date(), new Date(l.createdAt!)), 0) / (leads.filter(l => l.dealStage === 'Negotiation').length || 1)),
     },
   ];
@@ -579,31 +579,31 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="Open Pipeline" 
-          value={`$${Math.round(totalPipeline).toLocaleString()}`} 
+        <MetricCard
+          title="Open Pipeline"
+          value={`$${Math.round(totalPipeline).toLocaleString()}`}
           subtitle="Raw value"
           icon={Target}
           trend="neutral"
         />
-        <MetricCard 
-          title="Weighted Forecast" 
-          value={`$${Math.round(weightedForecast).toLocaleString()}`} 
+        <MetricCard
+          title="Weighted Forecast"
+          value={`$${Math.round(weightedForecast).toLocaleString()}`}
           subtitle="Probability-adjusted"
           icon={TrendingUp}
           trend="positive"
           highlight
         />
-        <MetricCard 
-          title="Closed Revenue" 
-          value={`$${closedWonValue.toLocaleString()}`} 
+        <MetricCard
+          title="Closed Revenue"
+          value={`$${closedWonValue.toLocaleString()}`}
           subtitle="Total won"
           icon={DollarSign}
           trend="positive"
         />
-        <MetricCard 
-          title="Avg Days in Pipe" 
-          value={avgDaysInPipeline.toString()} 
+        <MetricCard
+          title="Avg Days in Pipe"
+          value={avgDaysInPipeline.toString()}
           subtitle="Deal velocity"
           icon={Clock}
           trend={avgDaysInPipeline < 30 ? "positive" : "negative"}
@@ -620,8 +620,8 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip 
+                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v / 1000}k`} />
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                 />
@@ -642,8 +642,8 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={forecastByStage}>
                 <XAxis dataKey="stage" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
-                <Tooltip 
+                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${v / 1000}k`} />
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                 />
@@ -665,7 +665,7 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
               <BarChart data={dealVelocityData} layout="vertical">
                 <XAxis type="number" stroke="#64748b" fontSize={12} />
                 <YAxis type="category" dataKey="stage" stroke="#64748b" fontSize={12} width={80} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number) => [`${value} days`, 'Avg Time']}
                 />
@@ -681,32 +681,32 @@ function RevenueForecast({ leads }: { leads: Lead[] }) {
 
 function ActivityMetrics({ leads, projects }: { leads: Lead[]; projects: Project[] }) {
   const today = new Date();
-  const last7Days = leads.filter(l => 
+  const last7Days = leads.filter(l =>
     l.lastContactDate && differenceInDays(today, new Date(l.lastContactDate)) <= 7
   );
-  const last30Days = leads.filter(l => 
+  const last30Days = leads.filter(l =>
     l.lastContactDate && differenceInDays(today, new Date(l.lastContactDate)) <= 30
   );
 
-  const recentlyCreatedLeads = leads.filter(l => 
+  const recentlyCreatedLeads = leads.filter(l =>
     l.createdAt && differenceInDays(today, new Date(l.createdAt)) <= 7
   );
 
-  const recentlyCreatedProjects = projects.filter(p => 
+  const recentlyCreatedProjects = projects.filter(p =>
     p.createdAt && differenceInDays(today, new Date(p.createdAt)) <= 7
   );
 
   const avgResponseTime = leads.length > 0
     ? Math.round(leads.reduce((sum, l) => {
-        if (!l.lastContactDate || !l.createdAt) return sum;
-        return sum + differenceInDays(new Date(l.lastContactDate), new Date(l.createdAt));
-      }, 0) / leads.length)
+      if (!l.lastContactDate || !l.createdAt) return sum;
+      return sum + differenceInDays(new Date(l.lastContactDate), new Date(l.createdAt));
+    }, 0) / leads.length)
     : 0;
 
   const activityByDay = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(today, 6 - i);
-    const dayLeads = leads.filter(l => 
-      l.lastContactDate && 
+    const dayLeads = leads.filter(l =>
+      l.lastContactDate &&
       format(new Date(l.lastContactDate), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
     );
     return {
@@ -724,30 +724,30 @@ function ActivityMetrics({ leads, projects }: { leads: Lead[]; projects: Project
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="Contacts (7d)" 
-          value={last7Days.length.toString()} 
+        <MetricCard
+          title="Contacts (7d)"
+          value={last7Days.length.toString()}
           subtitle="Leads touched this week"
           icon={Users}
           trend="neutral"
         />
-        <MetricCard 
-          title="Contacts (30d)" 
-          value={last30Days.length.toString()} 
+        <MetricCard
+          title="Contacts (30d)"
+          value={last30Days.length.toString()}
           subtitle="Leads touched this month"
           icon={Calendar}
           trend="neutral"
         />
-        <MetricCard 
-          title="New Leads (7d)" 
-          value={recentlyCreatedLeads.length.toString()} 
+        <MetricCard
+          title="New Leads (7d)"
+          value={recentlyCreatedLeads.length.toString()}
           subtitle="Added this week"
           icon={ArrowUpRight}
           trend={recentlyCreatedLeads.length > 0 ? "positive" : "neutral"}
         />
-        <MetricCard 
-          title="Avg Response" 
-          value={`${avgResponseTime}d`} 
+        <MetricCard
+          title="Avg Response"
+          value={`${avgResponseTime}d`}
           subtitle="Time to first contact"
           icon={Clock}
           trend={avgResponseTime < 3 ? "positive" : "negative"}
@@ -765,7 +765,7 @@ function ActivityMetrics({ leads, projects }: { leads: Lead[]; projects: Project
               <BarChart data={activityByDay}>
                 <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
                 <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number, name: string) => [
                     name === 'value' ? `$${value.toLocaleString()}` : value,
@@ -844,9 +844,9 @@ function ActivityMetrics({ leads, projects }: { leads: Lead[]; projects: Project
                   <span>Deals Won (7d)</span>
                 </div>
                 <span className="font-bold">
-                  {leads.filter(l => 
-                    l.dealStage === 'Closed Won' && 
-                    l.updatedAt && 
+                  {leads.filter(l =>
+                    l.dealStage === 'Closed Won' &&
+                    l.updatedAt &&
                     differenceInDays(today, new Date(l.updatedAt)) <= 7
                   ).length}
                 </span>
@@ -859,13 +859,13 @@ function ActivityMetrics({ leads, projects }: { leads: Lead[]; projects: Project
   );
 }
 
-function MetricCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
   trend,
-  highlight 
+  highlight
 }: {
   title: string;
   value: string;
@@ -914,7 +914,7 @@ interface ResearchInsightsData {
 
 function ResearchInsights() {
   const [refreshKey, setRefreshKey] = useState(0);
-  
+
   const { data, isLoading, isError, refetch, isFetching } = useQuery<ResearchInsightsData>({
     queryKey: ['/api/research/insights', refreshKey],
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -994,9 +994,9 @@ function ResearchInsights() {
             Strategic analysis of accumulated client and property research
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={handleRefresh} 
+        <Button
+          variant="outline"
+          onClick={handleRefresh}
           disabled={isFetching}
           data-testid="button-refresh-insights"
         >
@@ -1010,30 +1010,30 @@ function ResearchInsights() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="Total Research" 
-          value={(data?.totalResearchCount || 0).toString()} 
+        <MetricCard
+          title="Total Research"
+          value={(data?.totalResearchCount || 0).toString()}
           subtitle="Intelligence reports generated"
           icon={Brain}
           trend="neutral"
         />
-        <MetricCard 
-          title="Clients Researched" 
-          value={(data?.clientsResearched || 0).toString()} 
+        <MetricCard
+          title="Clients Researched"
+          value={(data?.clientsResearched || 0).toString()}
           subtitle="Unique leads analyzed"
           icon={Users}
           trend="neutral"
         />
-        <MetricCard 
-          title="Client Intel" 
-          value={(data?.researchByType?.client || 0).toString()} 
+        <MetricCard
+          title="Client Intel"
+          value={(data?.researchByType?.client || 0).toString()}
           subtitle="Margin protection insights"
           icon={Target}
           trend="neutral"
         />
-        <MetricCard 
-          title="Property Intel" 
-          value={(data?.researchByType?.property || 0).toString()} 
+        <MetricCard
+          title="Property Intel"
+          value={(data?.researchByType?.property || 0).toString()}
           subtitle="Site complexity scores"
           icon={Activity}
           trend="neutral"
@@ -1096,7 +1096,7 @@ function ResearchInsights() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   />
                   <Legend />
@@ -1121,11 +1121,13 @@ interface WinLossData {
   byValueBand: Array<{ band: string; won: number; lost: number; winRate: number }>;
   byLeadSource: Array<{ source: string; won: number; lost: number; winRate: number; totalValue: number }>;
   byMonth: Array<{ month: string; won: number; lost: number; winRate: number }>;
+  byLossReason?: Array<{ reason: string; count: number }>;
+  byWonReason?: Array<{ reason: string; count: number }>;
 }
 
 function WinLossAnalytics() {
   const [isRecalculating, setIsRecalculating] = useState(false);
-  
+
   const { data, isLoading, refetch } = useQuery<WinLossData>({
     queryKey: ["/api/analytics/win-loss"],
   });
@@ -1171,8 +1173,8 @@ function WinLossAnalytics() {
           <h3 className="text-lg font-semibold">Win/Loss Intelligence</h3>
           <p className="text-sm text-muted-foreground">Patterns from historical deal outcomes</p>
         </div>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           onClick={handleRecalculateProbabilities}
           disabled={isRecalculating}
           data-testid="button-recalculate-probabilities"
@@ -1187,36 +1189,36 @@ function WinLossAnalytics() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard 
-          title="Win Rate" 
+        <MetricCard
+          title="Win Rate"
           value={`${data.overall.winRate}%`}
           subtitle={`${data.overall.totalWon} won / ${data.overall.totalWon + data.overall.totalLost} closed`}
           icon={Trophy}
           trend={data.overall.winRate >= 50 ? "positive" : "negative"}
         />
-        <MetricCard 
-          title="Deals Won" 
+        <MetricCard
+          title="Deals Won"
           value={data.overall.totalWon.toString()}
           subtitle={`$${Math.round(data.overall.avgWonValue).toLocaleString()} avg`}
           icon={CheckCircle2}
           trend="positive"
         />
-        <MetricCard 
-          title="Deals Lost" 
+        <MetricCard
+          title="Deals Lost"
           value={data.overall.totalLost.toString()}
           subtitle={`$${Math.round(data.overall.avgLostValue).toLocaleString()} avg`}
           icon={AlertTriangle}
           trend="negative"
         />
-        <MetricCard 
-          title="Avg Won Value" 
+        <MetricCard
+          title="Avg Won Value"
           value={`$${Math.round(data.overall.avgWonValue).toLocaleString()}`}
           subtitle="Per closed won deal"
           icon={DollarSign}
           trend="positive"
         />
-        <MetricCard 
-          title="Avg Lost Value" 
+        <MetricCard
+          title="Avg Lost Value"
           value={`$${Math.round(data.overall.avgLostValue).toLocaleString()}`}
           subtitle="Per closed lost deal"
           icon={TrendingDown}
@@ -1236,7 +1238,7 @@ function WinLossAnalytics() {
                 <BarChart data={data.byBuildingType.slice(0, 8)} layout="vertical">
                   <XAxis type="number" domain={[0, 100]} stroke="#64748b" fontSize={12} tickFormatter={(v) => `${v}%`} />
                   <YAxis type="category" dataKey="type" stroke="#64748b" fontSize={11} width={100} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     formatter={(value: number, name: string) => [
                       name === 'winRate' ? `${value}%` : value,
@@ -1264,7 +1266,7 @@ function WinLossAnalytics() {
               <BarChart data={data.byValueBand}>
                 <XAxis dataKey="band" stroke="#64748b" fontSize={11} />
                 <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                   formatter={(value: number, name: string) => [
                     name === 'winRate' ? `${value}%` : value,
@@ -1288,7 +1290,7 @@ function WinLossAnalytics() {
                 <BarChart data={data.byLeadSource.slice(0, 6)} layout="vertical">
                   <XAxis type="number" domain={[0, 100]} stroke="#64748b" fontSize={12} tickFormatter={(v) => `${v}%`} />
                   <YAxis type="category" dataKey="source" stroke="#64748b" fontSize={11} width={100} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     formatter={(value: number, name: string) => [
                       name === 'winRate' ? `${value}%` : name === 'totalValue' ? `$${value.toLocaleString()}` : value,
@@ -1317,7 +1319,7 @@ function WinLossAnalytics() {
                 <BarChart data={data.byLeadSource.filter(s => s.totalValue > 0).sort((a, b) => b.totalValue - a.totalValue).slice(0, 8)}>
                   <XAxis dataKey="source" stroke="#64748b" fontSize={11} angle={-30} textAnchor="end" height={70} />
                   <YAxis stroke="#64748b" fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
                   />
@@ -1343,17 +1345,17 @@ function WinLossAnalytics() {
                 <LineChart data={data.byMonth}>
                   <XAxis dataKey="month" stroke="#64748b" fontSize={12} />
                   <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }}
                     formatter={(value: number, name: string) => [
                       name === 'winRate' ? `${value}%` : value,
                       name === 'winRate' ? 'Win Rate' : name === 'won' ? 'Won' : 'Lost'
                     ]}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="winRate" 
-                    stroke={CHART_COLORS.success} 
+                  <Line
+                    type="monotone"
+                    dataKey="winRate"
+                    stroke={CHART_COLORS.success}
                     strokeWidth={2}
                     dot={{ fill: CHART_COLORS.success }}
                   />
@@ -1366,6 +1368,79 @@ function WinLossAnalytics() {
             )}
           </CardContent>
         </Card>
+
+        {data.byLossReason && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Why We Lose</CardTitle>
+              <CardDescription>Top reasons for lost deals</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {data.byLossReason.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data.byLossReason}
+                      dataKey="count"
+                      nameKey="reason"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ reason, percent }) => `${reason} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {data.byLossReason.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  No loss reason data
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {data.byWonReason && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Why We Win</CardTitle>
+              <CardDescription>Key drivers for winning deals</CardDescription>
+            </CardHeader>
+            <CardContent className="h-[300px]">
+              {data.byWonReason.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data.byWonReason}
+                      dataKey="count"
+                      nameKey="reason"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ reason, percent }) => `${reason} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {data.byWonReason.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={Object.values(CHART_COLORS)[index % Object.values(CHART_COLORS).length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  No win reason data
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
       </div>
 
       <Card className="mt-6">

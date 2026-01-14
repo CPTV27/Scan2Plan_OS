@@ -120,7 +120,10 @@ const mockLead: Lead = {
   deletedAt: null,
   deletedBy: null,
   projectZipCode: null,
-  missingInfo: null
+  missingInfo: null,
+  closedAt: null,
+  lossReason: null,
+  wonReason: null
 };
 
 const mockDocuments: LeadDocument[] = [

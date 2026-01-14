@@ -6,13 +6,13 @@ async function getAccessToken(): Promise<string> {
   if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
     return connectionSettings.settings.access_token;
   }
-  
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
+  const xReplitToken = process.env.REPL_IDENTITY
+    ? 'repl ' + process.env.REPL_IDENTITY
+    : process.env.WEB_REPL_RENEWAL
+      ? 'depl ' + process.env.WEB_REPL_RENEWAL
+      : null;
 
   if (!xReplitToken) {
     throw new Error('Gmail authentication not available');
@@ -95,7 +95,7 @@ function getHeader(headers: gmail_v1.Schema$MessagePartHeader[] | undefined, nam
 
 function getBodyPreview(payload: gmail_v1.Schema$MessagePart | undefined, maxLength = 200): string {
   if (!payload) return '';
-  
+
   function extractText(part: gmail_v1.Schema$MessagePart): string {
     if (part.mimeType === 'text/plain' && part.body?.data) {
       return Buffer.from(part.body.data, 'base64').toString('utf-8');
@@ -108,14 +108,14 @@ function getBodyPreview(payload: gmail_v1.Schema$MessagePart | undefined, maxLen
     }
     return '';
   }
-  
+
   const text = extractText(payload);
   return text.substring(0, maxLength).replace(/\s+/g, ' ').trim();
 }
 
 function getBodyHtml(payload: gmail_v1.Schema$MessagePart | undefined): string | null {
   if (!payload) return null;
-  
+
   function extractHtml(part: gmail_v1.Schema$MessagePart): string | null {
     if (part.mimeType === 'text/html' && part.body?.data) {
       return Buffer.from(part.body.data, 'base64').toString('utf-8');
@@ -128,13 +128,13 @@ function getBodyHtml(payload: gmail_v1.Schema$MessagePart | undefined): string |
     }
     return null;
   }
-  
+
   return extractHtml(payload);
 }
 
 function getAttachmentInfo(payload: gmail_v1.Schema$MessagePart | undefined): { hasAttachments: boolean; names: string[] } {
   const names: string[] = [];
-  
+
   function findAttachments(part: gmail_v1.Schema$MessagePart): void {
     if (part.filename && part.body?.attachmentId) {
       names.push(part.filename);
@@ -143,11 +143,11 @@ function getAttachmentInfo(payload: gmail_v1.Schema$MessagePart | undefined): { 
       part.parts.forEach(findAttachments);
     }
   }
-  
+
   if (payload) {
     findAttachments(payload);
   }
-  
+
   return { hasAttachments: names.length > 0, names };
 }
 
@@ -158,14 +158,14 @@ export function parseMessage(msg: gmail_v1.Schema$Message, userEmail: string): P
   const cc = getHeader(headers, 'Cc');
   const subject = getHeader(headers, 'Subject');
   const date = getHeader(headers, 'Date');
-  
+
   const fromParsed = parseEmailAddress(from);
   const toEmails = parseEmailList(to);
   const ccEmails = parseEmailList(cc);
   const attachmentInfo = getAttachmentInfo(msg.payload);
-  
+
   const isInbound = !fromParsed.email.toLowerCase().includes(userEmail.toLowerCase());
-  
+
   return {
     gmailMessageId: msg.id || '',
     fromEmail: fromParsed.email,
@@ -190,7 +190,7 @@ export async function searchThreadsByEmail(gmail: gmail_v1.Gmail, email: string)
       q: query,
       maxResults: 50,
     });
-    
+
     return response.data.threads || [];
   } catch (error: any) {
     console.error('Gmail search error:', error.message);
@@ -208,26 +208,26 @@ export async function getThreadDetails(gmail: gmail_v1.Gmail, threadId: string, 
       id: threadId,
       format: 'full',
     });
-    
+
     const thread = response.data;
     if (!thread.messages || thread.messages.length === 0) {
       return null;
     }
-    
+
     const messages = thread.messages.map(m => parseMessage(m, userEmail));
     const allParticipants = new Set<string>();
     let hasAttachments = false;
-    
+
     messages.forEach(m => {
       allParticipants.add(m.fromEmail);
       m.toEmails.forEach(e => allParticipants.add(e));
       m.ccEmails.forEach(e => allParticipants.add(e));
       if (m.hasAttachments) hasAttachments = true;
     });
-    
+
     const firstMessage = messages[0];
     const lastMessage = messages[messages.length - 1];
-    
+
     return {
       gmailThreadId: thread.id || '',
       subject: firstMessage.subject,
@@ -248,3 +248,31 @@ export async function getUserEmail(gmail: gmail_v1.Gmail): Promise<string> {
   const profile = await gmail.users.getProfile({ userId: 'me' });
   return profile.data.emailAddress || '';
 }
+
+export async function sendEmail(gmail: gmail_v1.Gmail, to: string, subject: string, body: string): Promise<{ messageId: string | null; threadId: string | null }> {
+  try {
+    const email = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      body,
+    ].join('\r\n');
+
+    const encodedEmail = Buffer.from(email).toString('base64url');
+
+    const response = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: encodedEmail },
+    });
+
+    return {
+      messageId: response.data.id || null,
+      threadId: response.data.threadId || null
+    };
+  } catch (error: any) {
+    console.error('Gmail send error:', error.message);
+    throw error;
+  }
+}
+

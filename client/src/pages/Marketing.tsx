@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
+import {
   Copy, Check, Linkedin, Twitter, Instagram, Mail,
   Megaphone, BarChart3, MessageSquare, Sparkles, Clock,
   ChevronRight, Trash2, Edit2, Eye, Plus, Star, ExternalLink, Lightbulb
@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { format } from "date-fns";
 import type { MarketingPost, EvidenceVaultEntry } from "@shared/schema";
+import { SequenceManager } from "@/features/sequences/components/SequenceManager";
 
 const PLATFORM_ICONS: Record<string, React.ReactNode> = {
   linkedin: <Linkedin className="h-4 w-4" />,
@@ -48,7 +49,7 @@ export default function Marketing() {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
         <main className="flex-1 p-4 md:p-8 overflow-auto">
@@ -71,6 +72,10 @@ export default function Marketing() {
                 <Sparkles className="h-4 w-4 mr-2" />
                 Evidence Vault
               </TabsTrigger>
+              <TabsTrigger value="sequences" data-testid="tab-sequences">
+                <Mail className="h-4 w-4 mr-2" />
+                Sequences
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="queue" className="space-y-6">
@@ -84,6 +89,10 @@ export default function Marketing() {
 
             <TabsContent value="evidence" className="space-y-6">
               <EvidenceVaultSection />
+            </TabsContent>
+
+            <TabsContent value="sequences" className="space-y-6">
+              <SequenceManager />
             </TabsContent>
           </Tabs>
         </main>
@@ -180,7 +189,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
         <h3 className="text-lg font-semibold">{title}</h3>
         <Badge variant="secondary">{posts.length} posts</Badge>
       </div>
-      
+
       <div className="grid gap-4 md:grid-cols-2">
         {posts.map((post) => (
           <Card key={post.id} data-testid={`card-post-${post.id}`}>
@@ -213,12 +222,12 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                 </CardDescription>
               )}
             </CardHeader>
-            
+
             <CardContent>
               <div className="bg-muted/50 rounded-md p-3 text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
                 {post.content}
               </div>
-              
+
               {post.savingsAmount && Number(post.savingsAmount) > 0 && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                   <span>Potential savings highlighted:</span>
@@ -228,7 +237,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                 </div>
               )}
             </CardContent>
-            
+
             <CardFooter className="flex flex-wrap gap-2 pt-3 border-t">
               <Button
                 size="sm"
@@ -242,7 +251,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                   <><Copy className="h-4 w-4 mr-1" /> Copy</>
                 )}
               </Button>
-              
+
               {status === 'draft' && (
                 <Button
                   size="sm"
@@ -254,7 +263,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                   <Check className="h-4 w-4 mr-1" /> Approve
                 </Button>
               )}
-              
+
               {status === 'approved' && (
                 <Button
                   size="sm"
@@ -265,7 +274,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                   <Megaphone className="h-4 w-4 mr-1" /> Mark Posted
                 </Button>
               )}
-              
+
               {status !== 'posted' && (
                 <Button
                   size="sm"
@@ -278,7 +287,7 @@ function ContentQueue({ status, title }: { status: string; title: string }) {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               )}
-              
+
               {post.createdAt && (
                 <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
                   <Clock className="h-3 w-3" />
@@ -321,11 +330,10 @@ function EWSStars({ score }: { score: number }) {
       {[1, 2, 3, 4, 5].map((s) => (
         <Star
           key={s}
-          className={`h-4 w-4 ${
-            s <= score
+          className={`h-4 w-4 ${s <= score
               ? 'fill-amber-400 text-amber-400'
               : 'text-muted-foreground/30'
-          }`}
+            }`}
         />
       ))}
     </div>
@@ -551,8 +559,8 @@ function EvidenceVaultSection() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button 
-                onClick={handleSubmit} 
+              <Button
+                onClick={handleSubmit}
                 disabled={createMutation.isPending || updateMutation.isPending}
                 data-testid="button-save-hook"
               >

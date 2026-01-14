@@ -77,7 +77,7 @@ export interface ProbabilityFactors {
 export function calculateProbability(lead: Lead): ProbabilityFactors {
   // Start with stage baseline
   const stageBaseline = STAGE_BASELINES[lead.dealStage] ?? 20;
-  
+
   // Skip calculation for closed deals
   if (lead.dealStage === 'Closed Won') {
     return {
@@ -93,7 +93,7 @@ export function calculateProbability(lead: Lead): ProbabilityFactors {
       daysSinceContact: 0,
     };
   }
-  
+
   if (lead.dealStage === 'Closed Lost') {
     return {
       stageBaseline: 0,
@@ -193,8 +193,8 @@ export function getStageSpecificStaleness(stage: string, lastContactDate: Date |
   threshold: { aging: number; stale: number; critical: number };
 } {
   if (!lastContactDate) {
-    return { 
-      daysOld: 0, 
+    return {
+      daysOld: 0,
       status: 'fresh',
       threshold: STAGE_STALENESS[stage] || STAGE_STALENESS['Proposal']
     };
@@ -226,11 +226,11 @@ export async function recalculateAllProbabilities(): Promise<{ updated: number; 
   for (const lead of allLeads) {
     const factors = calculateProbability(lead);
     const oldProb = lead.probability || 0;
-    
+
     if (factors.finalScore !== oldProb) {
       await db
         .update(leads)
-        .set({ 
+        .set({
           probability: factors.finalScore,
           updatedAt: new Date()
         })
@@ -255,9 +255,11 @@ export async function getWinLossAnalytics(): Promise<{
   byValueBand: Array<{ band: string; won: number; lost: number; winRate: number }>;
   byLeadSource: Array<{ source: string; won: number; lost: number; winRate: number; totalValue: number }>;
   byMonth: Array<{ month: string; won: number; lost: number; winRate: number }>;
+  byLossReason: Array<{ reason: string; count: number }>;
+  byWonReason: Array<{ reason: string; count: number }>;
 }> {
   const allLeads = await db.select().from(leads);
-  
+
   const wonLeads = allLeads.filter(l => l.dealStage === 'Closed Won');
   const lostLeads = allLeads.filter(l => l.dealStage === 'Closed Lost');
 
@@ -335,11 +337,12 @@ export async function getWinLossAnalytics(): Promise<{
     totalValue: stats.totalValue,
   })).sort((a, b) => b.totalValue - a.totalValue);
 
-  // By month (last 12 months)
+  // By month (based on closedAt if available, else updatedAt)
   const monthStats = new Map<string, { won: number; lost: number }>();
   for (const lead of [...wonLeads, ...lostLeads]) {
-    if (!lead.createdAt) continue;
-    const date = new Date(lead.createdAt);
+    const dateStr = lead.closedAt || lead.updatedAt || lead.createdAt;
+    if (!dateStr) continue;
+    const date = new Date(dateStr);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const stats = monthStats.get(monthKey) || { won: 0, lost: 0 };
     if (lead.dealStage === 'Closed Won') stats.won++;
@@ -356,11 +359,33 @@ export async function getWinLossAnalytics(): Promise<{
     .sort((a, b) => a.month.localeCompare(b.month))
     .slice(-12);
 
+  // By Loss Reason
+  const lossReasonStats = new Map<string, number>();
+  for (const lead of lostLeads) {
+    const reason = lead.lossReason || 'Unknown';
+    lossReasonStats.set(reason, (lossReasonStats.get(reason) || 0) + 1);
+  }
+  const byLossReason = Array.from(lossReasonStats.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // By Won Reason
+  const wonReasonStats = new Map<string, number>();
+  for (const lead of wonLeads) {
+    const reason = lead.wonReason || 'Unknown';
+    wonReasonStats.set(reason, (wonReasonStats.get(reason) || 0) + 1);
+  }
+  const byWonReason = Array.from(wonReasonStats.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count);
+
   return {
     overall: { totalWon, totalLost, winRate, avgWonValue, avgLostValue },
     byBuildingType,
     byValueBand,
     byLeadSource,
     byMonth,
+    byLossReason,
+    byWonReason,
   };
 }

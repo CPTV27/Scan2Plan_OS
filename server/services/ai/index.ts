@@ -4,4 +4,5 @@ export { analyzeDeal, type DealIntelligenceResult, type DealRisk, type PricingSt
 export { extractFromDocument, type DocumentExtractionResult, type ExtractedRequirement, type RiskFlag, type ContactInfo } from "./documentIntelligence";
 export { processCPQChat, type CPQChatResult, type ExtractedCPQData, type ChatMessage } from "./naturalLanguageCPQ";
 export { generateProposal, type ProposalResult, type ProposalSection } from "./proposalGenerator";
-export { findSimilarProjects, createProjectSummary, type ProjectMatchResult, type SimilarProject } from "./projectMatcher";
+export { findSimilarProjects, createProjectSummary, findMatchingCaseStudies, type ProjectMatchResult, type SimilarProject } from "./projectMatcher";
+export { getAIContext, formatContextForPrompt, type AIContext } from "./contextEngine";

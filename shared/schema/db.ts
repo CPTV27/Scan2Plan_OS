@@ -46,6 +46,9 @@ export const leads = pgTable("leads", {
   dealStage: text("deal_stage").notNull().default("Leads"), // Leads, Contacted, Proposal, Negotiation, On Hold, Closed Won, Closed Lost
   probability: integer("probability").default(0), // 0-100
   lastContactDate: timestamp("last_contact_date").defaultNow(),
+  closedAt: timestamp("closed_at"), // When deal was won/lost
+  lossReason: text("loss_reason"), // Why was the deal lost?
+  wonReason: text("won_reason"), // Why was the deal won?
   notes: text("notes"),
   // Payment & Retainer Status
   retainerPaid: boolean("retainer_paid").default(false), // Tracks if retainer has been received
@@ -178,6 +181,48 @@ export const leads = pgTable("leads", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// === MARKETING SEQUENCES ===
+export const sequences = pgTable("sequences", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // e.g., "New Lead Nurture"
+  description: text("description"),
+  triggerType: text("trigger_type").default("manual"), // manual, stage_change, form_submission
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const sequenceSteps = pgTable("sequence_steps", {
+  id: serial("id").primaryKey(),
+  sequenceId: integer("sequence_id").references(() => sequences.id).notNull(),
+  stepOrder: integer("step_order").notNull(), // 1, 2, 3...
+  delayDays: integer("delay_days").default(0), // Days to wait after previous step
+  type: text("type").notNull().default("email"), // email, task, sms
+  subject: text("subject"), // For emails
+  content: text("content"), // Email body or task description
+  templateId: text("template_id"), // Optional link to a template
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const sequenceEnrollments = pgTable("sequence_enrollments", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  sequenceId: integer("sequence_id").references(() => sequences.id).notNull(),
+  currentStep: integer("current_step").default(1),
+  status: text("status").default("active"), // active, completed, paused, cancelled
+  nextExecutionAt: timestamp("next_execution_at"), // When the next step should run
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertSequenceSchema = createInsertSchema(sequences);
+export const insertSequenceStepSchema = createInsertSchema(sequenceSteps);
+export const insertSequenceEnrollmentSchema = createInsertSchema(sequenceEnrollments);
+export type Sequence = typeof sequences.$inferSelect;
+export type SequenceStep = typeof sequenceSteps.$inferSelect;
+export type SequenceEnrollment = typeof sequenceEnrollments.$inferSelect;
+
 // === DEAL ATTRIBUTIONS (Marketing Influence "Assist" Tracker) ===
 export const dealAttributions = pgTable("deal_attributions", {
   id: serial("id").primaryKey(),

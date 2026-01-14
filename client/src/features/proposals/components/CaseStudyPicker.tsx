@@ -16,8 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import {
     Search, FileText, Quote, BarChart3, Check, Copy,
-    ChevronRight, Building2, Award
+    ChevronRight, Building2, Award, Sparkles
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CaseStudy, CaseStudySnippet } from "@shared/schema";
 
 interface CaseStudyWithSnippets extends CaseStudy {
@@ -28,6 +29,7 @@ interface CaseStudyPickerProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onInsert: (content: string, type: "full" | "snippet") => void;
+    leadId?: number;
 }
 
 const SNIPPET_ICONS: Record<string, typeof Quote> = {
@@ -37,7 +39,7 @@ const SNIPPET_ICONS: Record<string, typeof Quote> = {
     result: Award,
 };
 
-export function CaseStudyPicker({ open, onOpenChange, onInsert }: CaseStudyPickerProps) {
+export function CaseStudyPicker({ open, onOpenChange, onInsert, leadId }: CaseStudyPickerProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedStudy, setSelectedStudy] = useState<CaseStudyWithSnippets | null>(null);
     const [selectedSnippetId, setSelectedSnippetId] = useState<number | null>(null);
@@ -54,6 +56,17 @@ export function CaseStudyPicker({ open, onOpenChange, onInsert }: CaseStudyPicke
             return res.json();
         },
         enabled: open,
+    });
+
+    // Fetch recommendations
+    const { data: recData, isLoading: loadingRecs } = useQuery<{ recommendations: CaseStudy[], pricingBenchmarks: any }>({
+        queryKey: ["/api/case-studies/recommend", leadId],
+        queryFn: async () => {
+            const res = await fetch(`/api/case-studies/recommend/${leadId}`, { credentials: "include" });
+            if (!res.ok) throw new Error("Failed to fetch recommendations");
+            return res.json();
+        },
+        enabled: open && !!leadId,
     });
 
     // Fetch selected case study with snippets
@@ -111,68 +124,82 @@ export function CaseStudyPicker({ open, onOpenChange, onInsert }: CaseStudyPicke
                 <div className="grid grid-cols-2 gap-4 h-[500px]">
                     {/* Left: Case Study List */}
                     <div className="space-y-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search case studies..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
+                        <Tabs defaultValue={leadId ? "recommended" : "all"} className="h-full">
+                            <div className="flex items-center justify-between mb-4">
+                                <TabsList className="w-full">
+                                    {leadId && (
+                                        <TabsTrigger value="recommended" className="flex-1">
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Smart Match
+                                        </TabsTrigger>
+                                    )}
+                                    <TabsTrigger value="all" className="flex-1">All Case Studies</TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                        <ScrollArea className="h-[440px]">
-                            {isLoading ? (
-                                <div className="space-y-2">
-                                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
-                                </div>
-                            ) : caseStudies?.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">No case studies found</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 pr-2">
-                                    {caseStudies?.map((study) => (
-                                        <Card
-                                            key={study.id}
-                                            className={`cursor-pointer transition-colors ${selectedStudy?.id === study.id
-                                                    ? "border-primary bg-primary/5"
-                                                    : "hover:bg-muted/50"
-                                                }`}
-                                            onClick={() => handleSelectStudy(study)}
-                                        >
-                                            <CardContent className="p-3">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <h4 className="font-medium text-sm truncate">{study.title}</h4>
-                                                            {selectedStudy?.id === study.id && (
-                                                                <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                                                            )}
-                                                        </div>
-                                                        {study.clientName && (
-                                                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                                <Building2 className="h-3 w-3" />
-                                                                {study.clientName}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex flex-wrap gap-1 mt-1">
-                                                            {study.tags?.slice(0, 2).map(tag => (
-                                                                <Badge key={tag} variant="outline" className="text-[10px] px-1 py-0">
-                                                                    {tag}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            )}
-                        </ScrollArea>
+                            <div className="relative mb-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search case studies..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10"
+                                />
+                            </div>
+
+                            <TabsContent value="recommended" className="m-0 h-[380px]">
+                                <ScrollArea className="h-full">
+                                    {loadingRecs ? (
+                                        <div className="space-y-2">
+                                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}
+                                        </div>
+                                    ) : recData?.recommendations?.length === 0 ? (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            <Sparkles className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                            <p className="text-sm">No smart recommendations found</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 pr-2">
+                                            {recData?.recommendations.map((study) => (
+                                                <StudyCard
+                                                    key={study.id}
+                                                    study={study}
+                                                    isSelected={selectedStudy?.id === study.id}
+                                                    onClick={() => handleSelectStudy(study)}
+                                                    isRecommended
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </ScrollArea>
+                            </TabsContent>
+
+                            <TabsContent value="all" className="m-0 h-[380px]">
+                                <ScrollArea className="h-full">
+                                    {isLoading ? (
+                                        <div className="space-y-2">
+                                            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}
+                                        </div>
+                                    ) : caseStudies?.length === 0 ? (
+                                        <div className="text-center py-8 text-muted-foreground">
+                                            <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                            <p className="text-sm">No case studies found</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 pr-2">
+                                            {caseStudies?.map((study) => (
+                                                <StudyCard
+                                                    key={study.id}
+                                                    study={study}
+                                                    isSelected={selectedStudy?.id === study.id}
+                                                    onClick={() => handleSelectStudy(study)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </ScrollArea>
+                            </TabsContent>
+                        </Tabs>
                     </div>
 
                     {/* Right: Preview & Snippets */}
@@ -332,4 +359,54 @@ function formatSnippet(snippet: CaseStudySnippet, study: CaseStudyWithSnippets):
         default:
             return snippet.content;
     }
+}
+
+function StudyCard({ study, isSelected, onClick, isRecommended }: {
+    study: CaseStudy,
+    isSelected: boolean,
+    onClick: () => void,
+    isRecommended?: boolean
+}) {
+    return (
+        <Card
+            className={`cursor-pointer transition-colors ${isSelected
+                ? "border-primary bg-primary/5"
+                : "hover:bg-muted/50"
+                }`}
+            onClick={onClick}
+        >
+            <CardContent className="p-3">
+                <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-sm truncate">{study.title}</h4>
+                            {isRecommended && (
+                                <Badge variant="secondary" className="px-1 py-0 text-[10px] h-4">
+                                    <Sparkles className="w-2 h-2 mr-1" />
+                                    Match
+                                </Badge>
+                            )}
+                            {isSelected && (
+                                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
+                        </div>
+                        {study.clientName && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                {study.clientName}
+                            </p>
+                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {study.tags?.slice(0, 2).map(tag => (
+                                <Badge key={tag} variant="outline" className="text-[10px] px-1 py-0">
+                                    {tag}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </div>
+            </CardContent>
+        </Card>
+    );
 }

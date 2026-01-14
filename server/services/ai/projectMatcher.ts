@@ -1,6 +1,9 @@
 import { aiClient } from "./aiClient";
 import { log } from "../../lib/logger";
-import type { Lead } from "@shared/schema";
+import type { Lead, CaseStudy } from "@shared/schema";
+import { db } from "../../db";
+import { caseStudies } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface SimilarProject {
   leadId: number;
@@ -34,24 +37,24 @@ export interface ProjectMatchResult {
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
-  
+
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
-  
+
   for (let i = 0; i < a.length; i++) {
     dotProduct += a[i] * b[i];
     normA += a[i] * a[i];
     normB += b[i] * b[i];
   }
-  
+
   const denominator = Math.sqrt(normA) * Math.sqrt(normB);
   return denominator === 0 ? 0 : dotProduct / denominator;
 }
 
 export function createProjectSummary(lead: Lead): string {
   const parts: string[] = [];
-  
+
   if (lead.projectName) parts.push(`Project: ${lead.projectName}`);
   if (lead.buildingType) parts.push(`Building type: ${lead.buildingType}`);
   if (lead.sqft) parts.push(`Size: ${lead.sqft} sqft`);
@@ -62,7 +65,7 @@ export function createProjectSummary(lead: Lead): string {
     if (state) parts.push(`Location: ${state}`);
   }
   if (lead.notes) parts.push(`Notes: ${lead.notes.slice(0, 200)}`);
-  
+
   return parts.join(". ");
 }
 
@@ -153,19 +156,19 @@ export async function findSimilarProjects(
     }));
 
   const similarTypeProjects = wonProjects.filter(
-    (l) => l.buildingType === targetLead.buildingType || 
-           (targetLead.sqft && l.sqft && Math.abs(Number(l.sqft) - Number(targetLead.sqft)) < 20000)
+    (l) => l.buildingType === targetLead.buildingType ||
+      (targetLead.sqft && l.sqft && Math.abs(Number(l.sqft) - Number(targetLead.sqft)) < 20000)
   );
 
   const pricingBenchmarks = similarTypeProjects.length >= 3
     ? {
-        averageValue: Math.round(
-          similarTypeProjects.reduce((sum, l) => sum + Number(l.value || 0), 0) / similarTypeProjects.length
-        ),
-        minValue: Math.min(...similarTypeProjects.map((l) => Number(l.value || 0))),
-        maxValue: Math.max(...similarTypeProjects.map((l) => Number(l.value || 0))),
-        sampleSize: similarTypeProjects.length,
-      }
+      averageValue: Math.round(
+        similarTypeProjects.reduce((sum, l) => sum + Number(l.value || 0), 0) / similarTypeProjects.length
+      ),
+      minValue: Math.min(...similarTypeProjects.map((l) => Number(l.value || 0))),
+      maxValue: Math.max(...similarTypeProjects.map((l) => Number(l.value || 0))),
+      sampleSize: similarTypeProjects.length,
+    }
     : null;
 
   log(`[Project Matcher] Found ${scoredProjects.length} similar projects, ${recommendedCaseStudies.length} case studies`);
@@ -231,7 +234,7 @@ function fallbackMatching(target: Lead, candidates: Lead[], maxResults: number):
 
 function getMatchReasons(target: Lead, candidate: Lead): string[] {
   const reasons: string[] = [];
-  
+
   if (candidate.buildingType === target.buildingType && target.buildingType) {
     reasons.push(`Same building type: ${target.buildingType}`);
   }
@@ -242,6 +245,63 @@ function getMatchReasons(target: Lead, candidate: Lead): string[] {
   if (candidate.scope === target.scope) {
     reasons.push("Same scope");
   }
-  
+
   return reasons.length > 0 ? reasons : ["Similar project profile"];
+}
+
+export async function findMatchingCaseStudies(
+  targetLead: Lead,
+  maxResults: number = 3
+): Promise<{ recommendations: CaseStudy[], pricingBenchmarks: any }> {
+  // 1. Fetch all active case studies
+  const allCaseStudies = await db.select().from(caseStudies).where(eq(caseStudies.isActive, true));
+
+  if (allCaseStudies.length === 0) {
+    return { recommendations: [], pricingBenchmarks: null };
+  }
+
+  // 2. Embed Target Lead
+  let rankedStudies: { study: CaseStudy; score: number }[] = [];
+
+  if (aiClient.isConfigured()) {
+    try {
+      const targetSummary = createProjectSummary(targetLead);
+      const targetEmbedding = await aiClient.embed(targetSummary);
+
+      if (targetEmbedding) {
+        // Embed & Compare each Case Study
+        // Note: In production, we should cache embeddings for Case Studies
+        for (const study of allCaseStudies) {
+          const studyContent = `${study.title}. ${study.blurb}. Tags: ${study.tags?.join(", ")}. Client: ${study.clientName}`;
+          const studyEmbedding = await aiClient.embed(studyContent);
+
+          if (studyEmbedding) {
+            const score = cosineSimilarity(targetEmbedding.embedding, studyEmbedding.embedding);
+            rankedStudies.push({ study, score });
+          }
+        }
+
+        rankedStudies.sort((a, b) => b.score - a.score);
+      }
+    } catch (e) {
+      log(`WARN: [Case Study Matcher] Embedding failed: ${(e as Error).message}`);
+    }
+  }
+
+  // Fallback: Tag Matching if AI fails or returns no results
+  if (rankedStudies.length === 0) {
+    rankedStudies = allCaseStudies.map(study => {
+      let score = 0;
+      if (study.tags?.some(tag => targetLead.buildingType?.toLowerCase().includes(tag.toLowerCase()))) score += 30;
+      if (study.tags?.some(tag => targetLead.scope?.toLowerCase().includes(tag.toLowerCase()))) score += 20;
+      return { study, score };
+    }).sort((a, b) => b.score - a.score);
+  }
+
+  const recommendations = rankedStudies.slice(0, maxResults).map(r => r.study);
+
+  // Benchmarks (placeholder logic for now, as CaseStudy doesn't natively hold raw pricing data like Projects)
+  const pricingBenchmarks = null;
+
+  return { recommendations, pricingBenchmarks };
 }

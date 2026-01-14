@@ -37,6 +37,8 @@ import { customersRouter } from "./routes/customers";
 import { productsRouter } from "./routes/products";
 import { proposalTemplatesRouter, proposalTemplateGroupsRouter, generatedProposalsRouter } from "./routes/proposalTemplates";
 import { githubActionsRouter } from "./routes/githubActions";
+import { sequencesRouter, initSequenceScheduler } from "./routes/sequences";
+
 
 export async function registerRoutes(
   httpServer: Server,
@@ -126,6 +128,11 @@ export async function registerRoutes(
   app.use("/api/proposal-template-groups", proposalTemplateGroupsRouter);
   app.use("/api/generated-proposals", generatedProposalsRouter);
   app.use(githubActionsRouter);  // CI trigger endpoints
+
+  // Sequences & Automation
+  app.use(sequencesRouter);
+  initSequenceScheduler();
+
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

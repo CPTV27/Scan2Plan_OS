@@ -95,7 +95,7 @@ import { Label } from "@/components/ui/label";
 import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
-import { Brain, Paperclip, Download, Eye, Link2, Copy, CheckCircle2, FileSignature, ChevronRight } from "lucide-react";
+import { Brain, Paperclip, Download, Eye, Link2, Copy, CheckCircle2, FileSignature, ChevronRight, Activity } from "lucide-react";
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { Slider } from "@/components/ui/slider";
@@ -108,9 +108,11 @@ import {
 import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
 import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
+import { EngagementTab } from "@/features/deals/components/EngagementTab";
 import QuoteConfigurator from "@/features/cpq/QuoteConfigurator";
 import { CpqImportModal } from "@/features/cpq/CpqImportModal";
 import type { MappedConfiguratorData, CpqExportData } from "@/features/cpq/cpqImportUtils";
+import { EnrollSequenceDialog } from "@/features/sequences/components/EnrollSequenceDialog";
 
 import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
@@ -162,6 +164,7 @@ export default function DealWorkspace() {
   const [quoteBuilderMode, setQuoteBuilderMode] = useState<'simple' | 'advanced'>('simple');
   const [showCpqImportModal, setShowCpqImportModal] = useState(false);
   const [importedCpqData, setImportedCpqData] = useState<MappedConfiguratorData | null>(null);
+  const [showEnrollDialog, setShowEnrollDialog] = useState(false);
 
   // Shared quote configuration state - synced between Simple and Advanced modes
   const [sharedConfig, setSharedConfig] = useState<SharedQuoteConfig>({
@@ -776,6 +779,18 @@ export default function DealWorkspace() {
             </Button>
           )}
 
+          {/* Enroll in Sequence Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowEnrollDialog(true)}
+            data-testid="button-enroll-sequence"
+          >
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Enroll</span>
+          </Button>
+
           {/* Files Status Badge - Always show to indicate folder state */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -955,6 +970,10 @@ export default function DealWorkspace() {
               <Paperclip className="w-4 h-4" />
               Documents
             </TabsTrigger>
+            <TabsTrigger value="engagement" className="gap-2" data-testid="tab-engagement">
+              <Activity className="w-4 h-4" />
+              Engagement
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -1083,6 +1102,13 @@ export default function DealWorkspace() {
           </ErrorBoundary>
         </TabsContent>
 
+        {/* Engagement Tab */}
+        <TabsContent value="engagement" className="flex-1 overflow-auto m-0">
+          <ErrorBoundary fallbackTitle="Engagement Tab Error" fallbackMessage="Failed to load engagement tracking. Please try refreshing.">
+            <EngagementTab leadId={leadId} />
+          </ErrorBoundary>
+        </TabsContent>
+
         {/* PandaDoc Tab - Document editing and signature */}
         <TabsContent value="pandadoc" className="flex-1 overflow-auto m-0">
           <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
@@ -1126,6 +1152,12 @@ export default function DealWorkspace() {
           setViewingQuote(null);
           handleTabChange("quote");
         }}
+      />
+
+      <EnrollSequenceDialog
+        leadId={leadId}
+        open={showEnrollDialog}
+        onOpenChange={setShowEnrollDialog}
       />
 
       {/* CPQ Import Modal */}
