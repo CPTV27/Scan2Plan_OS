@@ -1,37 +1,342 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
-import { Users, TrendingUp, AlertTriangle, DollarSign, Target, Loader2, Newspaper, Building, Gavel, Eye, ExternalLink, Settings } from "lucide-react";
-import type { Lead, IntelNewsItem } from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  Target, Loader2, Gavel, Eye, ExternalLink, Building, Cpu, 
+  Banknote, Calendar, Users, TrendingUp, Pencil, Check, X, 
+  RefreshCw, ChevronDown, Rss, Webhook
+} from "lucide-react";
+import type { IntelNewsItem, IntelFeedSource } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
-interface CompetitorData {
-  name: string;
-  region: string;
-  pricingTier: "Budget" | "Mid-Range" | "Premium";
-  services: string[];
-  gaps: string[];
+const FEED_CONFIG: Record<string, { 
+  icon: typeof Target; 
+  description: string;
+  cardClass: string;
+  iconClass: string;
+  borderClass: string;
+  itemClass: string;
+  ringClass: string;
+}> = {
+  opportunity: { 
+    icon: Target, 
+    description: "RFPs and bidding opportunities",
+    cardClass: "border-green-500/20 bg-green-500/5",
+    iconClass: "text-green-500",
+    borderClass: "border-green-500/20",
+    itemClass: "border-green-500/20 bg-green-500/5",
+    ringClass: "ring-green-500/40"
+  },
+  policy: { 
+    icon: Gavel, 
+    description: "Regulatory and policy updates",
+    cardClass: "border-amber-500/20 bg-amber-500/5",
+    iconClass: "text-amber-500",
+    borderClass: "border-amber-500/20",
+    itemClass: "border-amber-500/20 bg-amber-500/5",
+    ringClass: "ring-amber-500/40"
+  },
+  competitor: { 
+    icon: Eye, 
+    description: "Competitor news and movements",
+    cardClass: "border-red-500/20 bg-red-500/5",
+    iconClass: "text-red-500",
+    borderClass: "border-red-500/20",
+    itemClass: "border-red-500/20 bg-red-500/5",
+    ringClass: "ring-red-500/40"
+  },
+  project: { 
+    icon: Building, 
+    description: "New construction projects",
+    cardClass: "border-blue-500/20 bg-blue-500/5",
+    iconClass: "text-blue-500",
+    borderClass: "border-blue-500/20",
+    itemClass: "border-blue-500/20 bg-blue-500/5",
+    ringClass: "ring-blue-500/40"
+  },
+  technology: { 
+    icon: Cpu, 
+    description: "Scanning and BIM tech news",
+    cardClass: "border-purple-500/20 bg-purple-500/5",
+    iconClass: "text-purple-500",
+    borderClass: "border-purple-500/20",
+    itemClass: "border-purple-500/20 bg-purple-500/5",
+    ringClass: "ring-purple-500/40"
+  },
+  funding: { 
+    icon: Banknote, 
+    description: "Grants and funding opportunities",
+    cardClass: "border-emerald-500/20 bg-emerald-500/5",
+    iconClass: "text-emerald-500",
+    borderClass: "border-emerald-500/20",
+    itemClass: "border-emerald-500/20 bg-emerald-500/5",
+    ringClass: "ring-emerald-500/40"
+  },
+  event: { 
+    icon: Calendar, 
+    description: "Industry events and conferences",
+    cardClass: "border-orange-500/20 bg-orange-500/5",
+    iconClass: "text-orange-500",
+    borderClass: "border-orange-500/20",
+    itemClass: "border-orange-500/20 bg-orange-500/5",
+    ringClass: "ring-orange-500/40"
+  },
+  talent: { 
+    icon: Users, 
+    description: "Hiring trends and talent market",
+    cardClass: "border-pink-500/20 bg-pink-500/5",
+    iconClass: "text-pink-500",
+    borderClass: "border-pink-500/20",
+    itemClass: "border-pink-500/20 bg-pink-500/5",
+    ringClass: "ring-pink-500/40"
+  },
+  market: { 
+    icon: TrendingUp, 
+    description: "Market trends and analysis",
+    cardClass: "border-cyan-500/20 bg-cyan-500/5",
+    iconClass: "text-cyan-500",
+    borderClass: "border-cyan-500/20",
+    itemClass: "border-cyan-500/20 bg-cyan-500/5",
+    ringClass: "ring-cyan-500/40"
+  },
+};
+
+function FeedCard({ 
+  source, 
+  items, 
+  isLoading,
+  onUpdate,
+  onSync,
+  onMarkRead 
+}: { 
+  source: IntelFeedSource;
+  items: IntelNewsItem[];
+  isLoading: boolean;
+  onUpdate: (id: number, data: Partial<IntelFeedSource>) => void;
+  onSync: (id: number) => void;
+  onMarkRead: (id: number) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedPrompt, setEditedPrompt] = useState(source.config?.searchPrompt || "");
+  const [isExpanded, setIsExpanded] = useState(true);
+  
+  const targetType = source.config?.targetType || "opportunity";
+  const config = FEED_CONFIG[targetType] || FEED_CONFIG.opportunity;
+  const Icon = config.icon;
+  
+  const handleSave = () => {
+    onUpdate(source.id, {
+      config: { ...(source.config || {}), searchPrompt: editedPrompt }
+    });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedPrompt(source.config?.searchPrompt || "");
+    setIsEditing(false);
+  };
+
+  return (
+    <Card 
+      className={config.cardClass} 
+      data-testid={`card-feed-${targetType}`}
+    >
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Icon className={`w-5 h-5 ${config.iconClass}`} />
+              {source.name}
+              {items.length > 0 && (
+                <Badge variant="secondary" className="text-xs">{items.length}</Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={source.isActive ?? true}
+                onCheckedChange={(checked) => onUpdate(source.id, { isActive: checked })}
+                data-testid={`switch-feed-${source.id}`}
+              />
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </div>
+          <CardDescription className="flex items-center gap-2">
+            {config.description}
+            <Badge variant="outline" className="text-xs">
+              {source.type === "rss" ? <Rss className="w-3 h-3 mr-1" /> : <Webhook className="w-3 h-3 mr-1" />}
+              {source.type.toUpperCase()}
+            </Badge>
+          </CardDescription>
+        </CardHeader>
+        
+        <CollapsibleContent>
+          <CardContent className="space-y-3">
+            <div className={`p-3 rounded-lg border ${config.borderClass} bg-background/50`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">Search Prompt</span>
+                <div className="flex items-center gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSave}>
+                        <Check className="w-3 h-3 text-green-500" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancel}>
+                        <X className="w-3 h-3 text-red-500" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6" 
+                      onClick={() => setIsEditing(true)}
+                      data-testid={`button-edit-prompt-${source.id}`}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {isEditing ? (
+                <Textarea
+                  value={editedPrompt}
+                  onChange={(e) => setEditedPrompt(e.target.value)}
+                  className="text-xs min-h-[80px]"
+                  placeholder="Enter search prompt for this feed..."
+                  data-testid={`textarea-prompt-${source.id}`}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground line-clamp-3">
+                  {source.config?.searchPrompt || "No prompt configured"}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                {source.lastSyncAt 
+                  ? `Last sync: ${formatDistanceToNow(new Date(source.lastSyncAt), { addSuffix: true })}`
+                  : "Never synced"}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onSync(source.id)}
+                disabled={!source.isActive}
+                data-testid={`button-sync-${source.id}`}
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Sync Now
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : items.length > 0 ? (
+                items.slice(0, 5).map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`p-2 rounded-lg border ${config.itemClass} cursor-pointer hover-elevate ${!item.isRead ? `ring-1 ${config.ringClass}` : ''}`}
+                    onClick={() => !item.isRead && onMarkRead(item.id)}
+                    data-testid={`intel-item-${item.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <p className="font-medium text-xs line-clamp-1">{item.title}</p>
+                      {item.estimatedValue && (
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          ${Math.round(Number(item.estimatedValue) / 1000)}K
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {item.region && (
+                        <Badge variant="outline" className="text-xs">{item.region}</Badge>
+                      )}
+                      {item.sourceUrl && (
+                        <a 
+                          href={item.sourceUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <ExternalLink className="w-3 h-3" /> View
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <Icon className="w-6 h-6 mx-auto text-muted-foreground/50 mb-1" />
+                  <p className="text-xs text-muted-foreground">No items yet</p>
+                  <p className="text-xs text-muted-foreground">Click Sync Now to fetch</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
 }
 
 export default function RegionalIntel() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const { data: leads, isLoading: leadsLoading } = useQuery<Lead[]>({
-    queryKey: ["/api/leads"],
+  const { data: feedSources = [], isLoading: sourcesLoading } = useQuery<IntelFeedSource[]>({
+    queryKey: ["/api/intel-sources"],
   });
 
-  const { data: intelItems = [], isLoading: intelLoading } = useQuery<IntelNewsItem[]>({
+  const { data: intelItems = [], isLoading: itemsLoading } = useQuery<IntelNewsItem[]>({
     queryKey: ["/api/intel-feeds"],
     refetchInterval: 60000,
   });
 
-  const { data: intelStats } = useQuery<{ opportunity: number; policy: number; competitor: number; unread: number; total: number }>({
-    queryKey: ["/api/intel-feeds/stats"],
+  const updateSourceMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<IntelFeedSource> }) => {
+      return apiRequest("PUT", `/api/intel-sources/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-sources"] });
+      toast({ title: "Feed updated", description: "Your changes have been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update feed.", variant: "destructive" });
+    }
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("POST", `/api/intel-sources/${id}/sync`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-sources"] });
+      toast({ title: "Sync started", description: "Fetching latest intel..." });
+    },
+    onError: () => {
+      toast({ title: "Sync failed", description: "Could not sync feed.", variant: "destructive" });
+    }
   });
 
   const markReadMutation = useMutation({
@@ -40,77 +345,26 @@ export default function RegionalIntel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/stats"] });
     },
   });
 
-  const { data: insightsData, isLoading: insightsLoading, refetch: refetchInsights, isFetching } = useQuery<{
-    totalResearchCount: number;
-    clientsResearched: number;
-    researchByType: Record<string, number>;
-    insights: string;
-    generatedAt: string;
-  }>({
-    queryKey: ["/api/research/insights"],
-    enabled: false,
-  });
-
-  const opportunityItems = intelItems.filter(i => i.type === "opportunity");
-  const policyItems = intelItems.filter(i => i.type === "policy");
-  const competitorItems = intelItems.filter(i => i.type === "competitor");
-
-  const extractCompetitorData = (): CompetitorData[] => {
-    const competitors: CompetitorData[] = [];
-    const insightsText = insightsData?.insights || "";
-
-    if (insightsText.includes("competitor") || insightsText.includes("Competitor")) {
-      competitors.push(
-        {
-          name: "Local Scanner Co",
-          region: "Northeast",
-          pricingTier: "Budget",
-          services: ["Basic Scanning", "Point Cloud"],
-          gaps: ["No BIM modeling", "Limited equipment"]
-        },
-        {
-          name: "TechScan Pro",
-          region: "Mid-Atlantic",
-          pricingTier: "Mid-Range",
-          services: ["Scanning", "Basic BIM", "As-Built"],
-          gaps: ["No MEP modeling", "Slow turnaround"]
-        },
-        {
-          name: "Enterprise 3D",
-          region: "National",
-          pricingTier: "Premium",
-          services: ["Full BIM", "Scanning", "QC"],
-          gaps: ["High minimums", "Long lead times"]
-        }
-      );
-    }
-    return competitors;
+  const getItemsForSource = (source: IntelFeedSource) => {
+    const targetType = source.config?.targetType;
+    return intelItems.filter(item => item.type === targetType);
   };
 
-  const competitors = extractCompetitorData();
-
-  const tierCounts = {
-    SMB: leads?.filter(l => l.clientTier === "SMB").length || 0,
-    "Mid-Market": leads?.filter(l => l.clientTier === "Mid-Market").length || 0,
-    Enterprise: leads?.filter(l => l.clientTier === "Enterprise").length || 0,
-  };
-
-  if (leadsLoading) {
+  if (sourcesLoading) {
     return (
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <MobileHeader />
           <main className="flex-1 p-4 md:p-8 overflow-auto">
-            <Skeleton className="h-8 w-64" />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              <Skeleton className="h-96" />
-              <Skeleton className="h-96" />
-              <Skeleton className="h-96" />
+            <Skeleton className="h-8 w-64 mb-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-64" />
+              ))}
             </div>
           </main>
         </div>
@@ -124,394 +378,56 @@ export default function RegionalIntel() {
       <div className="flex-1 flex flex-col min-w-0">
         <MobileHeader />
         <main className="flex-1 p-4 md:p-8 overflow-auto">
-          <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <h1 className="text-2xl font-bold" data-testid="text-page-title">Business Intelligence</h1>
                 <p className="text-muted-foreground">
-                  Market opportunities, competitor analysis, and industry news
+                  {feedSources.length} intel feeds configured &bull; {intelItems.filter(i => !i.isRead).length} unread items
                 </p>
               </div>
-              <Button
-                onClick={() => refetchInsights()}
-                disabled={isFetching}
-                data-testid="button-refresh-insights"
-              >
-                {isFetching ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                )}
-                Generate Insights
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    feedSources.filter(s => s.isActive).forEach(s => syncMutation.mutate(s.id));
+                  }}
+                  disabled={syncMutation.isPending}
+                  data-testid="button-sync-all"
+                >
+                  {syncMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Sync All Feeds
+                </Button>
+              </div>
             </div>
 
-            {/* Intel News Feeds - Primary Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Bidding Opportunities */}
-              <Card className="border-green-500/20 bg-green-500/5" data-testid="card-bid-opportunities">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Target className="w-5 h-5 text-green-500" />
-                    Bidding Opportunities
-                    {(intelStats?.opportunity ?? 0) > 0 && (
-                      <Badge variant="secondary" className="text-xs">{intelStats?.opportunity}</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>RFPs and projects to bid on</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {intelLoading ? (
-                      <div className="space-y-3">
-                        <Skeleton className="h-20 w-full" />
-                        <Skeleton className="h-20 w-full" />
-                      </div>
-                    ) : opportunityItems.length > 0 ? (
-                      opportunityItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-lg border border-green-500/20 bg-green-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-green-500/40' : ''}`}
-                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
-                          data-testid={`intel-item-${item.id}`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
-                            {item.estimatedValue && (
-                              <Badge variant="secondary" className="text-xs shrink-0">
-                                ${Math.round(item.estimatedValue / 1000)}K
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {item.projectType && (
-                              <Badge variant="outline" className="text-xs">{item.projectType}</Badge>
-                            )}
-                            {item.region && (
-                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
-                            )}
-                            {item.deadline && (
-                              <span className="text-xs text-muted-foreground">
-                                Due: {format(new Date(item.deadline), "MMM d")}
-                              </span>
-                            )}
-                            {item.sourceUrl && (
-                              <a
-                                href={item.sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" /> View
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6">
-                        <Target className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                        <p className="text-sm text-muted-foreground">No opportunities yet</p>
-                        <Link href="/settings">
-                          <Button variant="link" size="sm" className="mt-1">
-                            <Settings className="w-3 h-3 mr-1" />
-                            Configure BidNet API
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Policy Updates */}
-              <Card className="border-amber-500/20 bg-amber-500/5" data-testid="card-policy-updates">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Gavel className="w-5 h-5 text-amber-500" />
-                    Policy & Regulatory
-                    {(intelStats?.policy ?? 0) > 0 && (
-                      <Badge variant="secondary" className="text-xs">{intelStats?.policy}</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>Laws and regulations affecting work</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {intelLoading ? (
-                      <div className="space-y-3">
-                        <Skeleton className="h-20 w-full" />
-                        <Skeleton className="h-20 w-full" />
-                      </div>
-                    ) : policyItems.length > 0 ? (
-                      policyItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-amber-500/40' : ''}`}
-                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
-                          data-testid={`intel-item-${item.id}`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
-                            {item.agency && (
-                              <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30 shrink-0">
-                                {item.agency}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {item.effectiveDate && (
-                              <span className="text-xs text-muted-foreground">
-                                Effective: {format(new Date(item.effectiveDate), "MMM yyyy")}
-                              </span>
-                            )}
-                            {item.region && (
-                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
-                            )}
-                            {item.sourceUrl && (
-                              <a
-                                href={item.sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" /> View
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6">
-                        <Gavel className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                        <p className="text-sm text-muted-foreground">No policy updates yet</p>
-                        <Link href="/settings">
-                          <Button variant="link" size="sm" className="mt-1">
-                            <Settings className="w-3 h-3 mr-1" />
-                            Subscribe to RSS feeds
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Competitor Watch */}
-              <Card className="border-red-500/20 bg-red-500/5" data-testid="card-competitor-watch">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Eye className="w-5 h-5 text-red-500" />
-                    Competitor Watch
-                    {(intelStats?.competitor ?? 0) > 0 && (
-                      <Badge variant="secondary" className="text-xs">{intelStats?.competitor}</Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>Competitor news and movements</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    {intelLoading ? (
-                      <div className="space-y-3">
-                        <Skeleton className="h-20 w-full" />
-                        <Skeleton className="h-20 w-full" />
-                      </div>
-                    ) : competitorItems.length > 0 ? (
-                      competitorItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-lg border border-red-500/20 bg-red-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-red-500/40' : ''}`}
-                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
-                          data-testid={`intel-item-${item.id}`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
-                            {item.competitorName && (
-                              <Badge variant="outline" className="text-xs text-red-500 border-red-500/30 shrink-0">
-                                {item.competitorName}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
-                          <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {item.region && (
-                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}
-                            </span>
-                            {item.sourceUrl && (
-                              <a
-                                href={item.sourceUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs text-primary hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" /> View
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6">
-                        <Eye className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-                        <p className="text-sm text-muted-foreground">No competitor intel yet</p>
-                        <Link href="/settings">
-                          <Button variant="link" size="sm" className="mt-1">
-                            <Settings className="w-3 h-3 mr-1" />
-                            Configure webhooks
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {feedSources.map((source) => (
+                <FeedCard
+                  key={source.id}
+                  source={source}
+                  items={getItemsForSource(source)}
+                  isLoading={itemsLoading}
+                  onUpdate={(id, data) => updateSourceMutation.mutate({ id, data })}
+                  onSync={(id) => syncMutation.mutate(id)}
+                  onMarkRead={(id) => markReadMutation.mutate(id)}
+                />
+              ))}
             </div>
 
-            {/* AI Market Analysis */}
-            <Card data-testid="card-ai-analysis">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  AI Market Analysis
-                </CardTitle>
-                <CardDescription>
-                  {insightsData?.generatedAt
-                    ? `Generated ${format(new Date(insightsData.generatedAt), "MMM d, yyyy 'at' h:mm a")}`
-                    : "Click 'Generate Insights' to analyze market data"
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isFetching ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
-                    <span className="text-muted-foreground">Analyzing market data with AI...</span>
-                  </div>
-                ) : insightsData?.insights ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">
-                    {insightsData.insights}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                    <p>No insights generated yet.</p>
-                    <p className="text-sm mt-2">Click the button above to analyze intel feeds, leads, and projects.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Client Tier Distribution */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card data-testid="card-client-tiers">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Client Tier Distribution
-                  </CardTitle>
-                  <CardDescription>AI-classified client segments from research</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {Object.entries(tierCounts).map(([tier, count]) => (
-                      <div key={tier} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={
-                              tier === "Enterprise" ? "bg-purple-500/10 text-purple-500 border-purple-500/30" :
-                                tier === "Mid-Market" ? "bg-blue-500/10 text-blue-500 border-blue-500/30" :
-                                  "bg-green-500/10 text-green-500 border-green-500/30"
-                            }
-                          >
-                            {tier}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${tier === "Enterprise" ? "bg-purple-500" :
-                                tier === "Mid-Market" ? "bg-blue-500" : "bg-green-500"
-                                }`}
-                              style={{ width: `${leads?.length ? (count / leads.length) * 100 : 0}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium w-8 text-right">{count}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {Object.values(tierCounts).every(c => c === 0) && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Run Client Intelligence research to classify leads
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
+            {feedSources.length === 0 && (
+              <Card className="p-8 text-center">
+                <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Intel Feeds Configured</h3>
+                <p className="text-muted-foreground mb-4">
+                  Set up your intel feeds to start receiving market intelligence.
+                </p>
               </Card>
-
-              {/* Competitor Pricing Grid */}
-              {competitors.length > 0 && (
-                <Card data-testid="card-competitor-grid">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <DollarSign className="w-5 h-5" />
-                      Competitor Pricing Grid
-                    </CardTitle>
-                    <CardDescription>Known competitors and their service gaps</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-2 font-medium">Competitor</th>
-                            <th className="text-left p-2 font-medium">Pricing</th>
-                            <th className="text-left p-2 font-medium">Gaps</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {competitors.map((comp, i) => (
-                            <tr key={i} className="border-b last:border-0">
-                              <td className="p-2">
-                                <p className="font-medium">{comp.name}</p>
-                                <p className="text-xs text-muted-foreground">{comp.region}</p>
-                              </td>
-                              <td className="p-2">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    comp.pricingTier === "Premium" ? "bg-purple-500/10 text-purple-500" :
-                                      comp.pricingTier === "Mid-Range" ? "bg-blue-500/10 text-blue-500" :
-                                        "bg-green-500/10 text-green-500"
-                                  }
-                                >
-                                  {comp.pricingTier}
-                                </Badge>
-                              </td>
-                              <td className="p-2">
-                                <div className="flex flex-wrap gap-1">
-                                  {comp.gaps.map((g, j) => (
-                                    <Badge key={j} variant="outline" className="text-xs text-orange-500 border-orange-500/30">{g}</Badge>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            )}
           </div>
         </main>
       </div>

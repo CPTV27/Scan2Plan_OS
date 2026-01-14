@@ -44,6 +44,12 @@ router.get("/stats", isAuthenticated, async (req, res) => {
             opportunity: allItems.filter(i => i.type === "opportunity").length,
             policy: allItems.filter(i => i.type === "policy").length,
             competitor: allItems.filter(i => i.type === "competitor").length,
+            project: allItems.filter(i => i.type === "project").length,
+            technology: allItems.filter(i => i.type === "technology").length,
+            funding: allItems.filter(i => i.type === "funding").length,
+            event: allItems.filter(i => i.type === "event").length,
+            talent: allItems.filter(i => i.type === "talent").length,
+            market: allItems.filter(i => i.type === "market").length,
             unread: allItems.filter(i => !i.isRead).length,
             total: allItems.length,
         };
