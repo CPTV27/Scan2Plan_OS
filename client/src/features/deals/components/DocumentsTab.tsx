@@ -21,7 +21,7 @@ export function DocumentsTab({
   deleteDocumentMutation,
 }: DocumentsTabProps) {
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1">
         <div className="p-4 space-y-4">
           <Card>
             <CardHeader className="pb-3">

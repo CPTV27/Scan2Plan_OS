@@ -127,7 +127,7 @@ export function LeadDetailsTab({
   };
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="h-full flex-1">
       <div className="p-4 pb-32 space-y-4">
           <PersonaSuggestion
             leadId={leadId}

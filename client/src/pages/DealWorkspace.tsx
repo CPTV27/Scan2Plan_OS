@@ -900,7 +900,7 @@ export default function DealWorkspace() {
         </div>
 
         {/* Lead Details Tab - Consolidated form with bordered sections */}
-        <TabsContent value="lead" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="lead" className="flex-1 overflow-hidden m-0 flex flex-col">
           <ErrorBoundary fallbackTitle="Lead Details Error" fallbackMessage="Failed to load lead details. Please try refreshing.">
             <LeadDetailsTab
               lead={lead}
@@ -994,7 +994,7 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Version History Tab */}
-        <TabsContent value="history" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="history" className="flex-1 overflow-hidden m-0 flex flex-col">
           <ErrorBoundary fallbackTitle="Version History Error" fallbackMessage="Failed to load quote history. Please try refreshing.">
             <VersionHistoryTab
               quotes={quotes}
@@ -1006,14 +1006,14 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* Proposal Tab - Evidence Vault + AI Assistant */}
-        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="proposal" className="flex-1 overflow-hidden m-0 flex flex-col">
           <ErrorBoundary fallbackTitle="Proposal Tab Error" fallbackMessage="Failed to load proposal section. Please try refreshing.">
             <ProposalTab lead={lead} />
           </ErrorBoundary>
         </TabsContent>
 
         {/* Documents Tab */}
-        <TabsContent value="documents" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="documents" className="flex-1 overflow-hidden m-0 flex flex-col">
           <ErrorBoundary fallbackTitle="Documents Tab Error" fallbackMessage="Failed to load documents. Please try refreshing.">
             <DocumentsTab
               documents={documents}
@@ -1025,7 +1025,7 @@ export default function DealWorkspace() {
         </TabsContent>
 
         {/* PandaDoc Tab - Document editing and signature */}
-        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="pandadoc" className="flex-1 overflow-hidden m-0 flex flex-col">
           <ErrorBoundary fallbackTitle="PandaDoc Tab Error" fallbackMessage="Failed to load PandaDoc integration. Please try refreshing.">
             <PandaDocTab
               pandaDocId={lead?.pandaDocId || null}
