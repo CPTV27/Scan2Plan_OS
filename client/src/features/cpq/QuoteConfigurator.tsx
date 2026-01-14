@@ -38,6 +38,7 @@ import { generateEditableLineItems } from "./lineItemUtils";
 import { enrichAreaWithProducts, generateQuoteSkus } from "@/lib/productResolver";
 import { TreeDeciduous } from "lucide-react";
 import type { Lead } from "@shared/schema";
+import type { MappedConfiguratorData } from "./cpqImportUtils";
 
 interface Area {
     id: string;
@@ -54,9 +55,11 @@ interface QuoteConfiguratorProps {
     leadId?: number;
     quoteId?: number;
     onClose?: () => void;
+    importedData?: MappedConfiguratorData | null;
+    onClearImport?: () => void;
 }
 
-export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteConfiguratorProps) {
+export default function QuoteConfigurator({ leadId, quoteId, onClose, importedData, onClearImport }: QuoteConfiguratorProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
@@ -97,6 +100,38 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
         queryKey: [`/api/leads/${leadId}`],
         enabled: !!leadId,
     });
+
+    // Populate from imported CPQ data
+    useEffect(() => {
+        if (importedData) {
+            // Set areas
+            if (importedData.areas.length > 0) {
+                setAreas(importedData.areas);
+            }
+            // Set project location
+            if (importedData.projectLocation) {
+                setProjectLocation(importedData.projectLocation);
+            }
+            // Set landscape
+            if (importedData.landscape) {
+                setIncludeLandscape(importedData.landscape.include);
+                setLandscapeType(importedData.landscape.type);
+                setLandscapeAcres(importedData.landscape.acres);
+                setLandscapeLod(importedData.landscape.lod);
+            } else {
+                setIncludeLandscape(false);
+            }
+            // Show toast
+            toast({
+                title: "Quote Imported",
+                description: `Loaded ${importedData.areas.length} area(s) from ${importedData.projectName || "CPQ export"}`,
+            });
+            // Clear import data after applying
+            if (onClearImport) {
+                onClearImport();
+            }
+        }
+    }, [importedData, onClearImport, toast]);
 
     // Calculate pricing
     const pricing = useMemo(() => {

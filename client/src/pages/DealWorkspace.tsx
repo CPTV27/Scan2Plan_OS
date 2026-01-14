@@ -109,6 +109,8 @@ import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
 import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
 import QuoteConfigurator from "@/features/cpq/QuoteConfigurator";
+import { CpqImportModal } from "@/features/cpq/CpqImportModal";
+import type { MappedConfiguratorData, CpqExportData } from "@/features/cpq/cpqImportUtils";
 
 import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
@@ -133,6 +135,8 @@ export default function DealWorkspace() {
   const [viewingQuote, setViewingQuote] = useState<CpqQuote | null>(null);
   const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
   const [quoteBuilderMode, setQuoteBuilderMode] = useState<'simple' | 'advanced'>('simple');
+  const [showCpqImportModal, setShowCpqImportModal] = useState(false);
+  const [importedCpqData, setImportedCpqData] = useState<MappedConfiguratorData | null>(null);
 
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
@@ -858,8 +862,8 @@ export default function DealWorkspace() {
               <button
                 onClick={() => setQuoteBuilderMode('simple')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'simple'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
               >
                 <Sparkles className="w-4 h-4 inline mr-2" />
@@ -868,8 +872,8 @@ export default function DealWorkspace() {
               <button
                 onClick={() => setQuoteBuilderMode('advanced')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'advanced'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
               >
                 <Calculator className="w-4 h-4 inline mr-2" />
@@ -879,6 +883,15 @@ export default function DealWorkspace() {
             <p className="text-xs text-muted-foreground">
               Simple: Quick product selection | Advanced: Full calculator with all features
             </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCpqImportModal(true)}
+              className="ml-auto"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import from CPQ
+            </Button>
           </div>
 
           {/* Conditional Content */}
@@ -887,6 +900,8 @@ export default function DealWorkspace() {
               <QuoteConfigurator
                 leadId={leadId}
                 onClose={() => handleTabChange("lead")}
+                importedData={importedCpqData}
+                onClearImport={() => setImportedCpqData(null)}
               />
             ) : (
               <QuoteBuilderTab
@@ -973,6 +988,17 @@ export default function DealWorkspace() {
           setEditingFromQuote(quote);
           setViewingQuote(null);
           handleTabChange("quote");
+        }}
+      />
+
+      {/* CPQ Import Modal */}
+      <CpqImportModal
+        open={showCpqImportModal}
+        onOpenChange={setShowCpqImportModal}
+        onImport={(data, rawData) => {
+          setImportedCpqData(data);
+          setQuoteBuilderMode('simple'); // Switch to simple mode for imported data
+          setShowCpqImportModal(false);
         }}
       />
     </div>
