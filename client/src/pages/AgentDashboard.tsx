@@ -111,10 +111,36 @@ interface AnalyticsData {
     topOpportunities: Array<{ id: number; title: string; region: string; estimatedValue: number; relevanceScore: number }>;
 }
 
+interface ExecutiveSummary {
+    insights: string[];
+    actions: Array<{
+        type: "opportunity" | "urgent";
+        priority: "high" | "urgent";
+        title: string;
+        subtitle: string;
+        itemId: number;
+        region: string | null;
+    }>;
+    stats: {
+        totalOpportunities: number;
+        highValueCount: number;
+        urgentCount: number;
+        newThisWeek: number;
+        actionableCount: number;
+        totalEstimatedValue: number;
+    };
+    trend: {
+        direction: "up" | "down";
+        percent: number;
+        thisWeek: number;
+        lastWeek: number;
+    };
+}
+
 export default function AgentDashboard() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
-    const [activeTab, setActiveTab] = useState("prompts");
+    const [activeTab, setActiveTab] = useState("analytics");
     const [newPromptOpen, setNewPromptOpen] = useState(false);
     const [editingPrompt, setEditingPrompt] = useState<AgentPrompt | null>(null);
     const [newPrompt, setNewPrompt] = useState({ category: "", name: "", basePrompt: "" });
@@ -142,6 +168,11 @@ export default function AgentDashboard() {
     // Fetch analytics
     const { data: analytics, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
         queryKey: ["/api/agent/analytics"],
+    });
+
+    // Fetch executive summary
+    const { data: execSummary, isLoading: execLoading } = useQuery<ExecutiveSummary>({
+        queryKey: ["/api/agent/executive-summary"],
     });
 
     // Generate prompts mutation
@@ -288,55 +319,99 @@ export default function AgentDashboard() {
                         </div>
                     </div>
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <Card>
-                            <CardContent className="pt-6">
+                    {/* Executive Summary - CEO Priority View */}
+                    {execLoading ? (
+                        <Card className="mb-8">
+                            <CardContent className="py-8">
+                                <Skeleton className="h-24" />
+                            </CardContent>
+                        </Card>
+                    ) : execSummary && (execSummary.insights.length > 0 || execSummary.actions.length > 0) && (
+                        <Card className="mb-8 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+                            <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <Zap className="w-5 h-5 text-primary" />
+                                        What You Should Know
+                                    </CardTitle>
+                                    {execSummary.trend.percent > 0 && (
+                                        <Badge variant={execSummary.trend.direction === "up" ? "default" : "secondary"}>
+                                            {execSummary.trend.direction === "up" ? "↑" : "↓"} {execSummary.trend.percent}% vs last week
+                                        </Badge>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {/* AI Insights */}
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Active Prompts</p>
-                                        <p className="text-2xl font-bold">
-                                            {prompts?.filter(p => p.isActive).length || 0}
-                                        </p>
+                                        <p className="text-xs font-medium text-muted-foreground mb-2">INSIGHTS</p>
+                                        <ul className="space-y-2">
+                                            {execSummary.insights.map((insight, i) => (
+                                                <li key={i} className="text-sm">{insight}</li>
+                                            ))}
+                                        </ul>
                                     </div>
-                                    <MessageSquare className="w-8 h-8 text-primary/20" />
+
+                                    {/* Priority Actions */}
+                                    {execSummary.actions.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">PRIORITY ACTIONS</p>
+                                            <div className="space-y-2">
+                                                {execSummary.actions.map((action, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-background border">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                {action.priority === "urgent" && (
+                                                                    <Badge variant="destructive" className="text-xs">URGENT</Badge>
+                                                                )}
+                                                                {action.priority === "high" && (
+                                                                    <Badge className="text-xs bg-green-500">HIGH VALUE</Badge>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm font-medium mt-1 truncate">{action.title}</p>
+                                                            <p className="text-xs text-muted-foreground">{action.subtitle}</p>
+                                                        </div>
+                                                        <Button size="sm" variant="outline" className="ml-2 shrink-0">
+                                                            <Plus className="w-3 h-3 mr-1" />Create Lead
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Quick Stats Row */}
+                                <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-4 pt-4 border-t">
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold">{execSummary.stats.totalOpportunities}</p>
+                                        <p className="text-xs text-muted-foreground">Opportunities</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold text-green-500">{execSummary.stats.highValueCount}</p>
+                                        <p className="text-xs text-muted-foreground">High Value</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold text-orange-500">{execSummary.stats.urgentCount}</p>
+                                        <p className="text-xs text-muted-foreground">Urgent</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold">{execSummary.stats.newThisWeek}</p>
+                                        <p className="text-xs text-muted-foreground">New This Week</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold">{execSummary.stats.actionableCount}</p>
+                                        <p className="text-xs text-muted-foreground">Actionable</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xl font-bold">${(execSummary.stats.totalEstimatedValue / 1000).toFixed(0)}k</p>
+                                        <p className="text-xs text-muted-foreground">Est. Value</p>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Intel Items</p>
-                                        <p className="text-2xl font-bold">{intelData?.length || 0}</p>
-                                    </div>
-                                    <Lightbulb className="w-8 h-8 text-primary/20" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Total Leads</p>
-                                        <p className="text-2xl font-bold">{ragContext?.network?.totalLeads || 0}</p>
-                                    </div>
-                                    <Target className="w-8 h-8 text-primary/20" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Opportunities</p>
-                                        <p className="text-2xl font-bold">{ragContext?.intel?.recentOpportunities || 0}</p>
-                                    </div>
-                                    <TrendingUp className="w-8 h-8 text-primary/20" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    )}
 
                     {/* Main Tabs */}
                     <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -362,7 +362,7 @@ router.get(
             // Estimated value
             if (item.estimatedValue) {
                 totalWithValue++;
-                totalEstimatedValue += item.estimatedValue;
+                totalEstimatedValue += Number(item.estimatedValue) || 0;
             }
         }
 
@@ -378,7 +378,7 @@ router.get(
         // Top opportunities by value
         const topOpportunities = allItems
             .filter(i => i.type === "opportunity" && i.estimatedValue)
-            .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
+            .sort((a, b) => (Number(b.estimatedValue) || 0) - (Number(a.estimatedValue) || 0))
             .slice(0, 10)
             .map(i => ({
                 id: i.id,
@@ -415,6 +415,124 @@ router.get(
                 byRegion,
                 byCompetitor,
                 topOpportunities,
+            },
+        });
+    })
+);
+
+// GET /api/agent/executive-summary - AI-generated executive insights
+router.get(
+    "/executive-summary",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        // Get all active intel items
+        const allItems = await db
+            .select()
+            .from(intelNewsItems)
+            .where(eq(intelNewsItems.isArchived, false))
+            .orderBy(desc(intelNewsItems.createdAt));
+
+        const now = new Date();
+        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        // Categorize items
+        const opportunities = allItems.filter(i => i.type === "opportunity");
+        const competitors = allItems.filter(i => i.type === "competitor");
+        const policies = allItems.filter(i => i.type === "policy");
+        const highValue = opportunities.filter(i => (Number(i.estimatedValue) || 0) > 50000);
+        const actionable = allItems.filter(i => i.isActionable);
+
+        // Urgent items (deadline within 7 days)
+        const urgentItems = allItems.filter(i => {
+            if (!i.deadline) return false;
+            const deadline = new Date(i.deadline);
+            return deadline > now && deadline < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        });
+
+        // New this week
+        const newThisWeek = allItems.filter(i => new Date(i.createdAt || 0) > oneWeekAgo);
+
+        // Build executive insights
+        const insights: string[] = [];
+
+        if (opportunities.length > 0) {
+            const totalValue = opportunities.reduce((sum, o) => sum + (Number(o.estimatedValue) || 0), 0);
+            insights.push(`📋 ${opportunities.length} opportunities worth $${(totalValue / 1000).toFixed(0)}k in pipeline`);
+        }
+
+        if (highValue.length > 0) {
+            insights.push(`💰 ${highValue.length} high-value RFPs (>$50k) ready to pursue`);
+        }
+
+        if (urgentItems.length > 0) {
+            insights.push(`⚡ ${urgentItems.length} items with deadlines this week`);
+        }
+
+        if (newThisWeek.length > 0) {
+            insights.push(`📥 ${newThisWeek.length} new intel items this week`);
+        }
+
+        if (competitors.length > 0) {
+            const uniqueCompetitors = new Set(competitors.map(c => c.competitorName).filter(Boolean));
+            insights.push(`👁️ ${uniqueCompetitors.size} competitors active in your territory`);
+        }
+
+        if (policies.length > 0) {
+            insights.push(`📜 ${policies.length} policy/regulatory updates to review`);
+        }
+
+        // Top 5 actions for CEO
+        const actions = [
+            ...highValue.slice(0, 3).map(o => ({
+                type: "opportunity" as const,
+                priority: "high" as const,
+                title: o.title,
+                subtitle: `$${((Number(o.estimatedValue) || 0) / 1000).toFixed(0)}k potential`,
+                itemId: o.id,
+                region: o.region,
+            })),
+            ...urgentItems.slice(0, 2).map(u => ({
+                type: "urgent" as const,
+                priority: "urgent" as const,
+                title: u.title,
+                subtitle: `Deadline: ${new Date(u.deadline!).toLocaleDateString()}`,
+                itemId: u.id,
+                region: u.region,
+            })),
+        ].slice(0, 5);
+
+        // Weekly trend (compare to previous week)
+        const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        const lastWeek = allItems.filter(i => {
+            const created = new Date(i.createdAt || 0);
+            return created > twoWeeksAgo && created < oneWeekAgo;
+        });
+        const thisWeekCount = newThisWeek.length;
+        const lastWeekCount = lastWeek.length;
+        const trendPercent = lastWeekCount > 0
+            ? Math.round(((thisWeekCount - lastWeekCount) / lastWeekCount) * 100)
+            : 0;
+
+        return res.json({
+            success: true,
+            data: {
+                insights,
+                actions,
+                stats: {
+                    totalOpportunities: opportunities.length,
+                    highValueCount: highValue.length,
+                    urgentCount: urgentItems.length,
+                    newThisWeek: newThisWeek.length,
+                    actionableCount: actionable.length,
+                    totalEstimatedValue: opportunities.reduce((sum, o) => sum + (Number(o.estimatedValue) || 0), 0),
+                },
+                trend: {
+                    direction: trendPercent >= 0 ? "up" : "down",
+                    percent: Math.abs(trendPercent),
+                    thisWeek: thisWeekCount,
+                    lastWeek: lastWeekCount,
+                },
             },
         });
     })
