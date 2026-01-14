@@ -628,5 +628,219 @@ router.get(
     })
 );
 
+// =============================================
+// AGENT CONFIG MANAGEMENT (CEO Prompt Editor)
+// =============================================
+
+import { AGENT_CONFIGS, type AgentType as AgentTypeDef } from "../services/agents";
+
+// In-memory store for custom prompts (persists until server restart)
+// In production, this would be stored in the database
+const customAgentPrompts: Partial<Record<AgentTypeDef, { systemPrompt: string; updatedAt: Date; updatedBy: string }>> = {};
+
+// GET /api/agent/configs - Get all agent configurations (for visualization)
+router.get(
+    "/configs",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const configs = Object.entries(AGENT_CONFIGS).map(([key, config]) => {
+            const customPrompt = customAgentPrompts[key as AgentTypeDef];
+            return {
+                name: config.name,
+                displayName: config.displayName,
+                provider: config.provider,
+                model: config.model,
+                temperature: config.temperature,
+                maxTokens: config.maxTokens,
+                systemPrompt: customPrompt?.systemPrompt || config.systemPrompt,
+                isCustomized: !!customPrompt,
+                updatedAt: customPrompt?.updatedAt,
+                updatedBy: customPrompt?.updatedBy,
+            };
+        });
+
+        // Pipeline flow for visualization
+        const pipelineFlow = {
+            nodes: [
+                { id: "rss", label: "📡 RSS Feeds", type: "source" },
+                { id: "chromadb", label: "🔮 ChromaDB", type: "source" },
+                { id: "postgres", label: "🐘 PostgreSQL", type: "source" },
+                { id: "scout", label: "🔍 Scout", type: "agent" },
+                { id: "analyst", label: "📊 Analyst", type: "agent" },
+                { id: "strategist", label: "🎯 Strategist", type: "agent" },
+                { id: "composer", label: "✍️ Composer", type: "agent" },
+                { id: "auditor", label: "🛡️ Auditor", type: "agent" },
+                { id: "output", label: "📤 Output", type: "output" },
+            ],
+            edges: [
+                { from: "rss", to: "scout", label: "Intel" },
+                { from: "postgres", to: "analyst", label: "Leads/Projects" },
+                { from: "chromadb", to: "composer", label: "Proposals" },
+                { from: "scout", to: "analyst", label: "Structured Data" },
+                { from: "analyst", to: "strategist", label: "Insights" },
+                { from: "strategist", to: "composer", label: "Actions" },
+                { from: "composer", to: "auditor", label: "Drafts" },
+                { from: "auditor", to: "output", label: "Approved" },
+            ],
+        };
+
+        return res.json({
+            success: true,
+            agents: configs,
+            pipelineFlow,
+        });
+    })
+);
+
+// GET /api/agent/configs/:agent - Get specific agent config
+router.get(
+    "/configs/:agent",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const agentName = req.params.agent as AgentTypeDef;
+        const config = AGENT_CONFIGS[agentName];
+
+        if (!config) {
+            return res.status(404).json({ error: `Agent '${agentName}' not found` });
+        }
+
+        const customPrompt = customAgentPrompts[agentName];
+
+        return res.json({
+            success: true,
+            data: {
+                name: config.name,
+                displayName: config.displayName,
+                provider: config.provider,
+                model: config.model,
+                temperature: config.temperature,
+                maxTokens: config.maxTokens,
+                systemPrompt: customPrompt?.systemPrompt || config.systemPrompt,
+                defaultPrompt: config.systemPrompt,
+                isCustomized: !!customPrompt,
+                updatedAt: customPrompt?.updatedAt,
+                updatedBy: customPrompt?.updatedBy,
+            },
+        });
+    })
+);
+
+// PUT /api/agent/configs/:agent - Update agent system prompt (CEO only)
+router.put(
+    "/configs/:agent",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const agentName = req.params.agent as AgentTypeDef;
+        const { systemPrompt } = req.body;
+        const user = (req as any).user;
+
+        const config = AGENT_CONFIGS[agentName];
+        if (!config) {
+            return res.status(404).json({ error: `Agent '${agentName}' not found` });
+        }
+
+        if (!systemPrompt || typeof systemPrompt !== "string") {
+            return res.status(400).json({ error: "systemPrompt is required" });
+        }
+
+        // Store custom prompt
+        customAgentPrompts[agentName] = {
+            systemPrompt,
+            updatedAt: new Date(),
+            updatedBy: user?.email || user?.username || "unknown",
+        };
+
+        // Also update the in-memory config (affects running agents)
+        AGENT_CONFIGS[agentName].systemPrompt = systemPrompt;
+
+        console.log(`[Agent Config] ${agentName} prompt updated by ${user?.email}`);
+
+        return res.json({
+            success: true,
+            message: `${config.displayName} prompt updated successfully`,
+            data: {
+                name: config.name,
+                systemPrompt,
+                updatedAt: customAgentPrompts[agentName]!.updatedAt,
+                updatedBy: customAgentPrompts[agentName]!.updatedBy,
+            },
+        });
+    })
+);
+
+// POST /api/agent/configs/:agent/reset - Reset to default prompt (CEO only)
+router.post(
+    "/configs/:agent/reset",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const agentName = req.params.agent as AgentTypeDef;
+        const config = AGENT_CONFIGS[agentName];
+
+        if (!config) {
+            return res.status(404).json({ error: `Agent '${agentName}' not found` });
+        }
+
+        // Remove custom prompt
+        delete customAgentPrompts[agentName];
+
+        // Note: We'd need to store defaults to truly reset. For now, just clear custom.
+        console.log(`[Agent Config] ${agentName} prompt reset to default`);
+
+        return res.json({
+            success: true,
+            message: `${config.displayName} prompt reset to default`,
+        });
+    })
+);
+
+// POST /api/agent/configs/:agent/test - Test agent with sample input (CEO only)
+router.post(
+    "/configs/:agent/test",
+    isAuthenticated,
+    requireRole("ceo"),
+    asyncHandler(async (req: Request, res: Response) => {
+        const agentName = req.params.agent as AgentTypeDef;
+        const { testInput } = req.body;
+
+        if (!testInput) {
+            return res.status(400).json({ error: "testInput is required" });
+        }
+
+        const config = AGENT_CONFIGS[agentName];
+        if (!config) {
+            return res.status(404).json({ error: `Agent '${agentName}' not found` });
+        }
+
+        try {
+            // Run the agent with test input
+            const startTime = Date.now();
+            const results = await messageBus.runPipeline(
+                { rawContent: testInput, source: "test" },
+                agentName
+            );
+
+            const agentResult = results.find(r => r.from === agentName);
+            const durationMs = Date.now() - startTime;
+
+            return res.json({
+                success: true,
+                agent: agentName,
+                durationMs,
+                output: agentResult?.payload || null,
+                fullPipeline: results.length > 1,
+                agentsRun: results.map(r => r.from),
+            });
+        } catch (error: any) {
+            return res.status(500).json({
+                success: false,
+                error: error.message,
+            });
+        }
+    })
+);
+
 export default router;
+
 

@@ -25,6 +25,7 @@ const allNavigation = [
   { name: 'Business Intelligence', href: '/regional-intel', icon: Map, roles: ['ceo', 'sales'] as UserRole[] },
   { name: 'Brand Engine', href: '/brand-engine', icon: Sparkles, roles: ['ceo', 'sales'] as UserRole[] },
   { name: 'AI Agent', href: '/ai-agent', icon: Brain, roles: ['ceo'] as UserRole[] },
+  { name: 'Prompt Editor', href: '/prompt-editor', icon: Sparkles, roles: ['ceo'] as UserRole[] },
   // { name: 'Airtable', href: '/airtable', icon: Database, roles: ['ceo'] as UserRole[] },
   { name: 'S2P Academy', href: '/help', icon: BookOpen, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
   { name: 'Settings', href: '/settings', icon: Settings, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },

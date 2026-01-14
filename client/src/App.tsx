@@ -33,6 +33,7 @@ import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
 import BrandGenerator from "@/pages/BrandGenerator";
 import AgentDashboard from "@/pages/AgentDashboard";
+import { AgentPromptEditor } from "@/features/agents/AgentPromptEditor";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
@@ -153,6 +154,11 @@ function ProtectedRoutes() {
       <Route path="/ai-agent">
         <RoleGuard allowedRoles={["ceo"]}>
           <AgentDashboard />
+        </RoleGuard>
+      </Route>
+      <Route path="/prompt-editor">
+        <RoleGuard allowedRoles={["ceo"]}>
+          <AgentPromptEditor />
         </RoleGuard>
       </Route>
       <Route path="/scan-tech" component={ScanTech} />
