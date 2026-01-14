@@ -841,6 +841,124 @@ router.post(
     })
 );
 
+// =============================================
+// Meeting Transcript to RFP Conversion
+// =============================================
+import { MEETING_TO_RFP_PROMPT, type RFPFromTranscript } from "../services/prompts/meeting-to-rfp";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+/**
+ * POST /api/agent/transcript-to-rfp
+ * Convert a meeting transcript into a structured RFP for the pipeline
+ */
+router.post(
+    "/transcript-to-rfp",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { transcript, metadata } = req.body;
+
+        if (!transcript || typeof transcript !== "string") {
+            return res.status(400).json({
+                success: false,
+                error: "transcript is required and must be a string"
+            });
+        }
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    {
+                        role: "system",
+                        content: MEETING_TO_RFP_PROMPT
+                    },
+                    {
+                        role: "user",
+                        content: `Here is the meeting transcript to convert:\n\n${transcript}`
+                    }
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.3,
+            });
+
+            const content = completion.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error("No response from AI model");
+            }
+
+            const rfpData: RFPFromTranscript = JSON.parse(content);
+
+            // Log the conversion for analytics
+            console.log(`[Transcript-to-RFP] Converted transcript to RFP: ${rfpData.RFP_FOR_INGESTION?.projectIdentity?.projectName || "Unknown"}`);
+
+            return res.json({
+                success: true,
+                rfp: rfpData,
+                metadata: {
+                    transcriptLength: transcript.length,
+                    convertedAt: new Date().toISOString(),
+                    model: "gpt-4o",
+                    ...metadata
+                }
+            });
+        } catch (error: any) {
+            console.error("[Transcript-to-RFP] Error:", error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    })
+);
+
+/**
+ * POST /api/agent/rfp/ingest
+ * Ingest a structured RFP into the multi-agent pipeline
+ */
+router.post(
+    "/rfp/ingest",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        const { rfp } = req.body;
+
+        if (!rfp?.RFP_FOR_INGESTION) {
+            return res.status(400).json({
+                success: false,
+                error: "rfp.RFP_FOR_INGESTION is required"
+            });
+        }
+
+        const rfpData = rfp.RFP_FOR_INGESTION;
+
+        try {
+            // Run the full agent pipeline with the RFP data
+            const pipelineResults = await messageBus.runPipeline({
+                rawContent: JSON.stringify(rfpData),
+                source: "rfp_ingestion",
+            });
+
+            return res.json({
+                success: true,
+                message: "RFP processed through full pipeline",
+                pipelineResults,
+                projectName: rfpData.projectIdentity?.projectName,
+                buildingType: rfpData.buildingSpecs?.buildingType,
+                sqft: rfpData.buildingSpecs?.estimatedSqft,
+                agentsRun: pipelineResults.map((r: any) => r.from)
+            });
+        } catch (error: any) {
+            console.error("[RFP Ingest] Error:", error);
+            return res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    })
+);
+
 export default router;
+
 
 
