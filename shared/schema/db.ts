@@ -2139,3 +2139,41 @@ export const insertRfpSubmissionSchema = createInsertSchema(rfpSubmissions).omit
 });
 export type InsertRfpSubmission = z.infer<typeof insertRfpSubmissionSchema>;
 export type RfpSubmission = typeof rfpSubmissions.$inferSelect;
+
+// === COMPANY CAPABILITIES ===
+export const CAPABILITY_CATEGORIES = [
+  "core", // Core Capabilities (LiDAR, BIM, etc.)
+  "service", // Service Portfolio
+  "unique", // Unique Capabilities
+  "differentiator", // Differentiators
+  "risk", // Risk Mitigation
+] as const;
+export type CapabilityCategory = typeof CAPABILITY_CATEGORIES[number];
+
+export const companyCapabilities = pgTable("company_capabilities", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull().$type<CapabilityCategory>().default("core"),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  details: jsonb("details").$type<{
+    tools?: string[];
+    environments?: string[];
+    deliverables?: string[];
+    disciplines?: string[];
+    useCases?: string[];
+    applications?: string[];
+    formats?: string[];
+  }>(),
+  sortOrder: integer("sort_order").default(0),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCompanyCapabilitySchema = createInsertSchema(companyCapabilities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCompanyCapability = z.infer<typeof insertCompanyCapabilitySchema>;
+export type CompanyCapability = typeof companyCapabilities.$inferSelect;

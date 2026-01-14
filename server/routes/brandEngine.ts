@@ -390,4 +390,245 @@ router.post(
   })
 );
 
+// ============================================
+// COMPANY CAPABILITIES CRUD
+// ============================================
+
+import { companyCapabilities, insertCompanyCapabilitySchema, type CapabilityCategory, CAPABILITY_CATEGORIES } from "@shared/schema";
+import { and } from "drizzle-orm";
+
+router.get(
+  "/capabilities",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { category } = req.query;
+
+    let conditions = [eq(companyCapabilities.active, true)];
+
+    if (category && CAPABILITY_CATEGORIES.includes(category as CapabilityCategory)) {
+      conditions.push(eq(companyCapabilities.category, category as CapabilityCategory));
+    }
+
+    const capabilities = await db.select()
+      .from(companyCapabilities)
+      .where(and(...conditions))
+      .orderBy(companyCapabilities.sortOrder);
+
+    return res.json({ success: true, data: capabilities });
+  })
+);
+
+router.post(
+  "/capabilities",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = insertCompanyCapabilitySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
+    }
+
+    const [capability] = await db.insert(companyCapabilities).values(parsed.data as any).returning();
+    return res.status(201).json({ success: true, data: capability });
+  })
+);
+
+router.put(
+  "/capabilities/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { category, name, description, details, sortOrder, active } = req.body;
+
+    const [updated] = await db.update(companyCapabilities)
+      .set({ category, name, description, details, sortOrder, active, updatedAt: new Date() })
+      .where(eq(companyCapabilities.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Capability not found" });
+    }
+
+    return res.json({ success: true, data: updated });
+  })
+);
+
+router.delete(
+  "/capabilities/:id",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await db.delete(companyCapabilities).where(eq(companyCapabilities.id, parseInt(id)));
+    return res.json({ success: true });
+  })
+);
+
+// Seed Scan2Plan capabilities reference data
+router.post(
+  "/capabilities/seed",
+  isAuthenticated,
+  requireRole("ceo"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const capabilities = [
+      // Core Capabilities
+      {
+        category: "core" as CapabilityCategory,
+        name: "High-Precision Laser Scanning",
+        description: "LiDAR scanning for interior, exterior, and multi-floor spaces with 1/8 inch accuracy.",
+        details: {
+          tools: ["Trimble X7", "NavVis VLX 2", "Total Station"],
+          environments: ["Interior", "Exterior", "Multi-floor spaces"],
+        },
+        sortOrder: 1,
+      },
+      {
+        category: "core" as CapabilityCategory,
+        name: "BIM Model Deliverables",
+        description: "Revit and Archicad models with colorized point clouds.",
+        details: {
+          deliverables: ["Revit models", "Archicad models", "Colorized point clouds"],
+          formats: ["RVT", "PLA", "RCS", "E57"],
+        },
+        sortOrder: 2,
+      },
+      {
+        category: "core" as CapabilityCategory,
+        name: "Multi-Discipline Coverage",
+        description: "Architecture, Structure, MEPF, and Landscape/Civil documentation.",
+        details: {
+          disciplines: ["Architecture", "Structure", "MEPF (Mechanical, Electrical, Plumbing, Fire Protection)", "Landscape/Civil"],
+        },
+        sortOrder: 3,
+      },
+      // Service Portfolio
+      {
+        category: "service" as CapabilityCategory,
+        name: "Scan-to-BIM",
+        description: "Converts point clouds to BIM models in Revit and Archicad. LoD 200–350+, supports clash detection.",
+        details: {
+          deliverables: ["LoD 200", "LoD 300", "LoD 350", "LoD 350+"],
+          applications: ["Clash detection", "Coordination", "Renovation planning"],
+        },
+        sortOrder: 10,
+      },
+      {
+        category: "service" as CapabilityCategory,
+        name: "Scan-to-CAD",
+        description: "Converts point clouds to 2D CAD drawings (DWG, DXF).",
+        details: {
+          formats: ["DWG", "DXF"],
+          useCases: ["Floor plans", "Sections", "Site plans"],
+        },
+        sortOrder: 11,
+      },
+      {
+        category: "service" as CapabilityCategory,
+        name: "MEPF Modeling",
+        description: "Models HVAC, piping, conduits, utility pathways. LoD 350+ deliverables.",
+        details: {
+          disciplines: ["HVAC", "Piping", "Electrical conduits", "Fire protection"],
+          deliverables: ["LoD 350+"],
+        },
+        sortOrder: 12,
+      },
+      {
+        category: "service" as CapabilityCategory,
+        name: "360° Photo Documentation",
+        description: "High-resolution, colorized imagery hosted on secure platforms.",
+        details: {
+          tools: ["Trimble Clarity", "Matterport"],
+        },
+        sortOrder: 13,
+      },
+      {
+        category: "service" as CapabilityCategory,
+        name: "Paper-to-BIM/CAD Conversion",
+        description: "Digitizes legacy drawings into BIM/CAD formats with custom title blocks.",
+        details: {
+          useCases: ["Legacy drawing digitization", "Title block customization"],
+        },
+        sortOrder: 14,
+      },
+      // Unique Capabilities
+      {
+        category: "unique" as CapabilityCategory,
+        name: "Custom LoD by Area",
+        description: "Tailored LoD standards: LoD 350 for lobbies, LoD 300 for back-of-house.",
+        sortOrder: 20,
+      },
+      {
+        category: "unique" as CapabilityCategory,
+        name: "Multi-Discipline Single Project",
+        description: "Architecture, Structure, MEPF, and Landscape in one coordinated delivery.",
+        sortOrder: 21,
+      },
+      {
+        category: "unique" as CapabilityCategory,
+        name: "Workflow Flexibility",
+        description: "Scanning-only, full Scan-to-BIM, or modeling-only from client point clouds.",
+        details: {
+          useCases: ["Scanning & Registration Only", "Full Scan-to-BIM", "Modeling-Only Option"],
+        },
+        sortOrder: 22,
+      },
+      // Differentiators
+      {
+        category: "differentiator" as CapabilityCategory,
+        name: "Precision & Speed",
+        description: "LoD 350+ models with rapid delivery: scans in 1 week, models in 2-5 weeks.",
+        sortOrder: 30,
+      },
+      {
+        category: "differentiator" as CapabilityCategory,
+        name: "Comprehensive File Compatibility",
+        description: "Revit, Archicad, AutoCAD, Rhino, IFC, DWG with multi-discipline coordination.",
+        details: {
+          formats: ["Revit", "Archicad", "AutoCAD", "Rhino", "IFC", "DWG"],
+        },
+        sortOrder: 31,
+      },
+      {
+        category: "differentiator" as CapabilityCategory,
+        name: "End-to-End Support",
+        description: "Unlimited support & fixes with dedicated project management.",
+        sortOrder: 32,
+      },
+      // Risk Mitigation
+      {
+        category: "risk" as CapabilityCategory,
+        name: "Clash-Free Modeling",
+        description: "3-stage QC process ensures zero RFIs.",
+        sortOrder: 40,
+      },
+      {
+        category: "risk" as CapabilityCategory,
+        name: "File Security",
+        description: "Encrypted storage, password-protected sharing.",
+        sortOrder: 41,
+      },
+      {
+        category: "risk" as CapabilityCategory,
+        name: "Site Adaptability",
+        description: "Custom PPE for hazardous sites (fire, flood damage).",
+        sortOrder: 42,
+      },
+    ];
+
+    let inserted = 0;
+    for (const cap of capabilities) {
+      await db.insert(companyCapabilities).values(cap);
+      inserted++;
+    }
+
+    return res.json({
+      success: true,
+      count: inserted,
+      message: `Loaded ${inserted} Scan2Plan capabilities`,
+    });
+  })
+);
+
+
 export default router;
