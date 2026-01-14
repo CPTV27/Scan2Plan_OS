@@ -273,9 +273,11 @@ The price estimate is based on a square footage estimate. The total cost of the 
 - The first invoice will be for half of the estimated cost.
 - The second invoice, due upon delivery, will be for the outstanding balance based on the total square footage scanned and modeled.
 
-### Payment Methods
+### Accepted Forms of Payment
 
-Payment accepted via check, ACH, or credit card.
+- **ACH** (Preferred Method)
+- **Check** - Please mail check to Scan2Plan, 188 1st St., Troy, NY 12180
+- **Credit Card** (additional 3% fee) - Email accounting@scan2plan.io to request this option
 `,
     },
     {
@@ -297,9 +299,11 @@ The price estimate is based on a square footage estimate. The total cost of the 
 - The first invoice will be for half of the estimated cost.
 - The second invoice will be for the outstanding balance based on the total square footage scanned and modeled.
 
-### Payment Methods
+### Accepted Forms of Payment
 
-Payment accepted via check, ACH, or credit card.
+- **ACH** (Preferred Method)
+- **Check** - Please mail check to Scan2Plan, 188 1st St., Troy, NY 12180
+- **Credit Card** (additional 3% fee) - Email accounting@scan2plan.io to request this option
 `,
     },
     {
@@ -321,9 +325,11 @@ The price estimate is based on a square footage estimate. The total cost of the 
 
 **Net 30 Projects carry a 5% service fee.**
 
-### Payment Methods
+### Accepted Forms of Payment
 
-Payment accepted via check, ACH, or credit card.
+- **ACH** (Preferred Method)
+- **Check** - Please mail check to Scan2Plan, 188 1st St., Troy, NY 12180
+- **Credit Card** (additional 3% fee) - Email accounting@scan2plan.io to request this option
 `,
     },
     {
@@ -345,9 +351,11 @@ The price estimate is based on a square footage estimate. The total cost of the 
 
 **Net 60 Projects carry a 10% service fee.**
 
-### Payment Methods
+### Accepted Forms of Payment
 
-Payment accepted via check, ACH, or credit card.
+- **ACH** (Preferred Method)
+- **Check** - Please mail check to Scan2Plan, 188 1st St., Troy, NY 12180
+- **Credit Card** (additional 3% fee) - Email accounting@scan2plan.io to request this option
 `,
     },
     {
@@ -369,9 +377,11 @@ The price estimate is based on a square footage estimate. The total cost of the 
 
 **Net 90 Projects carry a 15% service fee.**
 
-### Payment Methods
+### Accepted Forms of Payment
 
-Payment accepted via check, ACH, or credit card.
+- **ACH** (Preferred Method)
+- **Check** - Please mail check to Scan2Plan, 188 1st St., Troy, NY 12180
+- **Credit Card** (additional 3% fee) - Email accounting@scan2plan.io to request this option
 `,
     },
     {
