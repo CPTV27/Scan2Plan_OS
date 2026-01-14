@@ -12,8 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Sun, Moon, Plus, X, Check, AlertTriangle,
-  Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign, Cloud, HelpCircle
+  Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign, Cloud, HelpCircle,
+  ClipboardList, Pencil, Trash2
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import type { LeadSourcesConfig, StalenessConfig, BusinessDefaultsConfig, GcsStorageConfig } from "@shared/schema";
 import { GCS_STORAGE_MODES } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -516,6 +518,9 @@ export default function Settings() {
 
             {/* Business Defaults */}
             <BusinessDefaultsEditor config={businessDefaults} />
+
+            {/* Technical Standards */}
+            <StandardsEditor />
 
             {/* CI/CD Status */}
             <CIStatusPanel />
@@ -1295,6 +1300,291 @@ function CloudStorageEditor() {
             )}
           </>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface StandardDefinition {
+  id: number;
+  term: string;
+  definition: string;
+  guaranteeText: string | null;
+  category: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+const STANDARDS_CATEGORY_LABELS: Record<string, string> = {
+  scanning_loa: "Scanning - Levels of Accuracy",
+  scanning_devices: "Scanning - Devices",
+  scanning_process: "Scanning - Process",
+  modeling_lod: "Modeling - Levels of Detail",
+  modeling_disciplines: "Modeling - Disciplines",
+  quality_control: "Quality Control",
+  general: "General",
+};
+
+const STANDARDS_CATEGORY_ORDER = [
+  "scanning_loa",
+  "scanning_devices",
+  "scanning_process",
+  "modeling_lod",
+  "modeling_disciplines",
+  "quality_control",
+  "general",
+];
+
+function StandardsEditor() {
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ term: "", definition: "", guaranteeText: "" });
+  const [newCategory, setNewCategory] = useState<string | null>(null);
+  const [newForm, setNewForm] = useState({ term: "", definition: "", guaranteeText: "" });
+
+  const { data: standardsData, isLoading } = useQuery<{ success: boolean; data: StandardDefinition[] }>({
+    queryKey: ["/api/brand/standards"],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/brand/standards/seed", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/standards"] });
+      toast({ title: "Standards seeded successfully" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, term, definition, guaranteeText }: { id: number; term: string; definition: string; guaranteeText: string }) => {
+      const res = await apiRequest("PUT", `/api/brand/standards/${id}`, { term, definition, guaranteeText: guaranteeText || null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/standards"] });
+      setEditingId(null);
+      toast({ title: "Standard updated" });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { category: string; term: string; definition: string; guaranteeText: string }) => {
+      const res = await apiRequest("POST", "/api/brand/standards", { ...data, guaranteeText: data.guaranteeText || null });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/standards"] });
+      setNewCategory(null);
+      setNewForm({ term: "", definition: "", guaranteeText: "" });
+      toast({ title: "Standard added" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/brand/standards/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/standards"] });
+      toast({ title: "Standard deleted" });
+    },
+  });
+
+  const groupedStandards = STANDARDS_CATEGORY_ORDER.reduce((acc, cat) => {
+    acc[cat] = standardsData?.data?.filter(s => s.category === cat) || [];
+    return acc;
+  }, {} as Record<string, StandardDefinition[]>);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Technical Standards
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!standardsData?.data?.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Technical Standards
+          </CardTitle>
+          <CardDescription>
+            Scanning and modeling standards that inform AI proposal writing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <p className="text-muted-foreground mb-4">No standards configured yet.</p>
+          <Button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending} data-testid="button-seed-standards">
+            {seedMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+            Load Scan2Plan Standards
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5" />
+          Technical Standards
+        </CardTitle>
+        <CardDescription>
+          Scanning and modeling standards that inform AI proposal writing
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {STANDARDS_CATEGORY_ORDER.map(category => {
+          const standards = groupedStandards[category];
+          if (standards.length === 0 && category !== newCategory) return null;
+
+          return (
+            <div key={category} className="space-y-3">
+              <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
+                {STANDARDS_CATEGORY_LABELS[category] || category}
+              </h4>
+              <div className="space-y-2">
+                {standards.map(standard => (
+                  <div key={standard.id} className="border rounded-lg p-3">
+                    {editingId === standard.id ? (
+                      <div className="space-y-3">
+                        <Input
+                          value={editForm.term}
+                          onChange={e => setEditForm(f => ({ ...f, term: e.target.value }))}
+                          placeholder="Term (e.g., LoD 300)"
+                          data-testid={`input-edit-term-${standard.id}`}
+                        />
+                        <Textarea
+                          value={editForm.definition}
+                          onChange={e => setEditForm(f => ({ ...f, definition: e.target.value }))}
+                          placeholder="Definition"
+                          rows={2}
+                          data-testid={`input-edit-definition-${standard.id}`}
+                        />
+                        <Input
+                          value={editForm.guaranteeText}
+                          onChange={e => setEditForm(f => ({ ...f, guaranteeText: e.target.value }))}
+                          placeholder="Guarantee text (optional)"
+                          data-testid={`input-edit-guarantee-${standard.id}`}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => updateMutation.mutate({ id: standard.id, ...editForm })}
+                            disabled={updateMutation.isPending}
+                            data-testid={`button-save-standard-${standard.id}`}
+                          >
+                            <Save className="h-4 w-4 mr-1" /> Save
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <h5 className="font-medium text-sm">{standard.term}</h5>
+                          <p className="text-sm text-muted-foreground mt-1">{standard.definition}</p>
+                          {standard.guaranteeText && (
+                            <p className="text-xs text-primary mt-1">{standard.guaranteeText}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingId(standard.id);
+                              setEditForm({
+                                term: standard.term,
+                                definition: standard.definition,
+                                guaranteeText: standard.guaranteeText || "",
+                              });
+                            }}
+                            data-testid={`button-edit-standard-${standard.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteMutation.mutate(standard.id)}
+                            data-testid={`button-delete-standard-${standard.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {newCategory === category ? (
+                  <div className="border rounded-lg p-3 border-dashed space-y-3">
+                    <Input
+                      value={newForm.term}
+                      onChange={e => setNewForm(f => ({ ...f, term: e.target.value }))}
+                      placeholder="Term"
+                      data-testid="input-new-term"
+                    />
+                    <Textarea
+                      value={newForm.definition}
+                      onChange={e => setNewForm(f => ({ ...f, definition: e.target.value }))}
+                      placeholder="Definition"
+                      rows={2}
+                      data-testid="input-new-definition"
+                    />
+                    <Input
+                      value={newForm.guaranteeText}
+                      onChange={e => setNewForm(f => ({ ...f, guaranteeText: e.target.value }))}
+                      placeholder="Guarantee text (optional)"
+                      data-testid="input-new-guarantee"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => createMutation.mutate({ category, ...newForm })}
+                        disabled={createMutation.isPending || !newForm.term || !newForm.definition}
+                        data-testid="button-add-standard"
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Add
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setNewCategory(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full border-dashed border"
+                    onClick={() => setNewCategory(category)}
+                    data-testid={`button-add-to-${category}`}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Standard
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );

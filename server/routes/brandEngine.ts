@@ -13,7 +13,7 @@ import {
 } from "../lib/brand_engine";
 import { z } from "zod";
 import { db } from "../db";
-import { brandValues, insertBrandValueSchema } from "@shared/schema";
+import { brandValues, insertBrandValueSchema, standardDefinitions, insertStandardDefinitionSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -86,8 +86,80 @@ router.get(
   "/standards",
   isAuthenticated,
   asyncHandler(async (req: Request, res: Response) => {
-    const definitions = await getStandardDefinitions();
+    const definitions = await db.select().from(standardDefinitions).orderBy(standardDefinitions.category, standardDefinitions.term);
     return res.json({ success: true, data: definitions });
+  })
+);
+
+router.post(
+  "/standards",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const parsed = insertStandardDefinitionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+    }
+    const [standard] = await db.insert(standardDefinitions).values(parsed.data).returning();
+    return res.json({ success: true, data: standard });
+  })
+);
+
+router.put(
+  "/standards/:id",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const { term, definition, guaranteeText, category, active } = req.body;
+    const [updated] = await db
+      .update(standardDefinitions)
+      .set({ term, definition, guaranteeText, category, active })
+      .where(eq(standardDefinitions.id, id))
+      .returning();
+    return res.json({ success: true, data: updated });
+  })
+);
+
+router.delete(
+  "/standards/:id",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    await db.delete(standardDefinitions).where(eq(standardDefinitions.id, id));
+    return res.json({ success: true });
+  })
+);
+
+router.post(
+  "/standards/seed",
+  isAuthenticated,
+  asyncHandler(async (req: Request, res: Response) => {
+    const seedData = [
+      { category: "scanning_loa", term: "LoA 40 (Measured Accuracy)", definition: "Tolerance: 0–1/8 inch. Point clouds generated directly from laser scans, providing high-precision scan data aligned with real-world conditions.", guaranteeText: "Validated via B-Validation (overlapping scan alignment) and C-Validation (control points aligned with survey data)." },
+      { category: "scanning_loa", term: "LoA 30 (Modeled Accuracy)", definition: "Tolerance: 0–1/2 inch. BIM/CAD models derived from point clouds, ensuring modeled geometry reflects scanned data for construction-ready deliverables.", guaranteeText: null },
+      { category: "scanning_devices", term: "Trimble X7", definition: "Accuracy: ±2mm. Features colorized scans and real-time registration for high-precision surveying.", guaranteeText: null },
+      { category: "scanning_devices", term: "NavVis VLX 2", definition: "Accuracy: Up to 6mm. Mobile SLAM scanning for dynamic environments and large-scale capture.", guaranteeText: null },
+      { category: "scanning_process", term: "Pre-Scan Protocol", definition: "Conduct site surveys to identify access points and conditions. Ensure comprehensive planning to cover all required areas.", guaranteeText: null },
+      { category: "scanning_process", term: "On-Site Execution", definition: "Perform live review to verify completeness of scan coverage. Address missing data before leaving the site.", guaranteeText: null },
+      { category: "modeling_lod", term: "LoD 200", definition: "Schematic massing, basic geometry for feasibility studies.", guaranteeText: null },
+      { category: "modeling_lod", term: "LoD 300", definition: "Construction-ready elements, accurate geometry and dimensions.", guaranteeText: null },
+      { category: "modeling_lod", term: "LoD 350", definition: "Detailed construction-ready models with joint and connection details.", guaranteeText: null },
+      { category: "modeling_lod", term: "LoD 350+ (HBIM)", definition: "Custom detail for historic preservation, including carvings and ornate features.", guaranteeText: null },
+      { category: "modeling_disciplines", term: "Architecture", definition: "Elements: Walls, doors, windows, ceilings, and floors. Special Features: Custom details for historic and high-profile projects (LoD 350+).", guaranteeText: null },
+      { category: "modeling_disciplines", term: "Structure", definition: "Elements: Beams, columns, trusses, and foundations. Special Features: Detailed connections supporting structural analysis.", guaranteeText: null },
+      { category: "modeling_disciplines", term: "MEPF", definition: "Mechanical, Electrical, Plumbing, Fire. Elements: Ducts, pipes, conduits, and sprinkler systems. Special Features: Fully clash-detectable layouts compatible with multidisciplinary coordination.", guaranteeText: null },
+      { category: "modeling_disciplines", term: "Landscape", definition: "Elements: Topography, pathways, and foliage. Special Features: Georeferenced models for landscape design and historic preservation at LoD 350+.", guaranteeText: null },
+      { category: "quality_control", term: "3-Stage QC Process", definition: "Stage 1: Dedicated BIM Modeling and CAD drafting teams. Stage 2: Dedicated BIM and CAD QC teams. Stage 3: Senior Engineer Review.", guaranteeText: "Every deliverable passes through our rigorous 3-stage quality control process." },
+    ];
+    
+    for (const item of seedData) {
+      const existing = await db.select().from(standardDefinitions).where(eq(standardDefinitions.term, item.term));
+      if (existing.length === 0) {
+        await db.insert(standardDefinitions).values(item);
+      }
+    }
+    
+    const allStandards = await db.select().from(standardDefinitions).orderBy(standardDefinitions.category, standardDefinitions.term);
+    return res.json({ success: true, data: allStandards });
   })
 );
 
