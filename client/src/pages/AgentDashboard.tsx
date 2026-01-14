@@ -95,6 +95,22 @@ interface RAGContext {
     };
 }
 
+interface AnalyticsData {
+    summary: {
+        totalItems: number;
+        totalActionable: number;
+        totalEstimatedValue: number;
+        avgValuePerOpportunity: number;
+        unreadCount: number;
+        last24Hours: number;
+        last7Days: number;
+    };
+    byCategory: Record<string, { count: number; actionable: number; avgRelevance: number; items: any[] }>;
+    byRegion: Record<string, number>;
+    byCompetitor: Record<string, number>;
+    topOpportunities: Array<{ id: number; title: string; region: string; estimatedValue: number; relevanceScore: number }>;
+}
+
 export default function AgentDashboard() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
@@ -121,6 +137,11 @@ export default function AgentDashboard() {
     // Fetch categories
     const { data: categories } = useQuery<Array<{ value: string; label: string }>>({
         queryKey: ["/api/agent/categories"],
+    });
+
+    // Fetch analytics
+    const { data: analytics, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
+        queryKey: ["/api/agent/analytics"],
     });
 
     // Generate prompts mutation
@@ -320,6 +341,10 @@ export default function AgentDashboard() {
                     {/* Main Tabs */}
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                         <TabsList className="mb-6">
+                            <TabsTrigger value="analytics" className="gap-2">
+                                <BarChart3 className="w-4 h-4" />
+                                Intel Analytics
+                            </TabsTrigger>
                             <TabsTrigger value="prompts" className="gap-2">
                                 <MessageSquare className="w-4 h-4" />
                                 Prompt Library
@@ -333,6 +358,183 @@ export default function AgentDashboard() {
                                 RAG Context
                             </TabsTrigger>
                         </TabsList>
+
+                        {/* Analytics Tab */}
+                        <TabsContent value="analytics">
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold">Intel Feed Analytics</h2>
+                                <p className="text-sm text-muted-foreground">
+                                    Aggregate view of all intelligence data by category
+                                </p>
+                            </div>
+
+                            {analyticsLoading ? (
+                                <div className="space-y-4">
+                                    {[1, 2, 3].map((i) => (
+                                        <Skeleton key={i} className="h-32" />
+                                    ))}
+                                </div>
+                            ) : !analytics ? (
+                                <Card>
+                                    <CardContent className="py-12 text-center">
+                                        <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/20" />
+                                        <p className="text-muted-foreground">No analytics data available.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Summary Stats */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Total Items</p>
+                                                <p className="text-2xl font-bold">{analytics.summary.totalItems}</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Actionable</p>
+                                                <p className="text-2xl font-bold text-green-500">{analytics.summary.totalActionable}</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Unread</p>
+                                                <p className="text-2xl font-bold text-orange-500">{analytics.summary.unreadCount}</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Last 24h</p>
+                                                <p className="text-2xl font-bold">{analytics.summary.last24Hours}</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Last 7 Days</p>
+                                                <p className="text-2xl font-bold">{analytics.summary.last7Days}</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Est. Value</p>
+                                                <p className="text-2xl font-bold">${(analytics.summary.totalEstimatedValue / 1000).toFixed(0)}k</p>
+                                            </CardContent>
+                                        </Card>
+                                        <Card>
+                                            <CardContent className="pt-4 pb-4">
+                                                <p className="text-xs text-muted-foreground">Avg/Opp</p>
+                                                <p className="text-2xl font-bold">${(analytics.summary.avgValuePerOpportunity / 1000).toFixed(0)}k</p>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    {/* By Category Grid */}
+                                    <div>
+                                        <h3 className="text-sm font-semibold mb-3">Intel by Category</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {Object.entries(analytics.byCategory).map(([category, data]) => (
+                                                <Card key={category}>
+                                                    <CardHeader className="pb-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <Badge className={getCategoryColor(category)}>{category}</Badge>
+                                                            <span className="text-2xl font-bold">{data.count}</span>
+                                                        </div>
+                                                    </CardHeader>
+                                                    <CardContent>
+                                                        <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                                                            <span>{data.actionable} actionable</span>
+                                                            <span>Avg relevance: {data.avgRelevance}%</span>
+                                                        </div>
+                                                        {data.items.length > 0 && (
+                                                            <div className="space-y-1">
+                                                                <p className="text-xs font-medium">Recent:</p>
+                                                                {data.items.slice(0, 3).map((item, i) => (
+                                                                    <p key={i} className="text-xs text-muted-foreground truncate">
+                                                                        • {item.title}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Top Opportunities */}
+                                    {analytics.topOpportunities.length > 0 && (
+                                        <div>
+                                            <h3 className="text-sm font-semibold mb-3">Top Opportunities by Value</h3>
+                                            <Card>
+                                                <CardContent className="pt-4">
+                                                    <div className="space-y-2">
+                                                        {analytics.topOpportunities.map((opp, i) => (
+                                                            <div key={opp.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                                                <div className="flex-1">
+                                                                    <p className="font-medium text-sm">{opp.title}</p>
+                                                                    <p className="text-xs text-muted-foreground">{opp.region || "Unknown region"}</p>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="font-bold text-green-500">${(opp.estimatedValue / 1000).toFixed(0)}k</p>
+                                                                    <p className="text-xs text-muted-foreground">{opp.relevanceScore}% match</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* By Region */}
+                                    {Object.keys(analytics.byRegion).length > 0 && (
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div>
+                                                <h3 className="text-sm font-semibold mb-3">Intel by Region</h3>
+                                                <Card>
+                                                    <CardContent className="pt-4">
+                                                        <div className="space-y-2">
+                                                            {Object.entries(analytics.byRegion)
+                                                                .sort((a, b) => b[1] - a[1])
+                                                                .slice(0, 8)
+                                                                .map(([region, count]) => (
+                                                                    <div key={region} className="flex items-center justify-between">
+                                                                        <span className="text-sm">{region}</span>
+                                                                        <Badge variant="secondary">{count}</Badge>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+
+                                            {/* By Competitor */}
+                                            {Object.keys(analytics.byCompetitor).length > 0 && (
+                                                <div>
+                                                    <h3 className="text-sm font-semibold mb-3">Competitor Mentions</h3>
+                                                    <Card>
+                                                        <CardContent className="pt-4">
+                                                            <div className="space-y-2">
+                                                                {Object.entries(analytics.byCompetitor)
+                                                                    .sort((a, b) => b[1] - a[1])
+                                                                    .slice(0, 8)
+                                                                    .map(([competitor, count]) => (
+                                                                        <div key={competitor} className="flex items-center justify-between">
+                                                                            <span className="text-sm">{competitor}</span>
+                                                                            <Badge variant="outline">{count}</Badge>
+                                                                        </div>
+                                                                    ))}
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </TabsContent>
 
                         {/* Prompts Tab */}
                         <TabsContent value="prompts">

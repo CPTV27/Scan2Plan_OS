@@ -308,4 +308,117 @@ router.get(
     })
 );
 
+// GET /api/agent/analytics - Get aggregate intel statistics
+router.get(
+    "/analytics",
+    isAuthenticated,
+    asyncHandler(async (req: Request, res: Response) => {
+        // Get all intel items (not archived)
+        const allItems = await db
+            .select()
+            .from(intelNewsItems)
+            .where(eq(intelNewsItems.isArchived, false));
+
+        // Aggregate by category
+        const byCategory: Record<string, { count: number; actionable: number; avgRelevance: number; items: any[] }> = {};
+        const byRegion: Record<string, number> = {};
+        const byCompetitor: Record<string, number> = {};
+
+        let totalActionable = 0;
+        let totalWithValue = 0;
+        let totalEstimatedValue = 0;
+
+        for (const item of allItems) {
+            // By category
+            if (!byCategory[item.type]) {
+                byCategory[item.type] = { count: 0, actionable: 0, avgRelevance: 0, items: [] };
+            }
+            byCategory[item.type].count++;
+            if (item.isActionable) {
+                byCategory[item.type].actionable++;
+                totalActionable++;
+            }
+            // Store recent items (max 5 per category for preview)
+            if (byCategory[item.type].items.length < 5) {
+                byCategory[item.type].items.push({
+                    id: item.id,
+                    title: item.title,
+                    region: item.region,
+                    relevanceScore: item.relevanceScore,
+                    createdAt: item.createdAt,
+                });
+            }
+
+            // By region
+            if (item.region) {
+                byRegion[item.region] = (byRegion[item.region] || 0) + 1;
+            }
+
+            // By competitor
+            if (item.competitorName) {
+                byCompetitor[item.competitorName] = (byCompetitor[item.competitorName] || 0) + 1;
+            }
+
+            // Estimated value
+            if (item.estimatedValue) {
+                totalWithValue++;
+                totalEstimatedValue += item.estimatedValue;
+            }
+        }
+
+        // Calculate average relevance per category
+        for (const cat of Object.keys(byCategory)) {
+            const catItems = allItems.filter(i => i.type === cat);
+            const totalRelevance = catItems.reduce((sum, i) => sum + (i.relevanceScore || 0), 0);
+            byCategory[cat].avgRelevance = catItems.length > 0
+                ? Math.round(totalRelevance / catItems.length)
+                : 0;
+        }
+
+        // Top opportunities by value
+        const topOpportunities = allItems
+            .filter(i => i.type === "opportunity" && i.estimatedValue)
+            .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
+            .slice(0, 10)
+            .map(i => ({
+                id: i.id,
+                title: i.title,
+                region: i.region,
+                estimatedValue: i.estimatedValue,
+                relevanceScore: i.relevanceScore,
+            }));
+
+        // Summary stats
+        const summary = {
+            totalItems: allItems.length,
+            totalActionable,
+            totalEstimatedValue,
+            avgValuePerOpportunity: totalWithValue > 0 ? Math.round(totalEstimatedValue / totalWithValue) : 0,
+            unreadCount: allItems.filter(i => !i.isRead).length,
+            last24Hours: allItems.filter(i => {
+                const created = new Date(i.createdAt || 0);
+                const now = new Date();
+                return (now.getTime() - created.getTime()) < 24 * 60 * 60 * 1000;
+            }).length,
+            last7Days: allItems.filter(i => {
+                const created = new Date(i.createdAt || 0);
+                const now = new Date();
+                return (now.getTime() - created.getTime()) < 7 * 24 * 60 * 60 * 1000;
+            }).length,
+        };
+
+        return res.json({
+            success: true,
+            data: {
+                summary,
+                byCategory,
+                byRegion,
+                byCompetitor,
+                topOpportunities,
+            },
+        });
+    })
+);
+
 export default router;
+
