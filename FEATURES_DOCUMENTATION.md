@@ -196,20 +196,43 @@ Automatically sets LOD 350+ for heritage building types:
 
 ## 4. Field Operations (ScanTech)
 
-### Mobile-Optimized Interface
-- Responsive design for phone/tablet use
-- Touch-friendly controls
-- Offline-capable (where applicable)
+### Mobile-First PWA Experience
+- **`FieldMobileLayout`**: Dedicated mobile shell with bottom navigation
+- **Responsive Detection**: `useIsMobile` hook automatically switches layouts
+- **Touch-Optimized**: Large buttons, swipe gestures, native-app feel
+- **Offline-Capable**: Local storage for notes (where applicable)
+
+### Mobile Navigation Tabs
+| Tab | Function |
+|-----|----------|
+| **Home** | Mission overview + Quick Actions |
+| **Time** | Clock In/Out + GPS tracking |
+| **Capture** | Photo/video upload to project folder |
+| **Chat** | AI support + escalation |
+| **Notes** | Voice recording + transcription |
+
+### Quick Actions (Mobile Home Screen)
+- **Clock In/Out**: One-tap with GPS capture
+- **Capture**: Direct camera access for site photos
+- **Voice Note**: Start recording → AI transcription
+- **Escalate**: Immediate chat with AI support
 
 ### GPS-Based Time Tracking
 - **Clock In/Out**: Automatic capture with coordinates
 - **Geofence Detection**: Visual indicator of on-site status
+- **Geolocation Capture**: Sent with `/api/projects/:id/mission-log`
 - **Time Logs**:
   - Arrival/departure timestamps
   - Total site minutes
   - Type: Automatic (GPS) or Manual
   - Latitude/longitude at clock-in
   - Technician notes
+
+### Voice Field Notes (Whisper AI)
+- **Recording Interface**: Microphone button with duration timer
+- **Backend Transcription**: `POST /api/transcribe` using OpenAI Whisper
+- **Automatic Processing**: Audio → Text → Notes field
+- **Local Storage**: Notes persist locally until submitted in Daily Report
 
 ### Daily Missions
 - View assigned projects for the day

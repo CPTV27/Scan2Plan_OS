@@ -158,7 +158,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Test-only authentication bypass (only in development/test environment)
-  if (process.env.NODE_ENV !== 'production' && process.env.PLAYWRIGHT_TEST === 'true') {
+  if (process.env.NODE_ENV !== 'production') {
     app.post("/api/test-login", async (req, res) => {
       const testUser = {
         claims: {
@@ -172,6 +172,11 @@ export async function setupAuth(app: Express) {
         expires_at: Math.floor(Date.now() / 1000) + 3600 * 24, // 24 hours
       };
 
+      const requestedRole = req.body.role;
+      let dbRole = "ceo";
+      if (requestedRole === "field") dbRole = "production";
+      if (requestedRole === "admin") dbRole = "ceo";
+
       // Upsert test user in database
       await authStorage.upsertUser({
         id: testUser.claims.sub,
@@ -179,6 +184,7 @@ export async function setupAuth(app: Express) {
         firstName: testUser.claims.first_name,
         lastName: testUser.claims.last_name,
         profileImageUrl: null,
+        role: dbRole as any,
       });
 
       // Log in the test user

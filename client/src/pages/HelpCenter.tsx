@@ -712,6 +712,102 @@ export default function HelpCenter() {
                     </Accordion>
                   </CardContent>
                 </Card>
+
+                {/* FieldHub Mobile App */}
+                <Card className="border-cyan-500/20 bg-cyan-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-cyan-500" />
+                      FieldHub Mobile App
+                      <Badge variant="secondary" className="ml-auto">New</Badge>
+                    </CardTitle>
+                    <CardDescription>Mobile-first interface for field technicians (PWA).</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="field-1">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Play className="h-4 w-4 text-cyan-500" />
+                            Getting Started
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Access:</strong> Navigate to <strong>/field</strong> on any device.</p>
+                          <p><strong className="text-foreground">Mobile Detection:</strong> On phones and tablets, the UI automatically switches to the mobile-optimized layout with bottom navigation.</p>
+                          <p><strong className="text-foreground">Bottom Tabs:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Home:</strong> Mission overview + Quick Actions</li>
+                            <li><strong>Time:</strong> Clock In/Out with GPS tracking</li>
+                            <li><strong>Capture:</strong> Photo/video upload</li>
+                            <li><strong>Chat:</strong> AI support</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="field-2">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-amber-500" />
+                            Quick Actions
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p>Large, touch-friendly buttons on the Home tab:</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Clock In/Out:</strong> One-tap status update with GPS capture</li>
+                            <li><strong>Capture:</strong> Direct camera access for site photos</li>
+                            <li><strong>Voice Note:</strong> Record → AI transcription → Field Notes</li>
+                            <li><strong>Escalate:</strong> Immediate chat with AI support</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="field-3">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Brain className="h-4 w-4 text-purple-500" />
+                            Voice Notes (Whisper AI)
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">How it works:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Tap <strong>Voice Note</strong> Quick Action</li>
+                            <li>Press <strong>Record Voice Note</strong> and speak clearly</li>
+                            <li>Tap <strong>Stop</strong> when finished</li>
+                            <li>AI transcribes audio to text using OpenAI Whisper</li>
+                            <li>Transcription appears in your Field Notes</li>
+                          </ol>
+                          <p className="text-sm mt-2 text-green-600 dark:text-green-400">Notes are saved locally until submitted in your Daily Report.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="field-4">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Target className="h-4 w-4 text-green-500" />
+                            GPS Time Tracking
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What it captures:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Clock In/Out timestamp</li>
+                            <li>GPS coordinates (latitude/longitude)</li>
+                            <li>Mission log entry with status update</li>
+                          </ul>
+                          <p><strong className="text-foreground">Requirements:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Browser location permissions enabled</li>
+                            <li>GPS signal (may be weak indoors)</li>
+                          </ul>
+                          <p className="text-sm mt-2 border-t pt-2">If geolocation fails, Clock In still works—location just won't be recorded.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="strategy" className="space-y-4">
@@ -1090,6 +1186,61 @@ export default function HelpCenter() {
                         <AccordionContent className="text-muted-foreground space-y-3">
                           <p>User management is restricted to Admins (CEO role).</p>
                           <p>Go to <strong className="text-foreground">Settings &gt; Team</strong> to invite new users or manage permissions.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="faq-5">
+                        <AccordionTrigger>How do I access the FieldHub mobile app?</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What it is:</strong> FieldHub is a mobile-first interface for field technicians.</p>
+                          <p><strong className="text-foreground">How to access:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Navigate to <strong>/field</strong> on any device</li>
+                            <li>On mobile, the interface automatically switches to mobile-optimized layout</li>
+                            <li>Bottom navigation: Home, Time, Capture, Chat</li>
+                          </ul>
+                          <p className="text-sm mt-2 text-green-600 dark:text-green-400">Tip: Add the page to your home screen for app-like experience.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="faq-6">
+                        <AccordionTrigger>What are the Quick Actions in FieldHub?</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Quick Actions</strong> are large, touch-friendly buttons for common field tasks:</p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Clock In/Out:</strong> One-tap with GPS location capture</li>
+                            <li><strong>Capture:</strong> Quick access to camera for site photos</li>
+                            <li><strong>Voice Note:</strong> Record and transcribe voice memos</li>
+                            <li><strong>Escalate:</strong> Immediately chat with AI support</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="faq-7">
+                        <AccordionTrigger>How do Voice Notes work?</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">AI-Powered Transcription:</strong> Voice Notes use OpenAI Whisper to convert speech to text.</p>
+                          <p><strong className="text-foreground">How to use:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Tap the <strong>Voice Note</strong> Quick Action</li>
+                            <li>Press <strong>Record Voice Note</strong> and speak clearly</li>
+                            <li>Tap <strong>Stop</strong> when finished</li>
+                            <li>The transcribed text appears in your Field Notes</li>
+                          </ol>
+                          <p className="text-sm mt-2 border-t pt-2">Notes are saved locally and included in your Daily Report.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="faq-8">
+                        <AccordionTrigger>Why isn't my GPS location captured when I Clock In?</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Common causes:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li>Location permissions not granted in browser settings</li>
+                            <li>GPS signal weak (indoors or in parking garage)</li>
+                            <li>Browser privacy settings blocking geolocation</li>
+                          </ul>
+                          <p className="text-sm mt-2 text-amber-600 dark:text-amber-400">If geolocation fails, Clock In will still work—but location won't be recorded.</p>
                         </AccordionContent>
                       </AccordionItem>
                     </Accordion>

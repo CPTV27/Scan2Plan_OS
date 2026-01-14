@@ -13,9 +13,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { 
-  Play, 
-  Square, 
+import {
+  Play,
+  Square,
   Mic,
   MicOff,
   MapPin,
@@ -48,6 +48,9 @@ import {
   FolderOpen,
   CheckCircle2
 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { FieldMobileLayout } from "@/features/field/layouts/FieldMobileLayout";
+import { QuickActions } from "@/features/field/components/QuickActions";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 
@@ -95,7 +98,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
   const items: ScopeChecklistItem[] = [];
   const disciplinesLower = disciplines?.toLowerCase() || "";
   const lodLevel = lod || "LOD 300";
-  
+
   // Always add baseline scan requirements
   items.push({
     id: "baseline-1",
@@ -109,7 +112,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
     category: "Baseline",
     completed: false,
   });
-  
+
   // Mechanical/HVAC discipline
   if (disciplinesLower.includes("mech") || disciplinesLower.includes("hvac") || disciplinesLower.includes("mep")) {
     items.push({
@@ -125,7 +128,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // Electrical discipline
   if (disciplinesLower.includes("elec") || disciplinesLower.includes("mep")) {
     items.push({
@@ -141,7 +144,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // Plumbing discipline
   if (disciplinesLower.includes("plumb") || disciplinesLower.includes("mep")) {
     items.push({
@@ -151,7 +154,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // Structural discipline
   if (disciplinesLower.includes("struct")) {
     items.push({
@@ -167,7 +170,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // LOD 350+ requirements
   if (lodLevel.includes("350") || lodLevel.includes("400")) {
     items.push({
@@ -183,7 +186,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // Architecture (always included)
   if (disciplinesLower.includes("arch") || items.length < 5) {
     items.push({
@@ -199,7 +202,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
       completed: false,
     });
   }
-  
+
   // Required items (always included)
   items.push({
     id: "required-video",
@@ -213,7 +216,7 @@ function generateScopeChecklist(disciplines: string, lod?: string): ScopeCheckli
     category: "Required",
     completed: false,
   });
-  
+
   return items;
 }
 
@@ -261,40 +264,40 @@ function TimestampButton({
   showToast,
 }: TimestampButtonProps) {
   const isEditing = editingTimestamp === field;
-  
+
   const handleTap = () => {
     if (timestamp) return; // Already recorded
     updateMutation.mutate({ missionLogId, field, manual: false });
   };
-  
+
   const handleManualSave = () => {
     if (!manualTimeValue) return;
-    
+
     // Build date from time input
     const manualDate = new Date();
     const [hours, minutes] = manualTimeValue.split(":").map(Number);
     manualDate.setHours(hours, minutes, 0, 0);
-    
+
     // Validate time is after previous timestamp
     if (previousTimestamp && manualDate <= new Date(previousTimestamp)) {
       showToast?.({ title: "Invalid Time", description: "Time must be after the previous step", variant: "destructive" });
       return;
     }
-    
+
     // Validate time is before next timestamp (if one exists)
     if (nextTimestamp && manualDate >= new Date(nextTimestamp)) {
       showToast?.({ title: "Invalid Time", description: "Time must be before the next step", variant: "destructive" });
       return;
     }
-    
-    updateMutation.mutate({ 
-      missionLogId, 
-      field, 
+
+    updateMutation.mutate({
+      missionLogId,
+      field,
       time: manualDate.toISOString(),
-      manual: true 
+      manual: true
     });
   };
-  
+
   if (isEditing) {
     return (
       <div className="flex items-center gap-1">
@@ -316,7 +319,7 @@ function TimestampButton({
       </div>
     );
   }
-  
+
   if (timestamp) {
     return (
       <div className="flex items-center justify-between gap-1 px-3 py-2 rounded-md bg-green-500/10 border border-green-500/30">
@@ -347,7 +350,7 @@ function TimestampButton({
       </div>
     );
   }
-  
+
   return (
     <div className="flex items-center gap-1">
       <Button
@@ -419,42 +422,44 @@ function saveChecklistState(projectId: number | null, state: Record<string, bool
 export default function FieldHub({ missionId }: FieldHubProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<TabType>("mission");
+  const [mobileTab, setMobileTab] = useState("home");
   const [detailsOpen, setDetailsOpen] = useState(false);
-  
+
   // Mission log state (four-point logistics tracker)
   const [editingTimestamp, setEditingTimestamp] = useState<string | null>(null);
   const [manualTimeValue, setManualTimeValue] = useState<string>("");
-  
+
   // Expense entry state
   const [expenseCategory, setExpenseCategory] = useState<string>("");
   const [expenseAmount, setExpenseAmount] = useState<string>("");
   const [expenseVendor, setExpenseVendor] = useState<string>("");
   const [expenseDescription, setExpenseDescription] = useState<string>("");
-  
+
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
-  
+
   // Notes state with localStorage persistence
   const [notes, setNotes] = useState(() => loadDraft().notes);
-  
+
   // Scope checklist state (per-project scoped)
   const [scopeChecklist, setScopeChecklist] = useState<ScopeChecklistItem[]>([]);
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
-  
+
   // Offline status
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  
+
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
-  
+
   // Data Handover state (multi-file upload)
   interface HandoverFile {
     file: File;
@@ -484,7 +489,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   });
 
   // Get today's assigned project for production users
-  const fallbackProject = projects.find(p => 
+  const fallbackProject = projects.find(p =>
     p.status === "Scanning" || p.status === "Scheduling"
   );
 
@@ -577,18 +582,18 @@ export default function FieldHub({ missionId }: FieldHubProps) {
       const disciplines = missionData.lead?.disciplines || "";
       const lod = missionData.targetLoD || "LOD 300";
       const checklist = generateScopeChecklist(disciplines, lod);
-      
+
       // Load per-project checklist state
       const savedState = loadChecklistState(todaysMission.id);
       setChecklistState(savedState);
-      
+
       // Apply saved checklist state to generated items
       checklist.forEach(item => {
         if (savedState[item.id]) {
           item.completed = true;
         }
       });
-      
+
       setScopeChecklist(checklist);
     } else {
       // Reset when no mission selected
@@ -601,10 +606,10 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
-    
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -629,7 +634,25 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   // Create mission log with Start Travel timestamp in one backend call
   const startTravelMutation = useMutation({
     mutationFn: async (projectId: number) => {
-      const response = await apiRequest("POST", `/api/projects/${projectId}/mission-log`, { startTravel: true });
+      let location = null;
+      try {
+        if (navigator.geolocation) {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          });
+          location = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          };
+        }
+      } catch (e) {
+        console.warn("Geolocation failed", e);
+      }
+
+      const response = await apiRequest("POST", `/api/projects/${projectId}/mission-log`, {
+        startTravel: true,
+        location
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -783,28 +806,28 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   const handoverMutation = useMutation({
     mutationFn: async () => {
       if (!todaysMission?.id || handoverFiles.length === 0) throw new Error("No files to upload");
-      
+
       const formData = new FormData();
       const areaDescriptions: string[] = [];
-      
+
       handoverFiles.forEach((hf, index) => {
         formData.append("files", hf.file);
         areaDescriptions.push(hf.areaDescription || "Site_Capture");
       });
-      
+
       formData.append("areaDescriptions", JSON.stringify(areaDescriptions));
-      
+
       const response = await fetch(`/api/projects/${todaysMission.id}/data-handover`, {
         method: "POST",
         body: formData,
         credentials: "include",
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Upload failed");
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
@@ -812,9 +835,9 @@ export default function FieldHub({ missionId }: FieldHubProps) {
       setHandoverFiles([]);
       setUploadProgress(0);
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-      toast({ 
-        title: "Data Handover Complete", 
-        description: `${data.uploadedCount} files uploaded to Google Drive${data.statusAdvanced ? ". Project moved to Registration." : ""}` 
+      toast({
+        title: "Data Handover Complete",
+        description: `${data.uploadedCount} files uploaded to Google Drive${data.statusAdvanced ? ". Project moved to Registration." : ""}`
       });
     },
     onError: (error: any) => {
@@ -835,7 +858,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   };
 
   const updateFileDescription = (index: number, description: string) => {
-    setHandoverFiles(prev => prev.map((hf, i) => 
+    setHandoverFiles(prev => prev.map((hf, i) =>
       i === index ? { ...hf, areaDescription: description } : hf
     ));
   };
@@ -854,7 +877,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
       const newState = { ...prev, [itemId]: !prev[itemId] };
       return newState;
     });
-    setScopeChecklist(prev => prev.map(item => 
+    setScopeChecklist(prev => prev.map(item =>
       item.id === itemId ? { ...item, completed: !item.completed } : item
     ));
   };
@@ -890,7 +913,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingDuration(0);
-      
+
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
@@ -912,14 +935,14 @@ export default function FieldHub({ missionId }: FieldHubProps) {
 
   const handleSendChat = () => {
     if (!chatInput.trim()) return;
-    
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
       content: chatInput.trim(),
       timestamp: new Date(),
     };
-    
+
     setChatMessages(prev => [...prev, userMessage]);
     setIsChatLoading(true);
     sendChatMutation.mutate(chatInput.trim(), {
@@ -949,6 +972,263 @@ export default function FieldHub({ missionId }: FieldHubProps) {
   const projectAddress = missionData?.lead?.projectAddress || "No address";
   const isLoading = missionId ? missionLoading : projectsLoading;
 
+  // === MOBILE LAYOUT RENDER ===
+  if (isMobile) {
+    return (
+      <FieldMobileLayout activeTab={mobileTab} onTabChange={setMobileTab}>
+        {mobileTab === "home" && (
+          <div className="p-4 space-y-6">
+            <header>
+              <h1 className="text-2xl font-bold">{todaysMission?.name || "Field Home"}</h1>
+              <p className="text-muted-foreground">
+                {todaysMission ? (todaysMission as MissionProject).lead?.projectAddress : "No active mission"}
+              </p>
+            </header>
+
+            <section>
+              <h2 className="text-sm font-semibold mb-3 tracking-wider text-muted-foreground uppercase">Quick Actions</h2>
+              <QuickActions
+                isClockedIn={!!missionLog?.startTravelTime && !missionLog?.arriveHomeTime}
+                onClockIn={() => {
+                  if (!missionLog && todaysMission?.id) {
+                    startTravelMutation.mutate(todaysMission.id);
+                  } else {
+                    setMobileTab("time");
+                  }
+                }}
+                onCapture={() => setMobileTab("capture")}
+                onVoiceNote={() => setMobileTab("notes")}
+                onEscalate={() => setMobileTab("chat")}
+              />
+            </section>
+
+            {todaysMission && (
+              <section>
+                <h2 className="text-sm font-semibold mb-2 tracking-wider text-muted-foreground uppercase">Mission Status</h2>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium">Scope</span>
+                      <Badge variant="outline">{(todaysMission as MissionProject).lead?.disciplines || "General"}</Badge>
+                    </div>
+                    <Progress value={missionLog ? 50 : 0} className="h-2" />
+                  </CardContent>
+                </Card>
+              </section>
+            )}
+          </div>
+        )}
+
+        {mobileTab === "time" && (
+          <div className="p-4 space-y-4">
+            <h2 className="text-lg font-bold">Time Tracking</h2>
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <TimestampButton
+                  label="Start Travel"
+                  icon={<Car className="w-4 h-4" />}
+                  timestamp={missionLog?.startTravelTime ? new Date(missionLog.startTravelTime) : null}
+                  isManual={missionLog?.startTravelManual || false}
+                  field="startTravel"
+                  missionLogId={missionLog?.id || 0}
+                  updateMutation={updateTimestampMutation}
+                  editingTimestamp={editingTimestamp}
+                  setEditingTimestamp={setEditingTimestamp}
+                  manualTimeValue={manualTimeValue}
+                  setManualTimeValue={setManualTimeValue}
+                  disabled={!missionLog}
+                />
+                <TimestampButton
+                  label="Arrive Site"
+                  icon={<MapPin className="w-4 h-4" />}
+                  timestamp={missionLog?.arriveSiteTime ? new Date(missionLog.arriveSiteTime) : null}
+                  isManual={missionLog?.arriveSiteManual || false}
+                  field="arriveSite"
+                  missionLogId={missionLog?.id || 0}
+                  updateMutation={updateTimestampMutation}
+                  editingTimestamp={editingTimestamp}
+                  setEditingTimestamp={setEditingTimestamp}
+                  manualTimeValue={manualTimeValue}
+                  setManualTimeValue={setManualTimeValue}
+                  disabled={!missionLog?.startTravelTime}
+                  previousTimestamp={missionLog?.startTravelTime ? new Date(missionLog.startTravelTime) : null}
+                />
+                <TimestampButton
+                  label="Leave Site"
+                  icon={<FolderOpen className="w-4 h-4" />}
+                  timestamp={missionLog?.leaveSiteTime ? new Date(missionLog.leaveSiteTime) : null}
+                  isManual={missionLog?.leaveSiteManual || false}
+                  field="leaveSite"
+                  missionLogId={missionLog?.id || 0}
+                  updateMutation={updateTimestampMutation}
+                  editingTimestamp={editingTimestamp}
+                  setEditingTimestamp={setEditingTimestamp}
+                  manualTimeValue={manualTimeValue}
+                  setManualTimeValue={setManualTimeValue}
+                  disabled={!missionLog?.arriveSiteTime}
+                  previousTimestamp={missionLog?.arriveSiteTime ? new Date(missionLog.arriveSiteTime) : null}
+                />
+                <TimestampButton
+                  label="Arrive Home"
+                  icon={<Home className="w-4 h-4" />}
+                  timestamp={missionLog?.arriveHomeTime ? new Date(missionLog.arriveHomeTime) : null}
+                  isManual={missionLog?.arriveHomeManual || false}
+                  field="arriveHome"
+                  missionLogId={missionLog?.id || 0}
+                  updateMutation={updateTimestampMutation}
+                  editingTimestamp={editingTimestamp}
+                  setEditingTimestamp={setEditingTimestamp}
+                  manualTimeValue={manualTimeValue}
+                  setManualTimeValue={setManualTimeValue}
+                  disabled={!missionLog?.leaveSiteTime}
+                  previousTimestamp={missionLog?.leaveSiteTime ? new Date(missionLog.leaveSiteTime) : null}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {mobileTab === "capture" && (
+          <div className="p-4">
+            <h2 className="text-lg font-bold mb-4">Field Capture</h2>
+            <div
+              className="border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center bg-muted/20"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-10 w-10 text-muted-foreground mb-4" />
+              <p className="font-medium">Tap to Upload</p>
+              <p className="text-xs text-muted-foreground">Photos or Videos</p>
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              accept="image/*,video/*"
+              onChange={(e) => {
+                if (e.target.files) {
+                  const newFiles = Array.from(e.target.files).map(file => ({
+                    file,
+                    areaDescription: "Quick Capture"
+                  }));
+                  setHandoverFiles(prev => [...prev, ...newFiles]);
+                }
+              }}
+            />
+            {/* List of files pending upload */}
+            {handoverFiles.length > 0 && (
+              <div className="mt-6 space-y-2">
+                {handoverFiles.map((f, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 bg-card border rounded">
+                    <span className="text-sm truncate max-w-[200px]">{f.file.name}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setHandoverFiles(prev => prev.filter((_, idx) => idx !== i))}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button className="w-full mt-4" onClick={() => handoverMutation.mutate()}>
+                  {handoverMutation.isPending ? <Loader2 className="animate-spin mr-2" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Upload {handoverFiles.length} Files
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mobileTab === "notes" && (
+          <div className="p-4 space-y-4">
+            <h2 className="text-lg font-bold">Field Notes</h2>
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <Textarea
+                  placeholder="Type notes or use voice recording..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="min-h-[200px] text-base"
+                />
+                <Button
+                  variant={isRecording ? "destructive" : "default"}
+                  size="lg"
+                  className="w-full h-16 text-lg"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={transcribeMutation.isPending}
+                >
+                  {isRecording ? (
+                    <>
+                      <MicOff className="w-6 h-6 mr-2" />
+                      Stop ({formatDuration(recordingDuration)})
+                    </>
+                  ) : transcribeMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                      Transcribing...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-6 h-6 mr-2" />
+                      Record Voice Note
+                    </>
+                  )}
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Notes are saved locally until submitted in Daily Report.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {mobileTab === "chat" && (
+          <div className="flex flex-col h-full">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {chatMessages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-lg p-3 ${msg.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : msg.id === 'welcome'
+                      ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                      : 'bg-muted'
+                    }`}>
+                    <p className="text-sm">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={chatScrollRef} />
+            </div>
+            <div className="p-2 border-t bg-background">
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!chatInput.trim()) return;
+                  const msg = chatInput;
+                  setChatInput("");
+                  setChatMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: "user",
+                    content: msg,
+                    timestamp: new Date()
+                  }]);
+                  sendChatMutation.mutate(msg);
+                }}
+              >
+                <Input
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  placeholder="Ask AI or type 'Help'..."
+                  className="flex-1"
+                />
+                <Button type="submit" size="icon">
+                  <Send className="w-4 h-4" />
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+      </FieldMobileLayout>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Offline Indicator */}
@@ -958,7 +1238,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
           Offline - Data will sync when connection is restored
         </div>
       )}
-      
+
       {/* Mission Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="p-3">
@@ -980,7 +1260,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
             <span className="truncate" data-testid="text-project-address">{projectAddress}</span>
           </div>
         </div>
-        
+
         {/* Four-Point Logistics Tracker */}
         {todaysMission && (
           <div className="px-3 py-2 border-t">
@@ -1135,7 +1415,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                 variant="outline"
                 size="lg"
                 className="h-20 flex-col gap-1"
-                onClick={() => {}}
+                onClick={() => { }}
                 data-testid="button-add-note"
               >
                 <FileText className="w-6 h-6" />
@@ -1145,7 +1425,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                 variant="outline"
                 size="lg"
                 className="h-20 flex-col gap-1"
-                onClick={() => {}}
+                onClick={() => { }}
                 data-testid="button-upload-video"
               >
                 <Video className="w-6 h-6" />
@@ -1225,19 +1505,17 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                       onClick={() => toggleChecklistItem(item.id)}
                       data-testid={`checklist-item-${item.id}`}
                     >
-                      <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-                        item.completed || checklistState[item.id]
-                          ? "bg-emerald-500 border-emerald-500"
-                          : "border-muted-foreground/50"
-                      }`}>
+                      <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-colors ${item.completed || checklistState[item.id]
+                        ? "bg-emerald-500 border-emerald-500"
+                        : "border-muted-foreground/50"
+                        }`}>
                         {(item.completed || checklistState[item.id]) && (
                           <Check className="w-3 h-3 text-white" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm leading-relaxed ${
-                          item.completed || checklistState[item.id] ? "line-through text-muted-foreground" : ""
-                        }`}>
+                        <p className={`text-sm leading-relaxed ${item.completed || checklistState[item.id] ? "line-through text-muted-foreground" : ""
+                          }`}>
                           {item.label}
                         </p>
                         <Badge variant="outline" className="text-xs mt-1">{item.category}</Badge>
@@ -1294,7 +1572,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                         </p>
                       </div>
                     </div>
-                    
+
                     {missionData?.lead?.disciplines && (
                       <div>
                         <p className="text-muted-foreground text-xs mb-1">Disciplines</p>
@@ -1303,7 +1581,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                         </p>
                       </div>
                     )}
-                    
+
                     {missionData?.lead?.scope && (
                       <div>
                         <p className="text-muted-foreground text-xs mb-1">Scope</p>
@@ -1312,7 +1590,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                         </p>
                       </div>
                     )}
-                    
+
                     {missionData?.lead?.notes && (
                       <div>
                         <p className="text-muted-foreground text-xs mb-1">Scoping Notes</p>
@@ -1329,7 +1607,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                           {missionData.lead.contactName}
                         </p>
                         {missionData.lead.contactPhone && (
-                          <a 
+                          <a
                             href={`tel:${missionData.lead.contactPhone}`}
                             className="text-sm text-primary underline"
                             data-testid="link-contact-phone"
@@ -1495,7 +1773,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                       <p className="text-xs text-muted-foreground">
                         Upload video walkthroughs, scan data, and site photos. Files go directly to the project's Google Drive folder.
                       </p>
-                      
+
                       {/* Hidden file input */}
                       <input
                         type="file"
@@ -1506,7 +1784,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                         className="hidden"
                         data-testid="input-handover-files"
                       />
-                      
+
                       {/* Add files button */}
                       <Button
                         variant="outline"
@@ -1517,13 +1795,13 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                         <Plus className="w-4 h-4 mr-2" />
                         Add Site Media
                       </Button>
-                      
+
                       {/* File list with area descriptions */}
                       {handoverFiles.length > 0 && (
                         <div className="space-y-2">
                           {handoverFiles.map((hf, index) => (
-                            <div 
-                              key={index} 
+                            <div
+                              key={index}
                               className="flex items-start gap-2 p-2 bg-muted/50 rounded-md"
                               data-testid={`handover-file-${index}`}
                             >
@@ -1560,7 +1838,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                           ))}
                         </div>
                       )}
-                      
+
                       {/* Upload progress */}
                       {handoverMutation.isPending && (
                         <div className="space-y-2">
@@ -1570,7 +1848,7 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                           </p>
                         </div>
                       )}
-                      
+
                       {/* Submit handover */}
                       {handoverFiles.length > 0 && (
                         <Button
@@ -1615,13 +1893,12 @@ export default function FieldHub({ missionId }: FieldHubProps) {
                       </div>
                     )}
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        msg.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : msg.escalated
+                      className={`max-w-[80%] rounded-lg p-3 ${msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : msg.escalated
                           ? "bg-yellow-500/10 border border-yellow-500/30"
                           : "bg-muted"
-                      }`}
+                        }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       <p className="text-xs opacity-60 mt-1">

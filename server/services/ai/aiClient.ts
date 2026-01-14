@@ -161,12 +161,12 @@ export class AIClient {
         });
 
         const result = response.choices[0]?.message?.content || null;
-        
+
         // Cache the result
         if (result) {
           chatCache.set(cacheKey, result);
         }
-        
+
         return result;
       } catch (error: any) {
         const isRateLimit = error?.status === 429;
@@ -209,7 +209,7 @@ export class AIClient {
 
   async embed(text: string, skipCache = false): Promise<EmbeddingResult | null> {
     const cacheKey = generateCacheKey({ text, model: this.embeddingsModel });
-    
+
     // Check cache first
     if (!skipCache) {
       const cached = embeddingCache.get(cacheKey);
@@ -229,10 +229,10 @@ export class AIClient {
         embedding: response.data[0].embedding,
         tokensUsed: response.usage?.total_tokens || 0,
       };
-      
+
       // Cache the result
       embeddingCache.set(cacheKey, result);
-      
+
       return result;
     } catch (error: any) {
       log(`ERROR: [AIClient] Embedding error: ${error?.message || error}`);
@@ -283,6 +283,20 @@ export class AIClient {
     chatCache.clear();
     embeddingCache.clear();
     log("[AIClient] Cache cleared");
+  }
+
+  async transcribe(file: any, prompt?: string): Promise<string | null> {
+    try {
+      const response = await this.openai.audio.transcriptions.create({
+        file,
+        model: "whisper-1",
+        prompt,
+      });
+      return response.text;
+    } catch (error: any) {
+      log(`ERROR: [AIClient] Transcription error: ${error?.message || error}`);
+      return null;
+    }
   }
 
   async chatStream(params: Omit<ChatParams, "responseFormat">): Promise<AsyncIterable<string>> {

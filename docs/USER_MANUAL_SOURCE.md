@@ -86,12 +86,30 @@ Navigate to **"Production"**. You'll see projects moving through these stages:
 5.  **QC**: Quality Control is checking the work.
 
 ### For Field Technicians (Mobile Workflow)
-Technicians use the mobile view of Scan2Plan OS.
-*   **Clock In**: When you arrive at the site, tap "Clock In". The system logs your GPS location to verify you're at the right address.
-*   **Field Notes**: Use the **AI Note Taker**.
-    *   *Feature*: Tap the microphone and say, "The mechanical room on the 3rd floor is locked, scope changed to hallway only."
-    *   *AI Action*: The system transcribes your voice and auto-formats it into a professional "Scope Change" note for the project manager.
-*   **Uploads**: Upload site photos directly to the Project ID folder on Google Drive (linked in the app).
+Technicians use the **mobile-first FieldHub** interface, which automatically activates on smartphones and tablets.
+
+#### Mobile Navigation
+You'll see a **bottom navigation bar** with these tabs:
+- **Home**: Your mission overview and Quick Actions.
+- **Time**: Clock In/Out and time tracking.
+- **Capture**: Upload site photos and videos.
+- **Chat**: AI support for questions.
+
+#### Quick Actions (Home Screen)
+The Home screen shows large, easy-to-tap buttons:
+- **Clock In/Out**: Tap once to log your arrival. The system captures your GPS coordinates automatically.
+- **Capture**: Opens your camera to snap site photos.
+- **Voice Note**: Record a voice memo. The AI automatically transcribes it to text.
+- **Escalate**: Jump to Chat for immediate AI assistance.
+
+#### Voice Notes
+1. Tap the **Voice Note** button.
+2. Speak clearly: *"The mechanical room on the 3rd floor is locked. Scope changed to hallway only."*
+3. Tap **Stop**. The AI transcribes your voice and adds it to your Field Notes.
+4. Notes are saved locally until you submit them in your Daily Report.
+
+#### Uploads
+Upload site photos directly to the Project ID folder on Google Drive (linked in the app).
 
 ---
 
@@ -126,6 +144,21 @@ Did you enter a valid **Project Address** in the Lead tab? The system needs a sp
 
 ### How do I add a new user?
 Go to **Settings > Team**. Only "CEO" role users can invite new members.
+
+### How do I access FieldHub on mobile?
+Navigate to **/field** on any smartphone or tablet. The interface automatically switches to mobile layout with bottom navigation (Home, Time, Capture, Chat).
+
+### How do Voice Notes work?
+1. Tap **Voice Note** Quick Action
+2. Press **Record Voice Note** and speak clearly
+3. Tap **Stop** when finished
+4. AI transcribes your audio using OpenAI Whisper
+5. Text appears in your Field Notes
+
+### Why isn't my GPS location captured?
+- Grant location permissions in your browser
+- GPS may be weak indoors or in parking garages
+- Check browser privacy settings
 
 ---
 

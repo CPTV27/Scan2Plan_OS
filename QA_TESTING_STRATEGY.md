@@ -30,14 +30,15 @@ This document outlines a comprehensive QA testing strategy for Scan2Plan OS, cov
 | Module | Unit Tests | Integration | E2E | Priority |
 |--------|------------|-------------|-----|----------|
 | **CPQ/Quote Builder** | ✅ 72 tests | 🔲 | 🔲 | HIGH |
-| **Proposal Builder** | 🔲 | 🔲 | 🔲 | HIGH |
-| **Deal Workspace** | 🔲 | 🔲 | 🔲 | HIGH |
-| **Sales Pipeline** | 🔲 | 🔲 | 🔲 | MEDIUM |
-| **Production** | 🔲 | 🔲 | 🔲 | MEDIUM |
-| **Analytics** | 🔲 | 🔲 | 🔲 | LOW |
-| **Settings** | 🔲 | 🔲 | 🔲 | MEDIUM |
+| **Proposal Builder** | 🔲 | 🔲 | ✅ 7 tests | HIGH |
+| **Deal Workspace** | 🔲 | 🔲 | ✅ 6 tests | HIGH |
+| **Field Ops Mobile** | 🔲 | ✅ 5 tests | ✅ 25 tests | HIGH |
+| **Sales Pipeline** | 🔲 | 🔲 | ✅ 14 tests | MEDIUM |
+| **Production** | 🔲 | 🔲 | ✅ 6 tests | MEDIUM |
+| **Analytics** | 🔲 | 🔲 | ✅ 5 tests | LOW |
+| **Settings** | 🔲 | 🔲 | ✅ 7 tests | MEDIUM |
 | **Authentication** | 🔲 | 🔲 | 🔲 | HIGH |
-| **Financial** | 🔲 | 🔲 | 🔲 | MEDIUM |
+| **Financial** | 🔲 | 🔲 | ✅ 8 tests | MEDIUM |
 
 ---
 
@@ -356,3 +357,22 @@ jobs:
 | **MSW** | API mocking | 🔲 To install |
 | **Testing Library** | React testing | 🔲 To install |
 | **k6/Artillery** | Load testing | 🔲 Optional |
+
+---
+
+## 15. Field Ops Mobile Test Coverage
+
+### Test File: `tests/field-ops-mobile.spec.ts`
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| Mobile UI | 10 | Layout, tabs, Quick Actions |
+| Time Tracking | 2 | GPS clock-in, geolocation mock |
+| Voice Notes | 2 | Recording UI, textarea |
+| API Endpoints | 5 | /transcribe, /mission-logs, /field-support |
+| Desktop Compat | 2 | Large viewport layout |
+| Responsive | 4 | iPhone SE, 12 Pro, Pixel 5, Tablet |
+| Error Handling | 2 | Rapid navigation, No Mission state |
+| Performance | 2 | Load time, tab switch latency |
+
+**Run with:** `npx playwright test tests/field-ops-mobile.spec.ts`

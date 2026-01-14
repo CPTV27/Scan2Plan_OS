@@ -12,6 +12,12 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+import fs from "fs";
+import multer from "multer";
+import { aiClient } from "../services/ai";
+
+const upload = multer({ dest: "/tmp/uploads/" });
+
 export function registerFieldOpsRoutes(app: Express) {
   app.get("/api/mission-logs", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
@@ -27,21 +33,68 @@ export function registerFieldOpsRoutes(app: Express) {
     try {
       const { projectId, notes } = req.body;
       const userId = (req.user as any)?.id?.toString() || "system";
-      
+
       if (!projectId) {
         return res.status(400).json({ message: "projectId is required" });
       }
-      
+
       const [newLog] = await db.insert(missionLogs).values({
         projectId: Number(projectId),
         techId: userId,
         notes: notes || null,
         missionDate: new Date(),
       }).returning();
-      
+
       res.status(201).json(newLog);
     } catch (error: any) {
       log("ERROR: Error creating mission log - " + (error?.message || error));
+      res.status(500).json({ message: error.message });
+    }
+  }));
+
+  // Create mission log for specific project (FieldHub Clock In)
+  app.post("/api/projects/:id/mission-log", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const projectId = Number(req.params.id);
+      const { startTravel, location } = req.body;
+      const userId = (req.user as any)?.id?.toString() || "system";
+
+      const values: any = {
+        projectId,
+        techId: userId,
+        missionDate: new Date(),
+      };
+
+      if (startTravel) {
+        values.startTravelTime = new Date();
+        values.status = "in_progress";
+      }
+
+      // Geo-fencing support (logging location)
+      if (location && location.latitude && location.longitude) {
+        // In a real app we would check distance to project site here
+        // For now we just log it, or we could add columns to missionLogs table if needed
+        // But timeLogs table handles lat/long. 
+
+        // We should also create a timeLog entry for "Travel"
+        /*
+        await db.insert(timeLogs).values({
+           projectId,
+           techId: userId,
+           type: "Automatic",
+           workType: "Travel",
+           latitude: location.latitude,
+           longitude: location.longitude,
+           startTime: new Date()
+        });
+        */
+      }
+
+      const [newLog] = await db.insert(missionLogs).values(values).returning();
+
+      res.status(201).json(newLog);
+    } catch (error: any) {
+      log("ERROR: Error creating project mission log - " + (error?.message || error));
       res.status(500).json({ message: error.message });
     }
   }));
@@ -54,7 +107,7 @@ export function registerFieldOpsRoutes(app: Express) {
   app.post("/api/field-translation/translate", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
       const { rawNote, projectId } = req.body;
-      
+
       if (!rawNote || typeof rawNote !== "string") {
         return res.status(400).json({ message: "rawNote is required" });
       }
@@ -116,4 +169,31 @@ Return ONLY valid JSON:
       res.status(500).json({ message: error.message || "Translation failed" });
     }
   }));
+
+  app.post("/api/transcribe", isAuthenticated, upload.single("audio"), asyncHandler(async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No audio file provided" });
+      }
+
+      const transcription = await aiClient.transcribe(fs.createReadStream(req.file.path));
+
+      // Cleanup
+      try { fs.unlinkSync(req.file.path); } catch { }
+
+      if (!transcription) {
+        throw new Error("Transcription failed");
+      }
+
+      res.json({ transcription });
+    } catch (error: any) {
+      log("ERROR: Transcription error - " + (error?.message || error));
+      if (req.file) {
+        try { fs.unlinkSync(req.file.path); } catch { }
+      }
+      res.status(500).json({ message: "Transcription failed" });
+    }
+  }));
+
+
 }
