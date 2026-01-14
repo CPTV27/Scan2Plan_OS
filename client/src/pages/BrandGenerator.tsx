@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings, Target, Shield, Megaphone, Building2 } from "lucide-react";
+import { Loader2, Sparkles, ShieldCheck, AlertTriangle, Clock, BookOpen, Copy, CheckCircle2, Users, FileText, History, Settings, Target, Shield, Megaphone, Building2, Heart, Pencil, Plus, Trash2, Save } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ProposalGenerator, NegotiationConsole, MarketingGenerator } from "@/components/intelligence";
@@ -59,6 +60,17 @@ interface RedLine {
   ruleContent: string;
   violationCategory: string;
   severity: number;
+}
+
+interface BrandValue {
+  id: number;
+  category: string;
+  title: string;
+  content: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const BUYER_TYPE_OPTIONS: { value: BuyerType; label: string; description: string }[] = [
@@ -232,6 +244,14 @@ export default function BrandGenerator() {
             >
               <FileText className="h-4 w-4" />
               Standards
+            </TabsTrigger>
+            <TabsTrigger 
+              value="values" 
+              data-testid="tab-values"
+              className="w-full justify-start gap-2 px-3 py-2 data-[state=active]:bg-background"
+            >
+              <Heart className="h-4 w-4" />
+              Brand Values
             </TabsTrigger>
             <TabsTrigger 
               value="governance" 
@@ -518,6 +538,10 @@ export default function BrandGenerator() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="values">
+          <BrandValuesEditor />
+        </TabsContent>
+
         <TabsContent value="governance">
           <Card>
             <CardHeader>
@@ -663,6 +687,248 @@ export default function BrandGenerator() {
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  mission: "Mission & Vision",
+  vision: "Mission & Vision",
+  core_values: "Core Values",
+  three_uniques: "The 3 Uniques",
+  guarantee: "Our Guarantee",
+  sustainability: "Sustainability Commitment",
+  empowerment: "Empowerment & Collaboration",
+  taglines: "Taglines & Anchors",
+};
+
+const CATEGORY_ORDER = ["mission", "vision", "core_values", "three_uniques", "guarantee", "sustainability", "empowerment", "taglines"];
+
+function BrandValuesEditor() {
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", content: "" });
+  const [newValueCategory, setNewValueCategory] = useState<string | null>(null);
+  const [newForm, setNewForm] = useState({ title: "", content: "" });
+
+  const { data: brandValuesData, isLoading } = useQuery<{ success: boolean; data: BrandValue[] }>({
+    queryKey: ["/api/brand/values"],
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/brand/values/seed", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/values"] });
+      toast({ title: "Brand values seeded successfully" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, title, content }: { id: number; title: string; content: string }) => {
+      const res = await apiRequest("PUT", `/api/brand/values/${id}`, { title, content });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/values"] });
+      setEditingId(null);
+      toast({ title: "Brand value updated" });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { category: string; title: string; content: string }) => {
+      const res = await apiRequest("POST", "/api/brand/values", { ...data, sortOrder: 99 });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/values"] });
+      setNewValueCategory(null);
+      setNewForm({ title: "", content: "" });
+      toast({ title: "Brand value added" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/brand/values/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand/values"] });
+      toast({ title: "Brand value deleted" });
+    },
+  });
+
+  const groupedValues = CATEGORY_ORDER.reduce((acc, cat) => {
+    acc[cat] = brandValuesData?.data?.filter(v => v.category === cat) || [];
+    return acc;
+  }, {} as Record<string, BrandValue[]>);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!brandValuesData?.data?.length) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Heart className="h-5 w-5" />
+            Brand Values
+          </CardTitle>
+          <CardDescription>
+            Your brand's mission, vision, core values, and key messaging
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <p className="text-muted-foreground mb-4">No brand values configured yet.</p>
+          <Button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+            {seedMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+            Load Default Brand Values
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Heart className="h-5 w-5" />
+            Brand Values
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Your brand's mission, vision, core values, and key messaging
+          </p>
+        </div>
+      </div>
+
+      {CATEGORY_ORDER.map(category => {
+        const values = groupedValues[category];
+        if (values.length === 0 && category !== newValueCategory) return null;
+
+        return (
+          <Card key={category}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">{CATEGORY_LABELS[category] || category}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {values.map(value => (
+                <div key={value.id} className="border rounded-lg p-3">
+                  {editingId === value.id ? (
+                    <div className="space-y-3">
+                      <Input
+                        value={editForm.title}
+                        onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="Title"
+                        data-testid={`input-edit-title-${value.id}`}
+                      />
+                      <Textarea
+                        value={editForm.content}
+                        onChange={e => setEditForm(f => ({ ...f, content: e.target.value }))}
+                        placeholder="Content"
+                        rows={3}
+                        data-testid={`input-edit-content-${value.id}`}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => updateMutation.mutate({ id: value.id, ...editForm })}
+                          disabled={updateMutation.isPending}
+                          data-testid={`button-save-${value.id}`}
+                        >
+                          <Save className="h-4 w-4 mr-1" /> Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm">{value.title}</h4>
+                        <p className="text-sm text-muted-foreground mt-1">{value.content}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingId(value.id);
+                            setEditForm({ title: value.title, content: value.content });
+                          }}
+                          data-testid={`button-edit-${value.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => deleteMutation.mutate(value.id)}
+                          data-testid={`button-delete-${value.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {newValueCategory === category ? (
+                <div className="border rounded-lg p-3 border-dashed space-y-3">
+                  <Input
+                    value={newForm.title}
+                    onChange={e => setNewForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="Title"
+                    data-testid="input-new-title"
+                  />
+                  <Textarea
+                    value={newForm.content}
+                    onChange={e => setNewForm(f => ({ ...f, content: e.target.value }))}
+                    placeholder="Content"
+                    rows={2}
+                    data-testid="input-new-content"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => createMutation.mutate({ category, ...newForm })}
+                      disabled={createMutation.isPending || !newForm.title || !newForm.content}
+                      data-testid="button-add-value"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setNewValueCategory(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full border-dashed border"
+                  onClick={() => setNewValueCategory(category)}
+                  data-testid={`button-add-${category}`}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add to {CATEGORY_LABELS[category]}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

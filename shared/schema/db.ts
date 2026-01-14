@@ -1762,6 +1762,26 @@ export const insertBrandVoiceSchema = createInsertSchema(brandVoices).omit({
 });
 export type BrandVoice = typeof brandVoices.$inferSelect;
 export type InsertBrandVoice = z.infer<typeof insertBrandVoiceSchema>;
+
+export const brandValues = pgTable("brand_values", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(), // mission, vision, core_values, three_uniques, guarantee, sustainability, empowerment, taglines
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBrandValueSchema = createInsertSchema(brandValues).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type BrandValue = typeof brandValues.$inferSelect;
+export type InsertBrandValue = z.infer<typeof insertBrandValueSchema>;
+
 export const solutionMappings = pgTable("solution_mappings", {
   id: serial("id").primaryKey(),
   buyerCode: text("buyer_code").notNull(),
