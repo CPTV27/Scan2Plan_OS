@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
-import { Users, TrendingUp, AlertTriangle, DollarSign, Target, Loader2, Newspaper, Building, Gavel, Eye } from "lucide-react";
-import type { Lead } from "@shared/schema";
-import { format } from "date-fns";
+import { Users, TrendingUp, AlertTriangle, DollarSign, Target, Loader2, Newspaper, Building, Gavel, Eye, ExternalLink, Settings } from "lucide-react";
+import type { Lead, IntelNewsItem } from "@shared/schema";
+import { format, formatDistanceToNow } from "date-fns";
+import { apiRequest } from "@/lib/queryClient";
+import { Link } from "wouter";
 
 interface CompetitorData {
   name: string;
@@ -17,8 +19,29 @@ interface CompetitorData {
 }
 
 export default function RegionalIntel() {
+  const queryClient = useQueryClient();
+  
   const { data: leads, isLoading: leadsLoading } = useQuery<Lead[]>({
     queryKey: ["/api/leads"],
+  });
+
+  const { data: intelItems = [], isLoading: intelLoading } = useQuery<IntelNewsItem[]>({
+    queryKey: ["/api/intel-feeds"],
+    refetchInterval: 60000,
+  });
+
+  const { data: intelStats } = useQuery<{ opportunity: number; policy: number; competitor: number; unread: number; total: number }>({
+    queryKey: ["/api/intel-feeds/stats"],
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("PUT", `/api/intel-feeds/${id}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/stats"] });
+    },
   });
 
   const { data: insightsData, isLoading: insightsLoading, refetch: refetchInsights, isFetching } = useQuery<{
@@ -31,6 +54,10 @@ export default function RegionalIntel() {
     queryKey: ["/api/research/insights"],
     enabled: false,
   });
+
+  const opportunityItems = intelItems.filter(i => i.type === "opportunity");
+  const policyItems = intelItems.filter(i => i.type === "policy");
+  const competitorItems = intelItems.filter(i => i.type === "competitor");
 
   const extractCompetitorData = (): CompetitorData[] => {
     const competitors: CompetitorData[] = [];
@@ -127,80 +154,74 @@ export default function RegionalIntel() {
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Target className="w-5 h-5 text-green-500" />
                     Bidding Opportunities
+                    {(intelStats?.opportunity ?? 0) > 0 && (
+                      <Badge variant="secondary" className="text-xs">{intelStats?.opportunity}</Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>RFPs and projects to bid on</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">NYC DOE School Renovation</p>
-                        <Badge variant="secondary" className="text-xs">$85K</Badge>
+                    {intelLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-20 w-full" />
                       </div>
-                      <p className="text-xs text-muted-foreground">LOD 300 MEP required. Due in 14 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Educational</Badge>
-                        <Badge variant="outline" className="text-xs">Northeast</Badge>
+                    ) : opportunityItems.length > 0 ? (
+                      opportunityItems.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className={`p-3 rounded-lg border border-green-500/20 bg-green-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-green-500/40' : ''}`}
+                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
+                          data-testid={`intel-item-${item.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
+                            {item.estimatedValue && (
+                              <Badge variant="secondary" className="text-xs shrink-0">
+                                ${Math.round(item.estimatedValue / 1000)}K
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {item.projectType && (
+                              <Badge variant="outline" className="text-xs">{item.projectType}</Badge>
+                            )}
+                            {item.region && (
+                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
+                            )}
+                            {item.deadline && (
+                              <span className="text-xs text-muted-foreground">
+                                Due: {format(new Date(item.deadline), "MMM d")}
+                              </span>
+                            )}
+                            {item.sourceUrl && (
+                              <a 
+                                href={item.sourceUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" /> View
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6">
+                        <Target className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">No opportunities yet</p>
+                        <Link href="/settings">
+                          <Button variant="link" size="sm" className="mt-1">
+                            <Settings className="w-3 h-3 mr-1" />
+                            Configure BidNet API
+                          </Button>
+                        </Link>
                       </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">Hudson Yards Tower Survey</p>
-                        <Badge variant="secondary" className="text-xs">$250K</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">45-story mixed-use. Due in 21 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Commercial</Badge>
-                        <Badge variant="outline" className="text-xs">Northeast</Badge>
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">Philadelphia Hospital Expansion</p>
-                        <Badge variant="secondary" className="text-xs">$180K</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Healthcare facility MEP as-built. Due in 30 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Healthcare</Badge>
-                        <Badge variant="outline" className="text-xs">Mid-Atlantic</Badge>
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">Boston University Campus Scan</p>
-                        <Badge variant="secondary" className="text-xs">$320K</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Multi-building campus documentation. Due in 45 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Educational</Badge>
-                        <Badge variant="outline" className="text-xs">Northeast</Badge>
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">NJ Transit Station Renovation</p>
-                        <Badge variant="secondary" className="text-xs">$145K</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Historic station LOD 350 required. Due in 18 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Transportation</Badge>
-                        <Badge variant="outline" className="text-xs">Northeast</Badge>
-                      </div>
-                    </div>
-                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">DC Government Building Survey</p>
-                        <Badge variant="secondary" className="text-xs">$210K</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Federal facility clearance required. Due in 60 days.</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">Government</Badge>
-                        <Badge variant="outline" className="text-xs">Mid-Atlantic</Badge>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center pt-2">
-                      Connect BidNet API for live feeds
-                    </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -211,62 +232,71 @@ export default function RegionalIntel() {
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Gavel className="w-5 h-5 text-amber-500" />
                     Policy & Regulatory
+                    {(intelStats?.policy ?? 0) > 0 && (
+                      <Badge variant="secondary" className="text-xs">{intelStats?.policy}</Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>Laws and regulations affecting work</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">Local Law 97 Update</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">NYC DOB</Badge>
+                    {intelLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-20 w-full" />
                       </div>
-                      <p className="text-xs text-muted-foreground">Carbon reporting may increase as-built demand.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Effective: May 2026</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">OSHA Heat Safety Rules</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">OSHA</Badge>
+                    ) : policyItems.length > 0 ? (
+                      policyItems.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className={`p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-amber-500/40' : ''}`}
+                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
+                          data-testid={`intel-item-${item.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
+                            {item.agency && (
+                              <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30 shrink-0">
+                                {item.agency}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {item.effectiveDate && (
+                              <span className="text-xs text-muted-foreground">
+                                Effective: {format(new Date(item.effectiveDate), "MMM yyyy")}
+                              </span>
+                            )}
+                            {item.region && (
+                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
+                            )}
+                            {item.sourceUrl && (
+                              <a 
+                                href={item.sourceUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" /> View
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6">
+                        <Gavel className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">No policy updates yet</p>
+                        <Link href="/settings">
+                          <Button variant="link" size="sm" className="mt-1">
+                            <Settings className="w-3 h-3 mr-1" />
+                            Subscribe to RSS feeds
+                          </Button>
+                        </Link>
                       </div>
-                      <p className="text-xs text-muted-foreground">New rest break requirements for field work.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Effective: July 2026</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">NYC Facade Inspection (FISP)</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">NYC DOB</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Cycle 9 deadline approaching. 3D scanning accepted.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Deadline: Feb 2027</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">NJ Energy Audit Requirements</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">NJ BPU</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Commercial buildings 25K+ SF need energy audits.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Effective: Jan 2027</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">MA Building Code Update</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">MA BBRS</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">New accessibility requirements for renovations.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Effective: Sept 2026</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">EPA Lead Paint Rule Expansion</p>
-                        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30">EPA</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Pre-1978 buildings need documentation before work.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Effective: March 2026</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center pt-2">
-                      Subscribe to agency RSS feeds
-                    </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -277,56 +307,69 @@ export default function RegionalIntel() {
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Eye className="w-5 h-5 text-red-500" />
                     Competitor Watch
+                    {(intelStats?.competitor ?? 0) > 0 && (
+                      <Badge variant="secondary" className="text-xs">{intelStats?.competitor}</Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>Competitor news and movements</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">ScanCorp Acquisition</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Expansion</Badge>
+                    {intelLoading ? (
+                      <div className="space-y-3">
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-20 w-full" />
                       </div>
-                      <p className="text-xs text-muted-foreground">Acquired Baltimore firm, expanding Mid-Atlantic.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">TechScan Pro Price Cut</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Pricing</Badge>
+                    ) : competitorItems.length > 0 ? (
+                      competitorItems.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className={`p-3 rounded-lg border border-red-500/20 bg-red-500/5 cursor-pointer hover-elevate ${!item.isRead ? 'ring-1 ring-red-500/40' : ''}`}
+                          onClick={() => !item.isRead && markReadMutation.mutate(item.id)}
+                          data-testid={`intel-item-${item.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="font-medium text-sm line-clamp-1">{item.title}</p>
+                            {item.competitorName && (
+                              <Badge variant="outline" className="text-xs text-red-500 border-red-500/30 shrink-0">
+                                {item.competitorName}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{item.summary}</p>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {item.region && (
+                              <Badge variant="outline" className="text-xs">{item.region}</Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true })}
+                            </span>
+                            {item.sourceUrl && (
+                              <a 
+                                href={item.sourceUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-3 h-3" /> View
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6">
+                        <Eye className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                        <p className="text-sm text-muted-foreground">No competitor intel yet</p>
+                        <Link href="/settings">
+                          <Button variant="link" size="sm" className="mt-1">
+                            <Settings className="w-3 h-3 mr-1" />
+                            Configure webhooks
+                          </Button>
+                        </Link>
                       </div>
-                      <p className="text-xs text-muted-foreground">30% price reduction on basic scanning services.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">3D Reality Labs New Equipment</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Equipment</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Purchased 3 Leica RTC360 scanners for faster delivery.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">BuildScan LLC Layoffs</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Workforce</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Reduced modeling team by 40%. Opportunity to hire talent.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">Precision 3D New Office</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Expansion</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Opening Boston office, targeting New England market.</p>
-                    </div>
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-sm">VirtualBuild Partnership</p>
-                        <Badge variant="outline" className="text-xs text-red-500 border-red-500/30">Partnership</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Partnered with major AEC firm for exclusive scanning work.</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center pt-2">
-                      Add items manually or via webhooks
-                    </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
