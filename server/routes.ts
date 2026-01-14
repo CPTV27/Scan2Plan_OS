@@ -47,6 +47,7 @@ import vectorsRouter from "./routes/vectors";
 import mauticRouter from "./routes/mautic";
 import helpCenterRouter from "./routes/help-center";
 import researchRouter from "./routes/research";
+import promptEngineRouter from "./routes/prompt-engine";
 
 
 export async function registerRoutes(
@@ -167,6 +168,9 @@ export async function registerRoutes(
 
   // Research & Insights
   app.use("/api/research", researchRouter);
+
+  // Dynamic Prompting Engine
+  app.use("/api/prompt-engine", promptEngineRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
