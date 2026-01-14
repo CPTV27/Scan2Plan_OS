@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:  # Allows manual triggers from GitHub UI or API
+    inputs:
+      run_e2e:
+        description: 'Run E2E tests'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   typecheck:

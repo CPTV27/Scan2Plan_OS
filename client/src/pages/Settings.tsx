@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Sun, Moon, Plus, X, Check, AlertTriangle, 
+import {
+  Sun, Moon, Plus, X, Check, AlertTriangle,
   Database, Link2, Brain, MapPin, Loader2, Save, RefreshCw, DollarSign, Cloud, HelpCircle
 } from "lucide-react";
 import type { LeadSourcesConfig, StalenessConfig, BusinessDefaultsConfig, GcsStorageConfig } from "@shared/schema";
@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PersonaManager from "@/components/PersonaManager";
+import { CIStatusPanel } from "@/components/CIStatusPanel";
 
 interface IntegrationStatus {
   airtable: { configured: boolean; writeEnabled: boolean };
@@ -117,10 +118,10 @@ export default function Settings() {
       window.location.href = authUrl;
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to connect QuickBooks", 
+      toast({
+        title: "Failed to connect QuickBooks",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -143,17 +144,17 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: (data: { synced: number; errors: string[] }) => {
-      toast({ 
-        title: "Expenses synced", 
-        description: `${data.synced} expenses synced from QuickBooks` 
+      toast({
+        title: "Expenses synced",
+        description: `${data.synced} expenses synced from QuickBooks`
       });
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Sync failed", 
+      toast({
+        title: "Sync failed",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -165,17 +166,17 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: (data: { message: string; invoices: { imported: number; updated: number }; estimates: { imported: number; updated: number } }) => {
-      toast({ 
-        title: "Pipeline synced", 
-        description: data.message 
+      toast({
+        title: "Pipeline synced",
+        description: data.message
       });
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Pipeline sync failed", 
+      toast({
+        title: "Pipeline sync failed",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -193,24 +194,24 @@ export default function Settings() {
     },
     onSuccess: (data: GHLTestResult) => {
       if (data.connected) {
-        toast({ 
-          title: "GoHighLevel connected", 
-          description: `Found ${data.contactCount || 0} contacts and ${data.opportunityCount || 0} opportunities` 
+        toast({
+          title: "GoHighLevel connected",
+          description: `Found ${data.contactCount || 0} contacts and ${data.opportunityCount || 0} opportunities`
         });
       } else {
-        toast({ 
-          title: "Connection test failed", 
+        toast({
+          title: "Connection test failed",
           description: data.message,
-          variant: "destructive" 
+          variant: "destructive"
         });
       }
       refetchGHL();
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Connection test failed", 
+      toast({
+        title: "Connection test failed",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -223,33 +224,33 @@ export default function Settings() {
     },
     onSuccess: (data: GHLSyncResult) => {
       if (data.success) {
-        toast({ 
-          title: "GoHighLevel synced", 
-          description: `${data.synced} opportunities imported` 
+        toast({
+          title: "GoHighLevel synced",
+          description: `${data.synced} opportunities imported`
         });
         queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       } else {
-        toast({ 
-          title: "Sync completed with errors", 
+        toast({
+          title: "Sync completed with errors",
           description: data.errors.join(", "),
-          variant: "destructive" 
+          variant: "destructive"
         });
       }
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Sync failed", 
+      toast({
+        title: "Sync failed",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
 
   const leadSources = (settings?.leadSources as LeadSourcesConfig) || { sources: [] };
   const staleness = (settings?.staleness as StalenessConfig) || { warningDays: 7, criticalDays: 14, penaltyPercent: 5 };
-  const businessDefaults = (settings?.businessDefaults as BusinessDefaultsConfig) || { 
-    defaultTravelRate: 4, 
-    dispatchLocations: [], 
+  const businessDefaults = (settings?.businessDefaults as BusinessDefaultsConfig) || {
+    defaultTravelRate: 4,
+    dispatchLocations: [],
     defaultBimDeliverable: "Revit",
     defaultBimVersion: ""
   };
@@ -292,7 +293,7 @@ export default function Settings() {
                     <Label htmlFor="theme-toggle">Dark Mode</Label>
                     <p className="text-sm text-muted-foreground">Toggle between light and dark themes</p>
                   </div>
-                  <Switch 
+                  <Switch
                     id="theme-toggle"
                     checked={theme === "dark"}
                     onCheckedChange={toggleTheme}
@@ -312,19 +313,19 @@ export default function Settings() {
                 <CardDescription>Connection status for external services</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <IntegrationRow 
+                <IntegrationRow
                   name="Airtable"
                   icon={<Database className="h-4 w-4" />}
                   connected={integrations?.airtable.configured ?? false}
                   details={integrations?.airtable.writeEnabled ? "Read/Write" : "Read Only"}
                 />
-                <IntegrationRow 
+                <IntegrationRow
                   name="CPQ Tool"
                   icon={<Link2 className="h-4 w-4" />}
                   connected={integrations?.cpq.configured ?? false}
                   details={integrations?.cpq.baseUrl}
                 />
-                <IntegrationRow 
+                <IntegrationRow
                   name="OpenAI (Scoping AI)"
                   icon={<Brain className="h-4 w-4" />}
                   connected={integrations?.openai.configured ?? false}
@@ -346,9 +347,9 @@ export default function Settings() {
                   <div>
                     <p className="text-sm font-medium">Connection Status</p>
                     <p className="text-xs text-muted-foreground">
-                      {qbStatus?.connected 
-                        ? "Connected - expenses will sync automatically" 
-                        : qbStatus?.configured 
+                      {qbStatus?.connected
+                        ? "Connected - expenses will sync automatically"
+                        : qbStatus?.configured
                           ? "Credentials configured, click Connect to authorize"
                           : "Add QUICKBOOKS_CLIENT_ID, QUICKBOOKS_CLIENT_SECRET, and QUICKBOOKS_REDIRECT_URI to secrets"}
                     </p>
@@ -365,13 +366,13 @@ export default function Settings() {
                     {qbStatus?.connected ? "Connected" : qbStatus?.configured ? "Ready" : "Not Configured"}
                   </Badge>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex flex-wrap gap-2">
                   {qbStatus?.connected ? (
                     <>
-                      <Button 
+                      <Button
                         size="sm"
                         onClick={() => qbSyncMutation.mutate()}
                         disabled={qbSyncMutation.isPending}
@@ -384,7 +385,7 @@ export default function Settings() {
                         )}
                         Sync Expenses
                       </Button>
-                      <Button 
+                      <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => qbPipelineSyncMutation.mutate()}
@@ -398,8 +399,8 @@ export default function Settings() {
                         )}
                         Sync Pipeline
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline"
                         onClick={() => qbDisconnectMutation.mutate()}
                         disabled={qbDisconnectMutation.isPending}
@@ -409,7 +410,7 @@ export default function Settings() {
                       </Button>
                     </>
                   ) : qbStatus?.configured ? (
-                    <Button 
+                    <Button
                       size="sm"
                       onClick={() => qbConnectMutation.mutate()}
                       disabled={qbConnectMutation.isPending}
@@ -445,8 +446,8 @@ export default function Settings() {
                   <div>
                     <p className="text-sm font-medium">Connection Status</p>
                     <p className="text-xs text-muted-foreground">
-                      {ghlStatus?.configured 
-                        ? "Credentials configured - click Test to verify connection" 
+                      {ghlStatus?.configured
+                        ? "Credentials configured - click Test to verify connection"
                         : `Missing: ${!ghlStatus?.hasApiKey ? 'GHL_API_KEY' : ''} ${!ghlStatus?.hasLocationId ? 'GHL_LOCATION_ID' : ''}`.trim()}
                     </p>
                   </div>
@@ -454,13 +455,13 @@ export default function Settings() {
                     {ghlStatus?.configured ? "Ready" : "Not Configured"}
                   </Badge>
                 </div>
-                
+
                 <Separator />
-                
+
                 <div className="flex flex-wrap gap-2">
                   {ghlStatus?.configured ? (
                     <>
-                      <Button 
+                      <Button
                         size="sm"
                         variant="outline"
                         onClick={() => ghlTestMutation.mutate()}
@@ -474,7 +475,7 @@ export default function Settings() {
                         )}
                         Test Connection
                       </Button>
-                      <Button 
+                      <Button
                         size="sm"
                         onClick={() => ghlSyncMutation.mutate()}
                         disabled={ghlSyncMutation.isPending}
@@ -514,6 +515,9 @@ export default function Settings() {
 
             {/* Business Defaults */}
             <BusinessDefaultsEditor config={businessDefaults} />
+
+            {/* CI/CD Status */}
+            <CIStatusPanel />
           </div>
         </div>
       </main>
@@ -521,15 +525,15 @@ export default function Settings() {
   );
 }
 
-function IntegrationRow({ 
-  name, 
-  icon, 
-  connected, 
-  details 
-}: { 
-  name: string; 
-  icon: React.ReactNode; 
-  connected: boolean; 
+function IntegrationRow({
+  name,
+  icon,
+  connected,
+  details
+}: {
+  name: string;
+  icon: React.ReactNode;
+  connected: boolean;
   details?: string;
 }) {
   return (
@@ -550,7 +554,7 @@ function IntegrationRow({
 
 function FinancialMappingEditor() {
   const { toast } = useToast();
-  
+
   // Fetch QBO accounts
   const { data: accounts, isLoading: accountsLoading } = useQuery<QBAccountsResponse>({
     queryKey: ["/api/quickbooks/accounts"],
@@ -664,8 +668,8 @@ function FinancialMappingEditor() {
 
             <Separator />
 
-            <Button 
-              onClick={handleSave} 
+            <Button
+              onClick={handleSave}
               disabled={saveMutation.isPending}
               data-testid="button-save-financial-mapping"
             >
@@ -732,16 +736,16 @@ function LeadSourcesEditor({ sources }: { sources: string[] }) {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
           {localSources.map((source) => (
-            <Badge 
-              key={source} 
-              variant="outline" 
+            <Badge
+              key={source}
+              variant="outline"
               className="flex items-center gap-1 pr-1"
               data-testid={`badge-source-${source.toLowerCase().replace(/\s+/g, '-')}`}
             >
               {source}
-              <Button 
-                size="icon" 
-                variant="ghost" 
+              <Button
+                size="icon"
+                variant="ghost"
                 className="h-4 w-4 p-0 no-default-hover-elevate"
                 onClick={() => removeSource(source)}
                 data-testid={`button-remove-source-${source.toLowerCase().replace(/\s+/g, '-')}`}
@@ -752,15 +756,15 @@ function LeadSourcesEditor({ sources }: { sources: string[] }) {
           ))}
         </div>
         <div className="flex gap-2">
-          <Input 
+          <Input
             placeholder="Add new source..."
             value={newSource}
             onChange={(e) => setNewSource(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addSource()}
             data-testid="input-new-source"
           />
-          <Button 
-            size="icon" 
+          <Button
+            size="icon"
             onClick={addSource}
             disabled={!newSource.trim() || mutation.isPending}
             data-testid="button-add-source"
@@ -809,7 +813,7 @@ function StalenessEditor({ config }: { config: StalenessConfig }) {
         <div className="grid gap-4">
           <div className="space-y-2">
             <Label htmlFor="warning-days">Warning After (days)</Label>
-            <Input 
+            <Input
               id="warning-days"
               type="number"
               value={localConfig.warningDays}
@@ -820,7 +824,7 @@ function StalenessEditor({ config }: { config: StalenessConfig }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="critical-days">Critical After (days)</Label>
-            <Input 
+            <Input
               id="critical-days"
               type="number"
               value={localConfig.criticalDays}
@@ -831,7 +835,7 @@ function StalenessEditor({ config }: { config: StalenessConfig }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="penalty-percent">Probability Penalty (%/day)</Label>
-            <Input 
+            <Input
               id="penalty-percent"
               type="number"
               value={localConfig.penaltyPercent}
@@ -841,8 +845,8 @@ function StalenessEditor({ config }: { config: StalenessConfig }) {
             <p className="text-xs text-muted-foreground">Reduce win probability by this % each day after warning</p>
           </div>
         </div>
-        <Button 
-          onClick={save} 
+        <Button
+          onClick={save}
           disabled={mutation.isPending}
           className="w-full"
           data-testid="button-save-staleness"
@@ -910,7 +914,7 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="travel-rate">Default Travel Rate ($/mile)</Label>
-              <Input 
+              <Input
                 id="travel-rate"
                 type="number"
                 step="0.01"
@@ -921,7 +925,7 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="bim-deliverable">Default BIM Deliverable</Label>
-              <Input 
+              <Input
                 id="bim-deliverable"
                 value={localConfig.defaultBimDeliverable}
                 onChange={(e) => setLocalConfig({ ...localConfig, defaultBimDeliverable: e.target.value })}
@@ -931,7 +935,7 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="bim-version">Default BIM Version/Template</Label>
-              <Input 
+              <Input
                 id="bim-version"
                 value={localConfig.defaultBimVersion}
                 onChange={(e) => setLocalConfig({ ...localConfig, defaultBimVersion: e.target.value })}
@@ -945,16 +949,16 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
               <Label>Dispatch Locations</Label>
               <div className="flex flex-wrap gap-2 min-h-[40px]">
                 {localConfig.dispatchLocations.map((location) => (
-                  <Badge 
-                    key={location} 
-                    variant="outline" 
+                  <Badge
+                    key={location}
+                    variant="outline"
                     className="flex items-center gap-1 pr-1"
                     data-testid={`badge-location-${location.toLowerCase().replace(/[,\s]+/g, '-')}`}
                   >
                     {location}
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       className="h-4 w-4 p-0 no-default-hover-elevate"
                       onClick={() => removeLocation(location)}
                       data-testid={`button-remove-location-${location.toLowerCase().replace(/[,\s]+/g, '-')}`}
@@ -965,15 +969,15 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
                 ))}
               </div>
               <div className="flex gap-2">
-                <Input 
+                <Input
                   placeholder="Add location (e.g., Brooklyn, NY)"
                   value={newLocation}
                   onChange={(e) => setNewLocation(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addLocation()}
                   data-testid="input-new-location"
                 />
-                <Button 
-                  size="icon" 
+                <Button
+                  size="icon"
                   onClick={addLocation}
                   disabled={!newLocation.trim()}
                   data-testid="button-add-location"
@@ -985,8 +989,8 @@ function BusinessDefaultsEditor({ config }: { config: BusinessDefaultsConfig }) 
           </div>
         </div>
         <Separator className="my-6" />
-        <Button 
-          onClick={save} 
+        <Button
+          onClick={save}
           disabled={mutation.isPending}
           className="w-full"
           data-testid="button-save-defaults"
@@ -1008,8 +1012,8 @@ function CloudStorageEditor() {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Fetch current GCS configuration
-  const { data: gcsData, isLoading } = useQuery<{ 
-    config: GcsStorageConfig | null; 
+  const { data: gcsData, isLoading } = useQuery<{
+    config: GcsStorageConfig | null;
     hasCredentials: boolean;
   }>({
     queryKey: ["/api/storage/gcs/config"],
@@ -1034,9 +1038,9 @@ function CloudStorageEditor() {
     },
     onSuccess: (data: { success: boolean; message?: string; error?: string; bucketLocation?: string }) => {
       if (data.success) {
-        setTestResult({ 
-          success: true, 
-          message: `Connection successful! Bucket location: ${data.bucketLocation || "Unknown"}` 
+        setTestResult({
+          success: true,
+          message: `Connection successful! Bucket location: ${data.bucketLocation || "Unknown"}`
         });
         toast({ title: "Connection test passed" });
       } else {
@@ -1045,10 +1049,10 @@ function CloudStorageEditor() {
     },
     onError: (error: any) => {
       setTestResult({ success: false, message: error.message || "Connection test failed" });
-      toast({ 
-        title: "Connection test failed", 
+      toast({
+        title: "Connection test failed",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -1068,10 +1072,10 @@ function CloudStorageEditor() {
       toast({ title: "Cloud storage configuration saved" });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to save configuration", 
+      toast({
+        title: "Failed to save configuration",
         description: error.message,
-        variant: "destructive" 
+        variant: "destructive"
       });
     },
   });
@@ -1118,8 +1122,8 @@ function CloudStorageEditor() {
               <div>
                 <p className="text-sm font-medium">Connection Status</p>
                 <p className="text-xs text-muted-foreground">
-                  {isConfigured 
-                    ? `Connected to ${gcsData?.config?.defaultBucket}` 
+                  {isConfigured
+                    ? `Connected to ${gcsData?.config?.defaultBucket}`
                     : "Not configured"}
                 </p>
               </div>
@@ -1205,8 +1209,8 @@ function CloudStorageEditor() {
                 {/* Storage Mode Selection */}
                 <div className="space-y-3">
                   <Label>Default Storage Mode for New Projects</Label>
-                  <RadioGroup 
-                    value={storageMode} 
+                  <RadioGroup
+                    value={storageMode}
                     onValueChange={(v) => setStorageMode(v as typeof storageMode)}
                     className="space-y-2"
                   >
