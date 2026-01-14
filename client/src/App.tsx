@@ -37,6 +37,7 @@ import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
 import AuthGate from "@/pages/AuthGate";
 import MissionBriefPage from "@/pages/MissionBriefPage";
+import { NetworkStatusIndicator } from "@/components/NetworkStatusIndicator";
 
 function ProtectedRoutes() {
   const { user } = useAuth();
@@ -203,6 +204,7 @@ function App() {
       <TooltipProvider>
         <Router />
         <Toaster />
+        <NetworkStatusIndicator />
       </TooltipProvider>
     </QueryClientProvider>
   );

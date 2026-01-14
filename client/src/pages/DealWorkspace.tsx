@@ -199,6 +199,12 @@ export default function DealWorkspace() {
     setSharedConfig(prev => ({ ...prev, projectLocation }));
   }, []);
 
+  // Memoize normalized areas to prevent infinite re-renders
+  const normalizedAreas = useMemo(() =>
+    sharedConfig.areas.map(a => ({ ...a, expanded: a.expanded ?? false })),
+    [sharedConfig.areas]
+  );
+
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
@@ -566,6 +572,33 @@ export default function DealWorkspace() {
       });
     }
   }, [lead, form]);
+
+  // Warn user about unsaved changes before leaving page
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (form.formState.isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [form.formState.isDirty]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd+S or Ctrl+S to save
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (activeTab === 'lead' && form.formState.isDirty) {
+          form.handleSubmit(onSubmit)();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, form]);
 
   async function onSubmit(data: LeadFormData) {
     try {
@@ -991,8 +1024,8 @@ export default function DealWorkspace() {
                 onClose={() => handleTabChange("lead")}
                 importedData={importedCpqData}
                 onClearImport={() => setImportedCpqData(null)}
-                // Shared state props - map to ensure expanded has a value
-                sharedAreas={sharedConfig.areas.map(a => ({ ...a, expanded: a.expanded ?? false }))}
+                // Shared state props - use memoized normalized areas
+                sharedAreas={normalizedAreas}
                 onAreasChange={updateSharedAreas}
                 sharedLandscape={sharedConfig.landscape}
                 onLandscapeChange={updateSharedLandscape}

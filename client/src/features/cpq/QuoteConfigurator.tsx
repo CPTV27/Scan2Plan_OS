@@ -299,6 +299,12 @@ export default function QuoteConfigurator({
         mutationFn: async () => {
             if (!pricing) throw new Error("No pricing calculated");
 
+            // Validate areas have square footage
+            const validAreas = areas.filter(a => parseInt(a.squareFeet) > 0);
+            if (validAreas.length === 0) {
+                throw new Error("At least one area must have square footage greater than 0");
+            }
+
             // Enrich areas with product SKUs
             const areasWithProducts = await Promise.all(
                 areas.map(area => enrichAreaWithProducts({
