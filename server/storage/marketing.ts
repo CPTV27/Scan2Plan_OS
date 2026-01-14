@@ -3,6 +3,7 @@
  * 
  * Domain-specific repository for marketing module operations:
  * - Case Studies (Proof Vault)
+ * - Case Study Snippets
  * - Events (Education-Led Sales)
  * - Event Registrations
  * - Deal Attributions (Marketing Influence Tracker)
@@ -12,17 +13,22 @@
  */
 
 import { db } from "../db";
-import { 
-  caseStudies, events, eventRegistrations, dealAttributions, 
+import {
+  caseStudies, caseStudySnippets, events, eventRegistrations, dealAttributions,
   notifications, proposalEmailEvents, leads,
-  type CaseStudy, type InsertCaseStudy, 
-  type Event, type InsertEvent, 
+  type CaseStudy, type InsertCaseStudy,
+  type CaseStudySnippet, type InsertCaseStudySnippet,
+  type Event, type InsertEvent,
   type EventRegistration, type InsertEventRegistration,
   type DealAttribution, type InsertDealAttribution,
   type Notification, type InsertNotification,
   type ProposalEmailEvent, type InsertProposalEmailEvent
 } from "@shared/schema";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, ilike, or } from "drizzle-orm";
+
+export interface CaseStudyWithSnippets extends CaseStudy {
+  snippets: CaseStudySnippet[];
+}
 
 export class CaseStudyRepository {
   async getCaseStudies(): Promise<CaseStudy[]> {
@@ -34,8 +40,8 @@ export class CaseStudyRepository {
   async getCaseStudiesByTags(tags: string[]): Promise<CaseStudy[]> {
     if (!tags.length) return this.getCaseStudies();
     const allStudies = await this.getCaseStudies();
-    return allStudies.filter(study => 
-      study.tags.some(tag => tags.some(t => 
+    return allStudies.filter(study =>
+      study.tags.some(tag => tags.some(t =>
         tag.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(tag.toLowerCase())
       ))
     );
@@ -44,6 +50,32 @@ export class CaseStudyRepository {
   async getCaseStudy(id: number): Promise<CaseStudy | undefined> {
     const [study] = await db.select().from(caseStudies).where(eq(caseStudies.id, id));
     return study;
+  }
+
+  async getCaseStudyWithSnippets(id: number): Promise<CaseStudyWithSnippets | undefined> {
+    const study = await this.getCaseStudy(id);
+    if (!study) return undefined;
+
+    const snippets = await db.select().from(caseStudySnippets)
+      .where(eq(caseStudySnippets.caseStudyId, id))
+      .orderBy(caseStudySnippets.createdAt);
+
+    return { ...study, snippets };
+  }
+
+  async searchCaseStudies(query: string): Promise<CaseStudy[]> {
+    const searchPattern = `%${query}%`;
+    return await db.select().from(caseStudies)
+      .where(and(
+        eq(caseStudies.isActive, true),
+        or(
+          ilike(caseStudies.title, searchPattern),
+          ilike(caseStudies.blurb, searchPattern),
+          ilike(caseStudies.clientName, searchPattern),
+          ilike(caseStudies.heroStat, searchPattern)
+        )
+      ))
+      .orderBy(desc(caseStudies.createdAt));
   }
 
   async createCaseStudy(insertStudy: InsertCaseStudy): Promise<CaseStudy> {
@@ -57,6 +89,37 @@ export class CaseStudyRepository {
       .where(eq(caseStudies.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteCaseStudy(id: number): Promise<void> {
+    // Soft delete - set isActive to false
+    await db.update(caseStudies)
+      .set({ isActive: false })
+      .where(eq(caseStudies.id, id));
+  }
+
+  // Snippet methods
+  async getSnippets(caseStudyId: number): Promise<CaseStudySnippet[]> {
+    return await db.select().from(caseStudySnippets)
+      .where(eq(caseStudySnippets.caseStudyId, caseStudyId))
+      .orderBy(caseStudySnippets.createdAt);
+  }
+
+  async createSnippet(snippet: InsertCaseStudySnippet): Promise<CaseStudySnippet> {
+    const [created] = await db.insert(caseStudySnippets).values(snippet).returning();
+    return created;
+  }
+
+  async updateSnippet(id: number, updates: Partial<InsertCaseStudySnippet>): Promise<CaseStudySnippet | undefined> {
+    const [updated] = await db.update(caseStudySnippets)
+      .set(updates)
+      .where(eq(caseStudySnippets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSnippet(id: number): Promise<void> {
+    await db.delete(caseStudySnippets).where(eq(caseStudySnippets.id, id));
   }
 }
 
@@ -122,7 +185,7 @@ export class EventRegistrationRepository {
 
   async updateEventRegistrationStatus(id: number, status: string, leadId: number): Promise<EventRegistration> {
     const updateData: Record<string, unknown> = { status };
-    
+
     if (status === 'attended') {
       updateData.attendedAt = new Date();
       await db.update(leads)
@@ -131,7 +194,7 @@ export class EventRegistrationRepository {
     } else if (status === 'certificate_sent') {
       updateData.certificateSentAt = new Date();
     }
-    
+
     const [updated] = await db.update(eventRegistrations)
       .set(updateData)
       .where(eq(eventRegistrations.id, id))
@@ -200,7 +263,7 @@ export class ProposalEmailRepository {
 
   async recordProposalOpen(token: string): Promise<ProposalEmailEvent | undefined> {
     const [updated] = await db.update(proposalEmailEvents)
-      .set({ 
+      .set({
         openCount: sql`${proposalEmailEvents.openCount} + 1`,
         lastOpenedAt: new Date(),
         firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
@@ -212,7 +275,7 @@ export class ProposalEmailRepository {
 
   async recordProposalClick(token: string): Promise<ProposalEmailEvent | undefined> {
     const [updated] = await db.update(proposalEmailEvents)
-      .set({ 
+      .set({
         clickCount: sql`${proposalEmailEvents.clickCount} + 1`,
         lastOpenedAt: new Date(),
         firstOpenedAt: sql`COALESCE(${proposalEmailEvents.firstOpenedAt}, NOW())`,
@@ -259,8 +322,16 @@ export const caseStudyStorage = {
   getAll: (): Promise<CaseStudy[]> => caseStudyRepo.getCaseStudies(),
   getByTags: (tags: string[]): Promise<CaseStudy[]> => caseStudyRepo.getCaseStudiesByTags(tags),
   getById: (id: number): Promise<CaseStudy | undefined> => caseStudyRepo.getCaseStudy(id),
+  getWithSnippets: (id: number): Promise<CaseStudyWithSnippets | undefined> => caseStudyRepo.getCaseStudyWithSnippets(id),
+  search: (query: string): Promise<CaseStudy[]> => caseStudyRepo.searchCaseStudies(query),
   create: (study: InsertCaseStudy): Promise<CaseStudy> => caseStudyRepo.createCaseStudy(study),
   update: (id: number, updates: Partial<InsertCaseStudy>): Promise<CaseStudy | undefined> => caseStudyRepo.updateCaseStudy(id, updates),
+  delete: (id: number): Promise<void> => caseStudyRepo.deleteCaseStudy(id),
+  // Snippets
+  getSnippets: (caseStudyId: number): Promise<CaseStudySnippet[]> => caseStudyRepo.getSnippets(caseStudyId),
+  createSnippet: (snippet: InsertCaseStudySnippet): Promise<CaseStudySnippet> => caseStudyRepo.createSnippet(snippet),
+  updateSnippet: (id: number, updates: Partial<InsertCaseStudySnippet>): Promise<CaseStudySnippet | undefined> => caseStudyRepo.updateSnippet(id, updates),
+  deleteSnippet: (id: number): Promise<void> => caseStudyRepo.deleteSnippet(id),
 };
 
 export const eventStorage = {
@@ -275,7 +346,7 @@ export const eventRegistrationStorage = {
   getByEventId: (eventId: number): Promise<EventRegistration[]> => eventRegistrationRepo.getEventRegistrations(eventId),
   getByLeadId: (leadId: number): Promise<EventRegistration[]> => eventRegistrationRepo.getEventRegistrationsByLead(leadId),
   create: (registration: InsertEventRegistration): Promise<EventRegistration> => eventRegistrationRepo.createEventRegistration(registration),
-  updateStatus: (id: number, status: string, leadId: number): Promise<EventRegistration> => 
+  updateStatus: (id: number, status: string, leadId: number): Promise<EventRegistration> =>
     eventRegistrationRepo.updateEventRegistrationStatus(id, status, leadId),
   delete: (id: number): Promise<void> => eventRegistrationRepo.deleteEventRegistration(id),
 };
@@ -301,6 +372,6 @@ export const proposalEmailStorage = {
 };
 
 export const abmAnalyticsStorage = {
-  getTierAAccountPenetration: (): Promise<{ total: number; engaged: number; percentage: number }> => 
+  getTierAAccountPenetration: (): Promise<{ total: number; engaged: number; percentage: number }> =>
     abmAnalyticsRepo.getTierAAccountPenetration(),
 };

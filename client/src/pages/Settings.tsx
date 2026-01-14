@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PersonaManager from "@/components/PersonaManager";
 import { CIStatusPanel } from "@/components/CIStatusPanel";
+import { CaseStudyManager } from "@/components/CaseStudyManager";
 
 interface IntegrationStatus {
   airtable: { configured: boolean; writeEnabled: boolean };
@@ -518,6 +519,9 @@ export default function Settings() {
 
             {/* CI/CD Status */}
             <CIStatusPanel />
+
+            {/* Case Study Manager */}
+            <CaseStudyManager />
           </div>
         </div>
       </main>

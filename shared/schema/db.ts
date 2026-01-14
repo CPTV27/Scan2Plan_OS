@@ -1117,6 +1117,24 @@ export const insertCaseStudySchema = createInsertSchema(caseStudies).omit({
 });
 export type CaseStudy = typeof caseStudies.$inferSelect;
 export type InsertCaseStudy = z.infer<typeof insertCaseStudySchema>;
+
+// Case study snippets for reusable content in proposals
+export const caseStudySnippets = pgTable("case_study_snippets", {
+  id: serial("id").primaryKey(),
+  caseStudyId: integer("case_study_id").references(() => caseStudies.id).notNull(),
+  title: text("title").notNull(),         // "Key Metric", "Problem Solved", "Testimonial"
+  content: text("content").notNull(),     // The actual snippet text
+  snippetType: text("snippet_type"),      // "stat", "quote", "summary", "result"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCaseStudySnippetSchema = createInsertSchema(caseStudySnippets).omit({
+  id: true,
+  createdAt: true,
+});
+export type CaseStudySnippet = typeof caseStudySnippets.$inferSelect;
+export type InsertCaseStudySnippet = z.infer<typeof insertCaseStudySnippetSchema>;
+
 export const personas = pgTable("personas", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // "BP1", "BP5"

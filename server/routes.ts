@@ -102,7 +102,7 @@ export async function registerRoutes(
   await registerGoogleRoutes(app);
   registerAnalyticsRoutes(app);
   registerProjectRoutes(app);
-  registerMarketingRoutes(app);
+  await registerMarketingRoutes(app);
   registerTimeLogRoutes(app);
   await registerWebhookRoutes(app);
   registerQuickbooksRoutes(app);

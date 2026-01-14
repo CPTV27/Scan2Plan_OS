@@ -33,6 +33,7 @@ import {
     DollarSign,
     LayoutTemplate,
     AlertTriangle,
+    FileText,
 } from "lucide-react";
 import {
     Dialog,
@@ -47,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import type { Lead, CpqQuote, ProposalTemplate, ProposalTemplateGroup } from "@shared/schema";
 import { SectionPanel } from "./SectionPanel";
 import { ProposalPreview } from "./ProposalPreview";
+import { CaseStudyPicker } from "./CaseStudyPicker";
 import {
     ProposalSection,
     substituteVariables,
@@ -102,6 +104,9 @@ export function ProposalLayoutEditor({
     const [editingSection, setEditingSection] = useState<ProposalSection | null>(null);
     const [editedContent, setEditedContent] = useState("");
     const [editedName, setEditedName] = useState("");
+
+    // Case study picker state
+    const [isCaseStudyPickerOpen, setIsCaseStudyPickerOpen] = useState(false);
 
     // Fetch template groups
     const { data: templateGroups = [], isLoading: groupsLoading, isError: groupsError } = useTemplateGroups();
@@ -199,6 +204,22 @@ export function ProposalLayoutEditor({
         );
         setSections(updated);
         setEditingSection(null);
+    };
+
+    // Handle inserting case study content
+    const handleInsertCaseStudy = (content: string, type: "full" | "snippet") => {
+        if (editingSection) {
+            // If editing, append to current content
+            setEditedContent(prev => prev + "\n\n" + content);
+        } else if (activeSectionId) {
+            // Otherwise, append to the active section
+            const updated = sections.map(s =>
+                s.id === activeSectionId
+                    ? { ...s, content: s.content + "\n\n" + content }
+                    : s
+            );
+            setSections(updated);
+        }
     };
 
     // Sort grouped templates by category order
@@ -401,6 +422,14 @@ export function ProposalLayoutEditor({
                         </div>
                     </div>
                     <DialogFooter className="mt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsCaseStudyPickerOpen(true)}
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Insert Case Study
+                        </Button>
+                        <div className="flex-1" />
                         <Button variant="outline" onClick={() => setEditingSection(null)}>
                             Cancel
                         </Button>
@@ -411,6 +440,13 @@ export function ProposalLayoutEditor({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Case Study Picker */}
+            <CaseStudyPicker
+                open={isCaseStudyPickerOpen}
+                onOpenChange={setIsCaseStudyPickerOpen}
+                onInsert={handleInsertCaseStudy}
+            />
         </div>
     );
 }
