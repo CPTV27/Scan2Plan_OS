@@ -99,15 +99,16 @@ import { Brain, Paperclip, Download, Eye, Link2, Copy, CheckCircle2, FileSignatu
 import type { LeadDocument } from "@shared/schema";
 import { SendProposalDialog } from "@/components/SendProposalDialog";
 import { Slider } from "@/components/ui/slider";
-import { 
-  calculatePricing, 
-  type Area as PricingArea, 
-  type TravelConfig, 
-  type PricingResult 
+import {
+  calculatePricing,
+  type Area as PricingArea,
+  type TravelConfig,
+  type PricingResult
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
 import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
+import QuoteConfigurator from "@/features/cpq/QuoteConfigurator";
 
 import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
@@ -131,7 +132,8 @@ export default function DealWorkspace() {
   const [showProposalDialog, setShowProposalDialog] = useState(false);
   const [viewingQuote, setViewingQuote] = useState<CpqQuote | null>(null);
   const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
-  
+  const [quoteBuilderMode, setQuoteBuilderMode] = useState<'simple' | 'advanced'>('simple');
+
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
@@ -182,17 +184,17 @@ export default function DealWorkspace() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads/trash"] });
-      toast({ 
-        title: "Deal Moved to Trash", 
-        description: "The deal has been moved to trash and will be permanently deleted after 60 days." 
+      toast({
+        title: "Deal Moved to Trash",
+        description: "The deal has been moved to trash and will be permanently deleted after 60 days."
       });
       setLocation("/sales");
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to delete deal", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete deal",
+        variant: "destructive"
       });
     },
   });
@@ -308,8 +310,8 @@ export default function DealWorkspace() {
     onSuccess: (data) => {
       setGeneratedMagicLink(data.magicLink);
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
-      toast({ 
-        title: "Magic Link Generated", 
+      toast({
+        title: "Magic Link Generated",
         description: `Link valid for 7 days. ${data.questionsCount} questions sent to client.`
       });
     },
@@ -319,7 +321,7 @@ export default function DealWorkspace() {
   });
 
   const toggleQuestionToSend = (questionId: string, checked: boolean) => {
-    setQuestionsToSend(prev => 
+    setQuestionsToSend(prev =>
       checked ? [...prev, questionId] : prev.filter(id => id !== questionId)
     );
   };
@@ -353,16 +355,16 @@ export default function DealWorkspace() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/estimate-url", leadId] });
-      toast({ 
-        title: "Estimate Created", 
+      toast({
+        title: "Estimate Created",
         description: `QuickBooks estimate ${data.estimateNumber} created successfully.`
       });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to push to QuickBooks", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to push to QuickBooks",
+        variant: "destructive"
       });
     },
   });
@@ -383,16 +385,16 @@ export default function DealWorkspace() {
     },
     onSuccess: (data) => {
       setShowProposalDialog(false);
-      toast({ 
-        title: "Proposal Sent", 
-        description: `Proposal email sent to ${data.sentTo}` 
+      toast({
+        title: "Proposal Sent",
+        description: `Proposal email sent to ${data.sentTo}`
       });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to send proposal email", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send proposal email",
+        variant: "destructive"
       });
     },
   });
@@ -481,10 +483,10 @@ export default function DealWorkspace() {
       queryClient.invalidateQueries({ queryKey: ["/api/leads"] });
       toast({ title: "Success", description: "Deal updated successfully" });
     } catch (error) {
-      toast({ 
-        title: "Error", 
-        description: error instanceof Error ? error.message : "Something went wrong", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive"
       });
     }
   }
@@ -531,7 +533,7 @@ export default function DealWorkspace() {
     // Default: folder created but empty
     return { color: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30", label: "Folder Empty", icon: FolderOpen };
   };
-  
+
   const filesStatus = getFilesStatus();
 
   // Helper function to get storage links based on storage mode
@@ -540,11 +542,11 @@ export default function DealWorkspace() {
     const gcsBucket = (lead as any).gcsBucket;
     const gcsPath = (lead as any).gcsPath;
     const driveFolderUrl = lead.driveFolderUrl;
-    
-    const gcsConsoleUrl = gcsBucket && gcsPath 
+
+    const gcsConsoleUrl = gcsBucket && gcsPath
       ? `https://console.cloud.google.com/storage/browser/${gcsBucket}/${gcsPath}`
       : null;
-    
+
     switch (storageMode) {
       case "hybrid_gcs":
         return {
@@ -561,7 +563,7 @@ export default function DealWorkspace() {
       default: // legacy_drive
         return {
           mode: "drive",
-          primary: driveFolderUrl 
+          primary: driveFolderUrl
             ? { url: driveFolderUrl, label: "Drive Folder", icon: HardDrive }
             : null,
           secondary: null,
@@ -584,7 +586,7 @@ export default function DealWorkspace() {
           <Button variant="ghost" size="icon" onClick={() => setLocation("/sales")} data-testid="button-back">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          
+
           {/* Google Maps Satellite Thumbnail - 16:9 aspect ratio */}
           {lead.projectAddress && lead.projectAddress.length >= 5 ? (
             <Tooltip>
@@ -618,7 +620,7 @@ export default function DealWorkspace() {
               <Building2 className="w-6 h-6 text-muted-foreground" />
             </div>
           )}
-          
+
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold">{lead.clientName}</h1>
@@ -649,13 +651,13 @@ export default function DealWorkspace() {
               {lead.qboEstimateId ? "Sync to QuickBooks" : "Generate Estimate in QuickBooks"}
             </Button>
           )}
-          
+
           {/* Files Status Badge - Always show to indicate folder state */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className={`gap-1 ${filesStatus.color}`}
                   data-testid="badge-files-status"
                 >
@@ -670,7 +672,7 @@ export default function DealWorkspace() {
               <p>Google Drive folder status</p>
             </TooltipContent>
           </Tooltip>
-          
+
           {lead.projectCode && storageLinks ? (
             storageLinks.mode === "hybrid" && storageLinks.secondary ? (
               <DropdownMenu>
@@ -849,23 +851,60 @@ export default function DealWorkspace() {
         </ErrorBoundary>
 
         {/* Quote Builder Tab */}
-        <TabsContent value="quote" className="flex-1 overflow-hidden m-0">
+        <TabsContent value="quote" className="flex-1 overflow-hidden m-0 flex flex-col">
+          {/* Mode Toggle */}
+          <div className="flex items-center justify-center gap-4 p-3 border-b bg-muted/30">
+            <div className="inline-flex rounded-lg border p-1 bg-background shadow-sm">
+              <button
+                onClick={() => setQuoteBuilderMode('simple')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'simple'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+              >
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                Simple Mode
+              </button>
+              <button
+                onClick={() => setQuoteBuilderMode('advanced')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'advanced'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+              >
+                <Calculator className="w-4 h-4 inline mr-2" />
+                Advanced Mode
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Simple: Quick product selection | Advanced: Full calculator with all features
+            </p>
+          </div>
+
+          {/* Conditional Content */}
           <ErrorBoundary fallbackTitle="Quote Builder Error" fallbackMessage="Failed to load quote builder. Please try refreshing.">
-            <QuoteBuilderTab 
-              lead={lead} 
-              leadId={leadId}
-              toast={toast}
-              onQuoteSaved={() => {
-                setEditingFromQuote(null);
-                handleTabChange("history");
-              }}
-              existingQuotes={quotes}
-              sourceQuote={editingFromQuote}
-              onClearSourceQuote={() => setEditingFromQuote(null)}
-              onPaymentTermsChange={(terms) => {
-                form.setValue("paymentTerms", terms, { shouldDirty: false });
-              }}
-            />
+            {quoteBuilderMode === 'simple' ? (
+              <QuoteConfigurator
+                leadId={leadId}
+                onClose={() => handleTabChange("lead")}
+              />
+            ) : (
+              <QuoteBuilderTab
+                lead={lead}
+                leadId={leadId}
+                toast={toast}
+                onQuoteSaved={() => {
+                  setEditingFromQuote(null);
+                  handleTabChange("history");
+                }}
+                existingQuotes={quotes}
+                sourceQuote={editingFromQuote}
+                onClearSourceQuote={() => setEditingFromQuote(null)}
+                onPaymentTermsChange={(terms) => {
+                  form.setValue("paymentTerms", terms, { shouldDirty: false });
+                }}
+              />
+            )}
           </ErrorBoundary>
         </TabsContent>
 
