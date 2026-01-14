@@ -160,22 +160,33 @@ export async function setupAuth(app: Express) {
   // Test-only authentication bypass (only in development/test environment)
   if (process.env.NODE_ENV !== 'production') {
     app.post("/api/test-login", async (req, res) => {
-      const testUser = {
-        claims: {
-          sub: "test-user-playwright",
-          email: "playwright@test.local",
-          first_name: "Playwright",
-          last_name: "Test",
-        },
-        access_token: "test-access-token",
-        refresh_token: "test-refresh-token",
-        expires_at: Math.floor(Date.now() / 1000) + 3600 * 24, // 24 hours
-      };
-
       const requestedRole = req.body.role;
       let dbRole = "ceo";
-      if (requestedRole === "field") dbRole = "production";
-      if (requestedRole === "admin") dbRole = "ceo";
+      let userId = "test-user-admin";
+      let email = "playwright-admin@scan2plan.io";
+      
+      if (requestedRole === "field") {
+        dbRole = "production";
+        userId = "test-user-field";
+        email = "playwright-field@scan2plan.io";
+      }
+      if (requestedRole === "admin") {
+        dbRole = "ceo";
+        userId = "test-user-admin";
+        email = "playwright-admin@scan2plan.io";
+      }
+
+      const testUser = {
+        claims: {
+          sub: userId,
+          email: email,
+          first_name: "Playwright",
+          last_name: requestedRole === "field" ? "Field" : "Admin",
+        },
+        access_token: `test-access-token-${requestedRole}`,
+        refresh_token: `test-refresh-token-${requestedRole}`,
+        expires_at: Math.floor(Date.now() / 1000) + 3600 * 24, // 24 hours
+      };
 
       // Upsert test user in database
       await authStorage.upsertUser({
@@ -192,7 +203,14 @@ export async function setupAuth(app: Express) {
         if (err) {
           return res.status(500).json({ message: "Login failed", error: err.message });
         }
-        res.json({ success: true, user: testUser.claims });
+        // Set password as verified for test user
+        (req.session as any).passwordVerified = true;
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            return res.status(500).json({ message: "Session save failed", error: saveErr.message });
+          }
+          res.json({ success: true, user: testUser.claims });
+        });
       });
     });
   }

@@ -1,0 +1,8 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - img [ref=e4]
+  - region "Notifications (F8)":
+    - list
+```

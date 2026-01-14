@@ -1,0 +1,306 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - button [ref=e7] [cursor=pointer]:
+          - img
+        - generic [ref=e8]:
+          - img [ref=e9]
+          - heading "New Quote" [level=1] [ref=e11]
+      - generic [ref=e12]:
+        - button "Customize Line Items" [ref=e13] [cursor=pointer]:
+          - img
+          - text: Customize Line Items
+        - button "Save Quote" [ref=e14] [cursor=pointer]:
+          - img
+          - text: Save Quote
+    - generic [ref=e15]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - heading "Pricing Mode" [level=2] [ref=e22]
+            - generic [ref=e23]: 0 sqft total
+          - generic [ref=e24]:
+            - button "Areas 1" [ref=e25] [cursor=pointer]:
+              - img
+              - text: Areas
+              - generic [ref=e26]: "1"
+            - button "Tier A Pricing" [ref=e27] [cursor=pointer]:
+              - img
+              - text: Tier A Pricing
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - heading "Project Areas" [level=2] [ref=e30]:
+              - img [ref=e31]
+              - text: Project Areas
+            - generic [ref=e35]:
+              - button "Add Building" [ref=e36] [cursor=pointer]:
+                - img
+                - text: Add Building
+              - button "Add Landscape" [ref=e37] [cursor=pointer]:
+                - img
+                - img
+                - text: Add Landscape
+          - generic [ref=e38]:
+            - generic [ref=e40]:
+              - generic [ref=e41]:
+                - textbox [ref=e42]: Area 1
+                - generic [ref=e43]:
+                  - img [ref=e44]
+                  - text: Building
+              - button [ref=e48] [cursor=pointer]:
+                - img
+            - generic [ref=e49]:
+              - generic [ref=e50]:
+                - generic [ref=e51]:
+                  - text: Building Type
+                  - combobox [ref=e52] [cursor=pointer]:
+                    - generic: Commercial - Simple
+                    - img [ref=e53]
+                - generic [ref=e55]:
+                  - text: Square Footage
+                  - spinbutton [ref=e56]
+              - generic [ref=e57]:
+                - generic [ref=e58]:
+                  - text: Level of Detail
+                  - combobox [ref=e59] [cursor=pointer]:
+                    - generic: LOD 200
+                    - img [ref=e60]
+                - generic [ref=e62]:
+                  - text: Scope
+                  - combobox [ref=e63] [cursor=pointer]:
+                    - generic: Full (Interior + Exterior)
+                    - img [ref=e64]
+              - button "Mixed LOD (Int/Ext)" [ref=e67] [cursor=pointer]:
+                - generic [ref=e68]: Mixed LOD (Int/Ext)
+                - img
+              - generic [ref=e69]:
+                - text: Disciplines
+                - generic [ref=e70]:
+                  - generic [ref=e71] [cursor=pointer]: Architecture
+                  - generic [ref=e72] [cursor=pointer]: MEP/F
+                  - generic [ref=e73] [cursor=pointer]: Structure
+                  - generic [ref=e74] [cursor=pointer]: Grade
+              - generic [ref=e75]:
+                - checkbox "Include CAD Deliverable" [ref=e76] [cursor=pointer]
+                - generic [ref=e77]: Include CAD Deliverable
+        - generic [ref=e78]:
+          - heading "Travel" [level=2] [ref=e79]:
+            - img [ref=e80]
+            - text: Travel
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - generic [ref=e86]:
+                - text: Dispatch Origin
+                - combobox [ref=e87] [cursor=pointer]:
+                  - generic: Woodstock (3272 Rt 212, Bearsville)
+                  - img [ref=e88]
+              - generic [ref=e90]:
+                - text: Distance (miles)
+                - spinbutton [ref=e91]
+            - generic [ref=e92]:
+              - text: Custom Travel Cost (optional)
+              - spinbutton [ref=e93]
+              - paragraph [ref=e94]: Override the calculated mileage-based travel cost
+            - generic [ref=e95]:
+              - generic [ref=e97]:
+                - text: "Calculated Travel Cost:"
+                - generic [ref=e98]: $0
+              - paragraph [ref=e99]: Enter distance to calculate travel cost
+        - generic [ref=e100]:
+          - heading "Building Features" [level=2] [ref=e101]
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - checkbox "Has Basement" [ref=e104] [cursor=pointer]
+              - generic [ref=e105]: Has Basement
+            - generic [ref=e106]:
+              - checkbox "Has Attic" [ref=e107] [cursor=pointer]
+              - generic [ref=e108]: Has Attic
+        - generic [ref=e109]:
+          - heading "Site Status" [level=2] [ref=e110]
+          - combobox [ref=e111] [cursor=pointer]:
+            - generic: Vacant
+            - img [ref=e112]
+        - generic [ref=e114]:
+          - heading "MEP Scope" [level=2] [ref=e115]
+          - combobox [ref=e116] [cursor=pointer]:
+            - generic: Full MEP Modeling
+            - img [ref=e117]
+        - generic [ref=e119]:
+          - heading "Scanning Above & Below Acoustic Ceiling Tile?" [level=2] [ref=e120]
+          - combobox [ref=e121] [cursor=pointer]:
+            - generic: "No"
+            - img [ref=e122]
+        - generic [ref=e124]:
+          - heading "Scanning & Registration Only" [level=2] [ref=e125]
+          - combobox [ref=e126] [cursor=pointer]:
+            - generic: None (Full Scan-to-BIM)
+            - img [ref=e127]
+        - generic [ref=e129]:
+          - heading "Payment Terms" [level=2] [ref=e130]
+          - combobox [ref=e131] [cursor=pointer]:
+            - generic: Standard
+            - img [ref=e132]
+        - generic [ref=e134]:
+          - heading "Risk Factors" [level=2] [ref=e135]
+          - generic [ref=e136]:
+            - generic [ref=e137] [cursor=pointer]: Hazardous Conditions (+25%)
+            - generic [ref=e138] [cursor=pointer]: No Power/HVAC (+20%)
+            - generic [ref=e139] [cursor=pointer]: Occupied Building (+15%)
+        - generic [ref=e140]:
+          - heading "Additional Services" [level=2] [ref=e141]
+          - generic [ref=e142]:
+            - generic [ref=e143]:
+              - generic [ref=e144]:
+                - text: Matterport Capture
+                - paragraph [ref=e145]: $0.1/sqft
+              - spinbutton [ref=e146]
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - text: Georeferencing
+                - paragraph [ref=e149]: $500/flat
+              - spinbutton [ref=e150]
+            - generic [ref=e151]:
+              - generic [ref=e152]:
+                - text: Scanning - Full Day
+                - paragraph [ref=e153]: $2500/day
+              - spinbutton [ref=e154]
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - text: Scanning - Half Day
+                - paragraph [ref=e157]: $1500/half-day
+              - spinbutton [ref=e158]
+        - generic [ref=e159]:
+          - heading "Project Notes" [level=2] [ref=e160]:
+            - img [ref=e161]
+            - text: Project Notes
+          - textbox "Add any notes about this project..." [ref=e164]
+        - generic [ref=e165]:
+          - heading "Project Details" [level=2] [ref=e166]
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - text: Specific Building/Area
+              - textbox "e.g., Building A - East Wing" [ref=e171]
+            - generic [ref=e172]:
+              - text: Type of Building
+              - textbox "e.g., 5-story commercial office" [ref=e173]
+        - generic [ref=e174]:
+          - heading "Deliverables" [level=2] [ref=e175]
+          - generic [ref=e177]:
+            - generic [ref=e178]:
+              - generic [ref=e179]:
+                - text: Interior CAD Elevations
+                - spinbutton [ref=e180]
+              - generic [ref=e181]:
+                - text: BIM Version
+                - textbox "e.g., Revit 2024" [ref=e182]
+            - generic [ref=e183]:
+              - text: BIM Deliverable Format
+              - generic [ref=e184]:
+                - generic [ref=e185] [cursor=pointer]: Revit
+                - generic [ref=e186] [cursor=pointer]: Archicad
+                - generic [ref=e187] [cursor=pointer]: Sketchup
+                - generic [ref=e188] [cursor=pointer]: Rhino
+                - generic [ref=e189] [cursor=pointer]: Other
+            - generic [ref=e190]:
+              - text: Custom Template
+              - combobox [ref=e191] [cursor=pointer]:
+                - generic: No (Standard S2P Template)
+                - img [ref=e192]
+        - generic [ref=e194]:
+          - heading "ACT Ceiling Details" [level=2] [ref=e195]
+          - generic [ref=e198]:
+            - generic [ref=e199]:
+              - text: Above/Below ACT Scope
+              - combobox [ref=e200] [cursor=pointer]:
+                - generic: Select scope...
+                - img [ref=e201]
+            - generic [ref=e203]:
+              - text: ACT Ceiling Square Footage
+              - spinbutton [ref=e204]
+        - generic [ref=e205]:
+          - heading "Internal Notes & Assumptions" [level=2] [ref=e206]
+          - generic [ref=e208]:
+            - generic [ref=e209]:
+              - text: Assumed Gross Margin
+              - textbox "e.g., 45%" [ref=e210]
+            - generic [ref=e211]:
+              - text: Square Footage Assumptions
+              - textbox "Describe how square footage was determined..." [ref=e212]
+            - generic [ref=e213]:
+              - text: Profitability Caveats
+              - textbox "Any concerns about profitability..." [ref=e214]
+            - generic [ref=e215]:
+              - text: Mixed Scope Description
+              - textbox "Describe mixed scope if applicable..." [ref=e216]
+            - generic [ref=e217]:
+              - text: Insurance Requirements
+              - textbox "Describe insurance requirements if applicable..." [ref=e218]
+        - generic [ref=e219]:
+          - heading "Timeline" [level=2] [ref=e220]
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - text: Estimated Timeline
+              - combobox [ref=e225] [cursor=pointer]:
+                - generic: Select timeline...
+                - img [ref=e226]
+            - generic [ref=e228]:
+              - text: Timeline Notes
+              - textbox "Any timeline notes or caveats..." [ref=e229]
+      - generic [ref=e230]:
+        - heading "Pricing Summary" [level=2] [ref=e232]
+        - generic [ref=e234]:
+          - generic [ref=e235]:
+            - generic [ref=e236]: Margin Target
+            - generic [ref=e237]: 45%
+          - slider [ref=e242]
+          - generic [ref=e243]:
+            - generic [ref=e244]: 35%
+            - generic [ref=e245]: 45% (recommended)
+            - generic [ref=e246]: 60%
+        - generic [ref=e250]:
+          - generic [ref=e252]:
+            - generic [ref=e253]: Area 1 - Architecture LOD 200 (3,000 sqft)
+            - generic [ref=e254]: $750
+          - generic [ref=e256]:
+            - generic [ref=e257]: Minimum Project Charge Adjustment
+            - generic [ref=e258]: $2,250
+          - generic [ref=e260]:
+            - generic [ref=e261]: Margin Target Adjustment (45.0%)
+            - generic [ref=e262]: "-$1,022.73"
+        - generic [ref=e264]:
+          - button "What's Included" [expanded] [ref=e265] [cursor=pointer]:
+            - generic [ref=e266]:
+              - img [ref=e267]
+              - text: What's Included
+          - generic [ref=e270]:
+            - img [ref=e271]
+            - generic [ref=e273]: Architecture Modeling
+        - generic [ref=e274]:
+          - generic [ref=e275]:
+            - generic [ref=e276]: Subtotal
+            - generic [ref=e277]: $3,000
+          - button "Internal Cost Breakdown $1,087.5" [ref=e279] [cursor=pointer]:
+            - generic [ref=e280]:
+              - img [ref=e281]
+              - text: Internal Cost Breakdown
+            - generic [ref=e283]: $1,087.5
+          - generic [ref=e284]:
+            - generic [ref=e285]: Total
+            - generic [ref=e286]: $1,977.27
+          - generic [ref=e287]:
+            - generic [ref=e288]:
+              - generic [ref=e289]: Profit Margin
+              - generic [ref=e290]: $889.77
+            - generic [ref=e292]: 81.8% markup
+          - generic [ref=e293]:
+            - generic [ref=e294]:
+              - generic [ref=e295]: Integrity Check
+              - generic [ref=e296]: Passed
+            - button "Re-run Audit" [ref=e297] [cursor=pointer]
+  - region "Notifications (F8)":
+    - list
+```

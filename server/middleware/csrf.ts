@@ -12,6 +12,8 @@ const EXEMPT_PATHS = [
   "/api/webhooks/",
   "/api/public/",
   "/api/google-chat/webhook",
+  "/api/test-login",
+  "/test-login",
 ];
 
 function generateToken(): string {

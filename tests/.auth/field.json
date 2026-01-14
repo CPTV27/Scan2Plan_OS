@@ -1,4 +1,39 @@
 {
-  "cookies": [],
-  "origins": []
+  "cookies": [
+    {
+      "name": "csrf-token",
+      "value": "2ea54261f11ff41bf4dc19c8439f20b6524b171bc546859173cad9721fa37fbb",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1768508462.564228,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "connect.sid",
+      "value": "s%3AiQZIrY1OnRwcg2BYfloO3Iee-oBWdnET.OvkdA614vHpuGgiOiSXSsBj2Z%2Fajh7hnC3mwjztQBjI",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1769026873.159437,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:5000",
+      "localStorage": [
+        {
+          "name": "fieldHub_draft",
+          "value": "{\"notes\":\"\",\"projectId\":6}"
+        },
+        {
+          "name": "fieldHub_checklist_6",
+          "value": "{}"
+        }
+      ]
+    }
+  ]
 }
