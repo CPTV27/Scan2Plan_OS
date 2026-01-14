@@ -32,6 +32,7 @@ import {
     Building2,
     DollarSign,
     LayoutTemplate,
+    AlertTriangle,
 } from "lucide-react";
 import {
     Dialog,
@@ -103,17 +104,17 @@ export function ProposalLayoutEditor({
     const [editedName, setEditedName] = useState("");
 
     // Fetch template groups
-    const { data: templateGroups = [], isLoading: groupsLoading } = useTemplateGroups();
+    const { data: templateGroups = [], isLoading: groupsLoading, isError: groupsError } = useTemplateGroups();
 
     // Fetch grouped templates for dropdown menus
-    const { data: groupedTemplates = {}, isLoading: templatesLoading } = useQuery<
+    const { data: groupedTemplates = {}, isLoading: templatesLoading, isError: templatesError } = useQuery<
         Record<string, ProposalTemplate[]>
     >({
         queryKey: ["/api/proposal-templates/grouped"],
     });
 
     // Fetch selected template group with expanded sections
-    const { data: selectedGroup, isLoading: groupLoading } = useQuery<ExpandedTemplateGroup>({
+    const { data: selectedGroup, isLoading: groupLoading, isError: groupError } = useQuery<ExpandedTemplateGroup>({
         queryKey: ["/api/proposal-template-groups", selectedGroupId],
         enabled: !!selectedGroupId,
     });
@@ -218,6 +219,7 @@ export function ProposalLayoutEditor({
     }, [groupedTemplates]);
 
     const isLoading = groupsLoading || templatesLoading;
+    const isError = groupsError || templatesError || groupError;
 
     if (isLoading) {
         return (
@@ -227,6 +229,29 @@ export function ProposalLayoutEditor({
                 </div>
                 <div className="flex-1 p-4">
                     <Skeleton className="h-full w-full" />
+                </div>
+            </div>
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8">
+                <div className="text-center space-y-4">
+                    <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+                    <h2 className="text-lg font-semibold">Failed to Load Templates</h2>
+                    <p className="text-muted-foreground max-w-sm">
+                        We couldn't load the proposal templates. Please check your connection and try again.
+                    </p>
+                    <div className="flex gap-2 justify-center">
+                        <Button variant="outline" onClick={onBack}>
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Go Back
+                        </Button>
+                        <Button onClick={() => window.location.reload()}>
+                            Retry
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
