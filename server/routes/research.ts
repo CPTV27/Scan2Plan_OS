@@ -13,9 +13,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = Router();
 
-// Initialize Gemini AI
-const genAI = process.env.GEMINI_API_KEY
-    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Initialize Gemini AI (using Replit's integration)
+const genAI = (process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY)
+    ? new GoogleGenerativeAI(process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "")
     : null;
 
 // GET /api/research/insights - Generate AI-powered business insights
