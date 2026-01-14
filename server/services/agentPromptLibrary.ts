@@ -15,12 +15,15 @@ import {
     INTEL_NEWS_TYPES
 } from "@shared/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { findSimilarProjects, isChromaDBAvailable } from "./vectorStore";
 
-// Initialize Gemini
-const genAI = process.env.GEMINI_API_KEY
-    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+// Initialize OpenAI (using Replit's integration)
+const openai = (process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY)
+    ? new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    })
     : null;
 
 // Types for the prompt library system
@@ -188,22 +191,27 @@ export async function buildRAGContext(): Promise<RAGContext> {
  * Generate optimized prompts for each intel category
  */
 export async function generateCategoryPrompts(): Promise<StoredPrompt[]> {
-    if (!genAI) {
-        console.warn("Gemini not configured, using template prompts");
+    if (!openai) {
+        console.warn("OpenAI not configured, using template prompts");
         return getTemplatePrompts();
     }
 
     const context = await buildRAGContext();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     const prompts: StoredPrompt[] = [];
 
     for (const category of INTEL_NEWS_TYPES) {
         try {
-            const result = await model.generateContent(`
-You are an AI agent for Scan2Plan, a 3D laser scanning and BIM modeling company.
-
-COMPANY CONTEXT:
+            const response = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an AI agent for Scan2Plan, a 3D laser scanning and BIM modeling company. Generate search/monitoring prompts for their intel system. Return valid JSON only."
+                    },
+                    {
+                        role: "user",
+                        content: `COMPANY CONTEXT:
 ${JSON.stringify(context, null, 2)}
 
 TASK: Generate an optimized search/monitoring prompt for the "${category}" intel category.
@@ -220,10 +228,14 @@ OUTPUT FORMAT (JSON only):
     "basePrompt": "The search query or monitoring prompt",
     "variables": ["{{variable1}}", "{{variable2}}"],
     "rationale": "Why this prompt is optimized for Scan2Plan"
-}
-`);
+}`
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 500,
+            });
 
-            const text = result.response.text();
+            const text = response.choices[0]?.message?.content || "";
             const jsonMatch = text.match(/\{[\s\S]*\}/);
 
             if (jsonMatch) {
@@ -265,26 +277,30 @@ export async function optimizePrompt(
     prompt: StoredPrompt,
     feedback?: { accepted: boolean; userEdits?: string }
 ): Promise<StoredPrompt> {
-    if (!genAI) {
+    if (!openai) {
         return prompt;
     }
 
     const context = await buildRAGContext();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     try {
-        const result = await model.generateContent(`
-You are optimizing a search/monitoring prompt for Scan2Plan.
-
-CURRENT PROMPT:
+        const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are optimizing a search/monitoring prompt for Scan2Plan. Return only the improved prompt text, nothing else."
+                },
+                {
+                    role: "user",
+                    content: `CURRENT PROMPT:
 Name: ${prompt.name}
 Category: ${prompt.category}
 Base: ${prompt.basePrompt}
 Current Optimized: ${prompt.optimizedPrompt}
 Performance: ${JSON.stringify(prompt.performance)}
 
-${feedback ? `
-USER FEEDBACK:
+${feedback ? `USER FEEDBACK:
 - Accepted: ${feedback.accepted}
 - User edits: ${feedback.userEdits || "None"}
 ` : ""}
@@ -298,10 +314,14 @@ TASK: Generate an improved version of this prompt that:
 3. Stays aligned with Scan2Plan's brand and capabilities
 4. Is more specific and targeted
 
-OUTPUT: Return ONLY the improved prompt text, nothing else.
-`);
+OUTPUT: Return ONLY the improved prompt text, nothing else.`
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 300,
+        });
 
-        const optimized = result.response.text().trim();
+        const optimized = response.choices[0]?.message?.content?.trim() || prompt.optimizedPrompt;
 
         return {
             ...prompt,
