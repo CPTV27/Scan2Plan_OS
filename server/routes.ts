@@ -42,6 +42,7 @@ import intelFeedsRouter from "./routes/intel-feeds";
 import xIntegrationRouter from "./routes/x-integration";
 import rfpAutomationRouter from "./routes/rfp-automation";
 import signaturesRouter from "./routes/signatures";
+import vectorsRouter from "./routes/vectors";
 
 
 export async function registerRoutes(
@@ -147,6 +148,9 @@ export async function registerRoutes(
 
   // E-Signatures (DocuSeal)
   app.use("/api/signatures", signaturesRouter);
+
+  // Vector Search (ChromaDB)
+  app.use("/api/vectors", vectorsRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
