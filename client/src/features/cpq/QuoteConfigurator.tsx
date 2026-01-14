@@ -5,7 +5,7 @@
  * Each area can have different building types, square footage, LOD, scope, and disciplines.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,19 +57,37 @@ interface QuoteConfiguratorProps {
     onClose?: () => void;
     importedData?: MappedConfiguratorData | null;
     onClearImport?: () => void;
+    // Shared state props for syncing with Advanced mode
+    sharedAreas?: Area[];
+    onAreasChange?: (areas: Area[]) => void;
+    sharedLandscape?: { include: boolean; type: "built" | "natural"; acres: string; lod: string };
+    onLandscapeChange?: (landscape: { include: boolean; type: "built" | "natural"; acres: string; lod: string }) => void;
+    sharedLocation?: string;
+    onLocationChange?: (location: string) => void;
 }
 
-export default function QuoteConfigurator({ leadId, quoteId, onClose, importedData, onClearImport }: QuoteConfiguratorProps) {
+export default function QuoteConfigurator({
+    leadId,
+    quoteId,
+    onClose,
+    importedData,
+    onClearImport,
+    sharedAreas,
+    onAreasChange,
+    sharedLandscape,
+    onLandscapeChange,
+    sharedLocation,
+    onLocationChange,
+}: QuoteConfiguratorProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    // Project-level state
-    const [projectLocation, setProjectLocation] = useState("");
-    const [areas, setAreas] = useState<Area[]>([
+    // Use shared state if provided, otherwise fall back to local state
+    const [localAreas, setLocalAreas] = useState<Area[]>([
         {
             id: "1",
             name: "Main Building",
-            buildingType: "4", // Commercial
+            buildingType: "4",
             squareFeet: "",
             lod: "300",
             scope: "full",
@@ -77,8 +95,71 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose, importedDa
             expanded: true,
         },
     ]);
+    const [localLocation, setLocalLocation] = useState("");
+    const [localIncludeLandscape, setLocalIncludeLandscape] = useState(true);
+    const [localLandscapeType, setLocalLandscapeType] = useState<"built" | "natural">("built");
+    const [localLandscapeAcres, setLocalLandscapeAcres] = useState("");
+    const [localLandscapeLod, setLocalLandscapeLod] = useState("300");
 
-    // Project-level add-ons
+    // Derive actual values from shared props or local state
+    const areas = sharedAreas || localAreas;
+    const projectLocation = sharedLocation ?? localLocation;
+    const includeLandscape = sharedLandscape?.include ?? localIncludeLandscape;
+    const landscapeType = sharedLandscape?.type ?? localLandscapeType;
+    const landscapeAcres = sharedLandscape?.acres ?? localLandscapeAcres;
+    const landscapeLod = sharedLandscape?.lod ?? localLandscapeLod;
+
+    // Unified setters that update shared or local state
+    const setAreas = useCallback((newAreas: Area[] | ((prev: Area[]) => Area[])) => {
+        const resolvedAreas = typeof newAreas === 'function' ? newAreas(areas) : newAreas;
+        if (onAreasChange) {
+            onAreasChange(resolvedAreas);
+        } else {
+            setLocalAreas(resolvedAreas);
+        }
+    }, [areas, onAreasChange]);
+
+    const setProjectLocation = useCallback((location: string) => {
+        if (onLocationChange) {
+            onLocationChange(location);
+        } else {
+            setLocalLocation(location);
+        }
+    }, [onLocationChange]);
+
+    const setIncludeLandscape = useCallback((include: boolean) => {
+        if (onLandscapeChange) {
+            onLandscapeChange({ include, type: landscapeType, acres: landscapeAcres, lod: landscapeLod });
+        } else {
+            setLocalIncludeLandscape(include);
+        }
+    }, [onLandscapeChange, landscapeType, landscapeAcres, landscapeLod]);
+
+    const setLandscapeType = useCallback((type: "built" | "natural") => {
+        if (onLandscapeChange) {
+            onLandscapeChange({ include: includeLandscape, type, acres: landscapeAcres, lod: landscapeLod });
+        } else {
+            setLocalLandscapeType(type);
+        }
+    }, [onLandscapeChange, includeLandscape, landscapeAcres, landscapeLod]);
+
+    const setLandscapeAcres = useCallback((acres: string) => {
+        if (onLandscapeChange) {
+            onLandscapeChange({ include: includeLandscape, type: landscapeType, acres, lod: landscapeLod });
+        } else {
+            setLocalLandscapeAcres(acres);
+        }
+    }, [onLandscapeChange, includeLandscape, landscapeType, landscapeLod]);
+
+    const setLandscapeLod = useCallback((lod: string) => {
+        if (onLandscapeChange) {
+            onLandscapeChange({ include: includeLandscape, type: landscapeType, acres: landscapeAcres, lod });
+        } else {
+            setLocalLandscapeLod(lod);
+        }
+    }, [onLandscapeChange, includeLandscape, landscapeType, landscapeAcres]);
+
+    // Project-level add-ons (not synced - Advanced mode only)
     const [services, setServices] = useState<Record<string, number>>({});
     const [risks, setRisks] = useState<string[]>([]);
     const [paymentTerms, setPaymentTerms] = useState("net_30");
@@ -88,12 +169,6 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose, importedDa
     const [showLineItemEditor, setShowLineItemEditor] = useState(false);
     const [customLineItems, setCustomLineItems] = useState<QuoteLineItem[] | null>(null);
     const [hasCustomizedPricing, setHasCustomizedPricing] = useState(false);
-
-    // Landscape configuration - included by default
-    const [includeLandscape, setIncludeLandscape] = useState(true);
-    const [landscapeType, setLandscapeType] = useState<"built" | "natural">("built");
-    const [landscapeAcres, setLandscapeAcres] = useState("");
-    const [landscapeLod, setLandscapeLod] = useState("300");
 
     // Load lead data
     const { data: lead } = useQuery<Lead>({

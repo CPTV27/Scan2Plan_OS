@@ -114,6 +114,31 @@ import type { MappedConfiguratorData, CpqExportData } from "@/features/cpq/cpqIm
 
 import { leadFormSchema, type LeadFormData, BUYER_PERSONAS } from "@/features/deals/types";
 
+// Shared state types for syncing between Simple and Advanced modes
+export interface SharedArea {
+  id: string;
+  name: string;
+  buildingType: string;
+  squareFeet: string;
+  lod: string;
+  scope: string;
+  disciplines: string[];
+  expanded?: boolean;
+}
+
+export interface SharedLandscape {
+  include: boolean;
+  type: "built" | "natural";
+  acres: string;
+  lod: string;
+}
+
+export interface SharedQuoteConfig {
+  areas: SharedArea[];
+  landscape: SharedLandscape;
+  projectLocation: string;
+}
+
 // QuoteBuilderTab extracted to client/src/features/deals/components/QuoteBuilderTab.tsx
 
 export default function DealWorkspace() {
@@ -137,6 +162,42 @@ export default function DealWorkspace() {
   const [quoteBuilderMode, setQuoteBuilderMode] = useState<'simple' | 'advanced'>('simple');
   const [showCpqImportModal, setShowCpqImportModal] = useState(false);
   const [importedCpqData, setImportedCpqData] = useState<MappedConfiguratorData | null>(null);
+
+  // Shared quote configuration state - synced between Simple and Advanced modes
+  const [sharedConfig, setSharedConfig] = useState<SharedQuoteConfig>({
+    areas: [{
+      id: "1",
+      name: "Main Building",
+      buildingType: "4",
+      squareFeet: "",
+      lod: "300",
+      scope: "full",
+      disciplines: ["architecture"],
+      expanded: true,
+    }],
+    landscape: {
+      include: true,
+      type: "built",
+      acres: "",
+      lod: "300",
+    },
+    projectLocation: "",
+  });
+
+  // Helper to update shared areas
+  const updateSharedAreas = useCallback((areas: SharedArea[]) => {
+    setSharedConfig(prev => ({ ...prev, areas }));
+  }, []);
+
+  // Helper to update shared landscape
+  const updateSharedLandscape = useCallback((landscape: SharedLandscape) => {
+    setSharedConfig(prev => ({ ...prev, landscape }));
+  }, []);
+
+  // Helper to update project location
+  const updateSharedLocation = useCallback((projectLocation: string) => {
+    setSharedConfig(prev => ({ ...prev, projectLocation }));
+  }, []);
 
   const handleTabChange = (value: string) => {
     const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
@@ -902,6 +963,13 @@ export default function DealWorkspace() {
                 onClose={() => handleTabChange("lead")}
                 importedData={importedCpqData}
                 onClearImport={() => setImportedCpqData(null)}
+                // Shared state props
+                sharedAreas={sharedConfig.areas}
+                onAreasChange={updateSharedAreas}
+                sharedLandscape={sharedConfig.landscape}
+                onLandscapeChange={updateSharedLandscape}
+                sharedLocation={sharedConfig.projectLocation}
+                onLocationChange={updateSharedLocation}
               />
             ) : (
               <QuoteBuilderTab
