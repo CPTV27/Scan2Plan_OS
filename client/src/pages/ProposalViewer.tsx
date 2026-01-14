@@ -4,6 +4,7 @@ import { FileText, Download, Calendar, Mail, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Proposal3DViewer } from "@/features/proposals/components/Proposal3DViewer";
 
 interface ProposalData {
   lead: {
@@ -25,6 +26,7 @@ interface ProposalData {
   sentAt: string;
   recipientEmail: string;
   recipientName: string | null;
+  has3DModel?: boolean;
 }
 
 const PAYMENT_TERMS_NAMES: Record<string, string> = {
@@ -89,8 +91,8 @@ export default function ProposalViewer() {
 
   const { lead, quote } = proposal;
   const totalPrice = quote?.totalPrice ? formatCurrency(quote.totalPrice) : null;
-  const paymentTermsDisplay = quote?.paymentTerms 
-    ? PAYMENT_TERMS_NAMES[quote.paymentTerms] || quote.paymentTerms 
+  const paymentTermsDisplay = quote?.paymentTerms
+    ? PAYMENT_TERMS_NAMES[quote.paymentTerms] || quote.paymentTerms
     : null;
 
   return (
@@ -162,6 +164,16 @@ export default function ProposalViewer() {
                   </div>
                 )}
               </div>
+
+              {proposal.has3DModel && token && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Interactive 3D Model</h3>
+                    <Proposal3DViewer token={token} height="400px" />
+                  </div>
+                </>
+              )}
 
               <Separator />
 
