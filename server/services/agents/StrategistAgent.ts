@@ -2,10 +2,31 @@
  * Strategist Agent
  * 
  * Recommends actions based on analyst insights
+ * Includes FitScore for structured go/no-go decisions
  */
 
 import { AgentBase, AgentType, MessageType, AGENT_CONFIGS } from "./AgentBase";
 import { AnalystOutput } from "./AnalystAgent";
+
+/**
+ * Structured fit score for RFP/opportunity evaluation
+ * Based on patterns from RFP_IntelliCheck and Microsoft RFP Reviewer
+ */
+export interface FitScore {
+    overall: number;           // 0-100
+    decision: "go" | "no-go" | "maybe";
+    confidence: number;        // 0-100 on the decision
+    breakdown: {
+        projectTypeMatch: number;   // 0-100: Have we done this before?
+        geoFit: number;             // 0-100: Travel viable?
+        capacityFit: number;        // 0-100: Can we staff it?
+        marginPotential: number;    // 0-100: Will it hit 40%? 
+        comfortLevel: number;       // 0-100: Risk assessment
+    };
+    redFlags: string[];    // Reasons NOT to pursue
+    greenFlags: string[];  // Reasons TO pursue
+    rationale: string;     // 2-3 sentence summary
+}
 
 export interface StrategistInput {
     analysis: AnalystOutput;
@@ -14,9 +35,15 @@ export interface StrategistInput {
         stageDistribution: Record<string, number>;
         staleDeals: number;
     };
+    companyContext?: {
+        regions: string[];
+        buildingTypes: string[];
+        currentCapacity: "low" | "medium" | "high";
+    };
 }
 
 export interface StrategistOutput {
+    fitScore: FitScore;
     priorityActions: Array<{
         priority: 1 | 2 | 3;
         action: string;
@@ -28,8 +55,7 @@ export interface StrategistOutput {
     bidDecisions: Array<{
         opportunityTitle: string;
         decision: "bid" | "no-bid" | "monitor";
-        confidence: number;
-        reasoning: string;
+        fitScore: FitScore;
         pricingHint?: string;
     }>;
     weeklyFocus: string;
@@ -46,7 +72,7 @@ export class StrategistAgent extends AgentBase {
             .map((insight, i) => `[${i}] ${insight.type}: ${insight.title} (confidence: ${insight.confidence}%)`)
             .join("\n");
 
-        return `Based on the following analysis, provide strategic recommendations:
+        return `Based on the following analysis, provide strategic recommendations with STRUCTURED FIT SCORES.
 
 INSIGHTS:
 ${insightsSummary}
@@ -61,8 +87,35 @@ PIPELINE STATE:
 - Total value: $${input.pipelineState?.totalValue?.toLocaleString() || "Unknown"}
 - Stale deals: ${input.pipelineState?.staleDeals || 0}
 
+COMPANY CONTEXT:
+- Target regions: ${input.companyContext?.regions?.join(", ") || "Northeast, Mid-Atlantic"}
+- Building types: ${input.companyContext?.buildingTypes?.join(", ") || "Commercial, Healthcare, Historic"}
+- Current capacity: ${input.companyContext?.currentCapacity || "medium"}
+
+SCAN2PLAN FIT CRITERIA:
+- Project type match: Do we have case studies/experience?
+- Geo fit: Is it in our coverage area (NY, NJ, PA, CT)? How far from dispatch?
+- Capacity fit: Can we staff it given current workload?
+- Margin potential: Can we hit 40% gross margin?
+- Comfort level: Any red flags (tight timeline, complex requirements, unknown client)?
+
 Provide strategic recommendations as JSON:
 {
+    "fitScore": {
+        "overall": 0-100,
+        "decision": "go|no-go|maybe",
+        "confidence": 0-100,
+        "breakdown": {
+            "projectTypeMatch": 0-100,
+            "geoFit": 0-100,
+            "capacityFit": 0-100,
+            "marginPotential": 0-100,
+            "comfortLevel": 0-100
+        },
+        "redFlags": ["list of concerns"],
+        "greenFlags": ["list of positives"],
+        "rationale": "2-3 sentence summary of recommendation"
+    },
     "priorityActions": [
         {
             "priority": 1-3 (1 = most urgent),
@@ -77,8 +130,7 @@ Provide strategic recommendations as JSON:
         {
             "opportunityTitle": "Name of opportunity",
             "decision": "bid|no-bid|monitor",
-            "confidence": 0-100,
-            "reasoning": "Why this decision",
+            "fitScore": { same structure as above },
             "pricingHint": "Suggested pricing approach"
         }
     ],
@@ -93,7 +145,28 @@ Return ONLY valid JSON.`;
         try {
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]) as StrategistOutput;
+                const parsed = JSON.parse(jsonMatch[0]) as StrategistOutput;
+
+                // Ensure fitScore has defaults if missing
+                if (!parsed.fitScore) {
+                    parsed.fitScore = {
+                        overall: 50,
+                        decision: "maybe",
+                        confidence: 50,
+                        breakdown: {
+                            projectTypeMatch: 50,
+                            geoFit: 50,
+                            capacityFit: 50,
+                            marginPotential: 50,
+                            comfortLevel: 50,
+                        },
+                        redFlags: [],
+                        greenFlags: [],
+                        rationale: "Insufficient data for scoring",
+                    };
+                }
+
+                return parsed;
             }
         } catch (error) {
             console.error("[Strategist] Failed to parse response:", error);

@@ -14,9 +14,9 @@ export type { ScoutInput, ScoutOutput } from "./ScoutAgent";
 export { AnalystAgent, analystAgent } from "./AnalystAgent";
 export type { AnalystInput, AnalystOutput } from "./AnalystAgent";
 export { StrategistAgent, strategistAgent } from "./StrategistAgent";
-export type { StrategistInput, StrategistOutput } from "./StrategistAgent";
+export type { StrategistInput, StrategistOutput, FitScore } from "./StrategistAgent";
 export { ComposerAgent, composerAgent } from "./ComposerAgent";
-export type { ComposerInput, ComposerOutput } from "./ComposerAgent";
+export type { ComposerInput, ComposerOutput, ProposalReference } from "./ComposerAgent";
 export { AuditorAgent, auditorAgent } from "./AuditorAgent";
 export type { AuditorInput, AuditorOutput } from "./AuditorAgent";
 
