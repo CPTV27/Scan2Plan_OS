@@ -35,6 +35,7 @@ import { registerGHLRoutes } from "./routes/ghl";
 import { registerHealthRoutes } from "./routes/health";
 import { customersRouter } from "./routes/customers";
 import { productsRouter } from "./routes/products";
+import { proposalTemplatesRouter, proposalTemplateGroupsRouter, generatedProposalsRouter } from "./routes/proposalTemplates";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -120,6 +121,9 @@ export async function registerRoutes(
   registerGHLRoutes(app);
   app.use(customersRouter);
   app.use(productsRouter);
+  app.use("/api/proposal-templates", proposalTemplatesRouter);
+  app.use("/api/proposal-template-groups", proposalTemplateGroupsRouter);
+  app.use("/api/generated-proposals", generatedProposalsRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
