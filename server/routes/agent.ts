@@ -6,7 +6,7 @@
 
 import { Router, Request, Response } from "express";
 import { asyncHandler } from "../middleware/errorHandler";
-import { isAuthenticated, requireRole } from "../replit_integrations/auth";
+import { isAuthenticated, requireRole, requireAdmin } from "../replit_integrations/auth";
 import { db } from "../db";
 import { agentPrompts, marketingIntel, intelNewsItems, INTEL_NEWS_TYPES } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
@@ -729,7 +729,7 @@ router.get(
 router.put(
     "/configs/:agent",
     isAuthenticated,
-    requireRole("ceo"),
+    requireAdmin,
     asyncHandler(async (req: Request, res: Response) => {
         const agentName = req.params.agent as AgentTypeDef;
         const { systemPrompt } = req.body;
@@ -773,7 +773,7 @@ router.put(
 router.post(
     "/configs/:agent/reset",
     isAuthenticated,
-    requireRole("ceo"),
+    requireAdmin,
     asyncHandler(async (req: Request, res: Response) => {
         const agentName = req.params.agent as AgentTypeDef;
         const config = AGENT_CONFIGS[agentName];
@@ -799,7 +799,7 @@ router.post(
 router.post(
     "/configs/:agent/test",
     isAuthenticated,
-    requireRole("ceo"),
+    requireAdmin,
     asyncHandler(async (req: Request, res: Response) => {
         const agentName = req.params.agent as AgentTypeDef;
         const { testInput } = req.body;

@@ -164,7 +164,7 @@ export async function setupAuth(app: Express) {
       let dbRole = "ceo";
       let userId = "test-user-admin";
       let email = "playwright-admin@scan2plan.io";
-      
+
       if (requestedRole === "field") {
         dbRole = "production";
         userId = "test-user-field";
@@ -329,3 +329,72 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
     }
   };
 }
+
+// =============================================
+// EMAIL-BASED ADMIN ACCESS CONTROL
+// COO and dev team have full access to sensitive features
+// CEO has reduced access (view-only on some features)
+// =============================================
+
+const ADMIN_EMAILS = [
+  "chase@scan2plan.io",   // COO - full access
+  "elijah@scan2plan.io",  // Dev - full access
+];
+
+const CEO_EMAIL = "v@scan2plan.io";  // CEO - reduced access
+
+/**
+ * Check if user has full admin access (COO/dev team)
+ */
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
+/**
+ * Check if user is CEO (reduced access)
+ */
+export function isCeoEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return email.toLowerCase() === CEO_EMAIL;
+}
+
+/**
+ * Middleware: Require full admin access (COO/dev only)
+ * Use this for features that could break things if misconfigured
+ */
+export const requireAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  const email = user?.claims?.email;
+
+  if (!isAdminEmail(email)) {
+    return res.status(403).json({
+      message: "Access denied. Admin privileges required.",
+      code: "ADMIN_REQUIRED"
+    });
+  }
+
+  next();
+};
+
+/**
+ * Middleware: Allow CEO with view-only indicator
+ * Use this when CEO can view but should be warned about edits
+ */
+export const allowCeoViewOnly: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+  const email = user?.claims?.email;
+
+  // Attach access level to request
+  (req as any).accessLevel = isAdminEmail(email) ? "admin" : (isCeoEmail(email) ? "view-only" : "none");
+
+  if (!isAdminEmail(email) && !isCeoEmail(email)) {
+    return res.status(403).json({
+      message: "Access denied. Insufficient permissions.",
+      code: "ACCESS_DENIED"
+    });
+  }
+
+  next();
+};
+

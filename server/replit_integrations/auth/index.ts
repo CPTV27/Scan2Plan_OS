@@ -1,3 +1,4 @@
-export { setupAuth, isAuthenticated, getSession, requireRole } from "./replitAuth";
+export { setupAuth, isAuthenticated, getSession, requireRole, requireAdmin, allowCeoViewOnly, isAdminEmail, isCeoEmail } from "./replitAuth";
 export { authStorage, type IAuthStorage } from "./storage";
 export { registerAuthRoutes } from "./routes";
+
