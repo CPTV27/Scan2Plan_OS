@@ -32,6 +32,7 @@ import HelpCenter from "@/pages/HelpCenter";
 import ClientInput from "@/pages/ClientInput";
 import TestPayloadSender from "@/pages/TestPayloadSender";
 import BrandGenerator from "@/pages/BrandGenerator";
+import AgentDashboard from "@/pages/AgentDashboard";
 import Trash from "@/pages/Trash";
 import SiteReadinessForm from "@/pages/SiteReadinessForm";
 import ProposalViewer from "@/pages/ProposalViewer";
@@ -147,6 +148,11 @@ function ProtectedRoutes() {
       <Route path="/brand-engine">
         <RoleGuard allowedRoles={["ceo", "sales"]}>
           <BrandGenerator />
+        </RoleGuard>
+      </Route>
+      <Route path="/ai-agent">
+        <RoleGuard allowedRoles={["ceo"]}>
+          <AgentDashboard />
         </RoleGuard>
       </Route>
       <Route path="/scan-tech" component={ScanTech} />
