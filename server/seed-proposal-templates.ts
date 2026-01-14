@@ -255,21 +255,133 @@ We can often accommodate rush timelines for an additional fee. Please contact us
 `,
     },
     {
-        name: "Terms & Conditions",
-        slug: "terms-conditions",
+        name: "Payment Terms - Owner",
+        slug: "payment-terms-owner",
         category: "terms",
         sortOrder: 9,
         isDefault: true,
-        variables: ["payment_terms"],
+        variables: [],
+        content: `## Payment Terms
+
+### Pricing Basis
+
+The price estimate is based on a square footage estimate. The total cost of the project will be determined by the actual square footage scanned and modeled. We use the **BOMA 2024 Gross Areas Standard**, and will send a square footage audit approximately one week after scan completion.
+
+### Payment Schedule
+
+- **50% of the estimated cost** will be due at the time of the client engaging the Services.
+- The first invoice will be for half of the estimated cost.
+- The second invoice, due upon delivery, will be for the outstanding balance based on the total square footage scanned and modeled.
+
+### Payment Methods
+
+Payment accepted via check, ACH, or credit card.
+`,
+    },
+    {
+        name: "Payment Terms - Partner",
+        slug: "payment-terms-partner",
+        category: "terms",
+        sortOrder: 9,
+        isDefault: false,
+        variables: [],
+        content: `## Payment Terms
+
+### Pricing Basis
+
+The price estimate is based on a square footage estimate. The total cost of the project will be determined by the actual square footage scanned and modeled. We use the **BOMA 2024 Gross Areas Standard**, and will send a square footage audit approximately one week after scan completion.
+
+### Payment Schedule
+
+- **50% of the estimated cost** will be due at the time of the client ("Client") engaging the Services.
+- The first invoice will be for half of the estimated cost.
+- The second invoice will be for the outstanding balance based on the total square footage scanned and modeled.
+
+### Payment Methods
+
+Payment accepted via check, ACH, or credit card.
+`,
+    },
+    {
+        name: "Payment Terms - Net 30",
+        slug: "payment-terms-net30",
+        category: "terms",
+        sortOrder: 9,
+        isDefault: false,
+        variables: [],
+        content: `## Payment Terms
+
+### Net 30
+
+Net 30 - upon delivery.
+
+### Pricing Basis
+
+The price estimate is based on a square footage estimate. The total cost of the project will be determined by the actual square footage scanned and modeled. We use the **BOMA 2024 Gross Areas Standard**, and will send a square footage audit approximately one week after scan completion.
+
+**Net 30 Projects carry a 5% service fee.**
+
+### Payment Methods
+
+Payment accepted via check, ACH, or credit card.
+`,
+    },
+    {
+        name: "Payment Terms - Net 60",
+        slug: "payment-terms-net60",
+        category: "terms",
+        sortOrder: 9,
+        isDefault: false,
+        variables: [],
+        content: `## Payment Terms
+
+### Net 60
+
+Net 60 - upon delivery.
+
+### Pricing Basis
+
+The price estimate is based on a square footage estimate. The total cost of the project will be determined by the actual square footage scanned and modeled. We use the **BOMA 2024 Gross Areas Standard**, and will send a square footage audit approximately one week after scan completion.
+
+**Net 60 Projects carry a 10% service fee.**
+
+### Payment Methods
+
+Payment accepted via check, ACH, or credit card.
+`,
+    },
+    {
+        name: "Payment Terms - Net 90",
+        slug: "payment-terms-net90",
+        category: "terms",
+        sortOrder: 9,
+        isDefault: false,
+        variables: [],
+        content: `## Payment Terms
+
+### Net 90
+
+Net 90 - upon delivery.
+
+### Pricing Basis
+
+The price estimate is based on a square footage estimate. The total cost of the project will be determined by the actual square footage scanned and modeled. We use the **BOMA 2024 Gross Areas Standard**, and will send a square footage audit approximately one week after scan completion.
+
+**Net 90 Projects carry a 15% service fee.**
+
+### Payment Methods
+
+Payment accepted via check, ACH, or credit card.
+`,
+    },
+    {
+        name: "General Terms",
+        slug: "general-terms",
+        category: "terms",
+        sortOrder: 9.5,
+        isDefault: true,
+        variables: [],
         content: `## Terms & Conditions
-
-### Payment Terms
-
-{{payment_terms}}
-
-- A 50% retainer is required to commence work
-- Balance due upon delivery of final files
-- Payment accepted via check, ACH, or credit card
 
 ### Revisions
 
