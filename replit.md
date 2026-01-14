@@ -39,3 +39,12 @@ Key architectural components and features include:
 - **HubSpot:** Used for CRM synchronization.
 - **Airtable:** Key for project handoff synchronization.
 - **PandaDoc:** Essential for document signing and proposal management.
+
+## Recent Changes (January 2026)
+- **Regional Intel Module:** 9 categories of intel feeds (opportunities, policy, competitor, projects, technology, funding, events, talent, market) with RSS sync from Google News
+- **5-Agent AI Pipeline:** Scout, Analyst, Strategist, Composer, and Auditor agents process intel automatically through a multi-stage pipeline
+- **Bug Fixes:**
+  - Fixed attribution gate field name (`lead.source` → `lead.leadSource` in profitabilityGates.ts)
+  - Removed invalid "Qualified" stage from probability calculations (not in Lead schema)
+  - Removed unused duplicate `server/routes/scoring.ts` file
+- **ChromaDB:** Optional for vector search/project matching (warnings expected if not configured)
