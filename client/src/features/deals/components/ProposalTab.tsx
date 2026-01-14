@@ -11,7 +11,7 @@ export function ProposalTab({ lead }: ProposalTabProps) {
   return (
     <TabsContent value="proposal" className="flex-1 overflow-hidden m-0">
       <ScrollArea className="h-full">
-        <div className="p-4">
+        <div className="pt-2 px-4 pb-4">
           <DealAIAssistant lead={lead} />
         </div>
       </ScrollArea>
