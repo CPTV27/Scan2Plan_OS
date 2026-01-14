@@ -1807,5 +1807,95 @@ export const insertEmailMessageSchema = createInsertSchema(emailMessages).omit({
 export type InsertEmailMessage = z.infer<typeof insertEmailMessageSchema>;
 export type EmailMessage = typeof emailMessages.$inferSelect;
 
+// === PROPOSAL TEMPLATES (Boilerplate sections for proposal assembly) ===
+export const proposalTemplates = pgTable("proposal_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // "Company Overview", "Deliverables", "Terms & Conditions"
+  slug: text("slug").notNull().unique(), // "company-overview", "deliverables", "terms"
+  category: text("category").notNull().default("boilerplate"), // "intro", "company", "scope", "pricing", "terms", "legal", "appendix"
+  content: text("content").notNull(), // Markdown/rich text content with variable placeholders
+  description: text("description"), // Optional description for template management
+  version: integer("version").notNull().default(1),
+  isDefault: boolean("is_default").default(false), // Default template for this category
+  isActive: boolean("is_active").default(true), // Soft delete support
+  sortOrder: integer("sort_order").default(0), // For ordering within category
+  variables: jsonb("variables").$type<string[]>().default([]), // List of variables used in this template
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: text("created_by"), // User who created the template
+});
+
+export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+
+// === PROPOSAL TEMPLATE GROUPS (Collections of templates for different proposal types) ===
+export const proposalTemplateGroups = pgTable("proposal_template_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // "Standard Proposal", "Enterprise", "Simple Quote"
+  slug: text("slug").notNull().unique(), // "standard", "enterprise", "simple"
+  description: text("description"),
+  sections: jsonb("sections").$type<{
+    templateId: number;
+    sortOrder: number;
+    required: boolean;
+  }[]>().default([]), // Ordered list of template sections
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProposalTemplateGroupSchema = createInsertSchema(proposalTemplateGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProposalTemplateGroup = z.infer<typeof insertProposalTemplateGroupSchema>;
+export type ProposalTemplateGroup = typeof proposalTemplateGroups.$inferSelect;
+
+// === GENERATED PROPOSALS (Assembled proposals per deal) ===
+export const generatedProposals = pgTable("generated_proposals", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").references(() => leads.id).notNull(),
+  quoteId: integer("quote_id").references(() => cpqQuotes.id),
+  templateGroupId: integer("template_group_id").references(() => proposalTemplateGroups.id),
+  name: text("name").notNull(), // "Proposal for JPMC - 545 Washington Blvd"
+  status: text("status").default("draft"), // "draft", "generated", "sent", "signed"
+  // Snapshot of sections used (allows for per-proposal customization)
+  sections: jsonb("sections").$type<{
+    templateId: number;
+    name: string;
+    content: string; // Rendered content with variables replaced
+    sortOrder: number;
+    included: boolean;
+  }[]>().default([]),
+  // PDF generation
+  pdfUrl: text("pdf_url"), // URL to generated PDF
+  pdfGeneratedAt: timestamp("pdf_generated_at"),
+  // PandaDoc integration
+  pandaDocDocumentId: text("pandadoc_document_id"),
+  pandaDocStatus: text("pandadoc_status"), // "draft", "sent", "viewed", "completed"
+  pandaDocSentAt: timestamp("pandadoc_sent_at"),
+  pandaDocCompletedAt: timestamp("pandadoc_completed_at"),
+  // Metadata
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: text("created_by"),
+});
+
+export const insertGeneratedProposalSchema = createInsertSchema(generatedProposals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertGeneratedProposal = z.infer<typeof insertGeneratedProposalSchema>;
+export type GeneratedProposal = typeof generatedProposals.$inferSelect;
+
 // Products / Services catalog (synced from QuickBooks)
 
