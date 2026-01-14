@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle } from "lucide-react";
+import { BookOpen, Shield, Target, Zap, Brain, Calculator, FileSearch, TrendingUp, MessageSquare, FileText, Sparkles, AlertTriangle, Star, CheckCircle, Settings, GitBranch, Play, Palette } from "lucide-react";
 import { Sidebar, MobileHeader } from "@/components/Sidebar";
 
 export default function HelpCenter() {
@@ -23,13 +23,17 @@ export default function HelpCenter() {
             </div>
 
             <Tabs defaultValue="ai-tools" className="w-full">
-              <TabsList className="grid w-full grid-cols-5 mb-8">
+              <TabsList className="grid w-full grid-cols-6 mb-8">
                 <TabsTrigger value="ai-tools" data-testid="tab-ai-tools" className="gap-1">
                   <Brain className="h-4 w-4" />
                   AI & Tools
                 </TabsTrigger>
                 <TabsTrigger value="sales" data-testid="tab-sales">Growth & Sales</TabsTrigger>
                 <TabsTrigger value="ops" data-testid="tab-ops">Operations</TabsTrigger>
+                <TabsTrigger value="settings" data-testid="tab-settings" className="gap-1">
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </TabsTrigger>
                 <TabsTrigger value="strategy" data-testid="tab-strategy">The Strategy</TabsTrigger>
                 <TabsTrigger value="faq" data-testid="tab-faq">FAQ</TabsTrigger>
               </TabsList>
@@ -773,6 +777,272 @@ export default function HelpCenter() {
                         <p className="text-sm text-muted-foreground">ROI, long-term value</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Settings & Admin Tab */}
+              <TabsContent value="settings" className="space-y-4">
+                {/* Proposal Builder */}
+                <Card className="border-purple-500/20 bg-purple-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Palette className="h-5 w-5 text-purple-500" />
+                      Proposal Builder
+                      <Badge variant="secondary" className="ml-auto">New</Badge>
+                    </CardTitle>
+                    <CardDescription>Create beautiful, customizable proposals for clients.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="proposal-1">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-purple-500" />
+                            Opening the Proposal Builder
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">How to access:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Open a deal from the Sales pipeline</li>
+                            <li>Go to the <strong className="text-foreground">Proposal</strong> tab</li>
+                            <li>Click <strong className="text-foreground">"Open Proposal Builder"</strong></li>
+                          </ol>
+                          <p className="text-sm text-purple-600 dark:text-purple-400">The builder opens in a split-pane view with sections on the left and live preview on the right.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="proposal-2">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Target className="h-4 w-4 text-blue-500" />
+                            Using Template Groups
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">What are template groups?</strong> Pre-configured sets of sections tailored for different proposal types.</p>
+                          <p><strong className="text-foreground">Available groups:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>Standard:</strong> Full proposal with all sections</li>
+                            <li><strong>Quick Quote:</strong> Minimal sections for fast turnaround</li>
+                            <li><strong>Technical:</strong> Detailed specs for engineering clients</li>
+                          </ul>
+                          <p><strong className="text-foreground">How to switch:</strong> Use the dropdown at the top of the Sections panel.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="proposal-3">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-green-500" />
+                            Editing Sections
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">To edit a section:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Click the three-dot menu on any section</li>
+                            <li>Select <strong className="text-foreground">"Edit Section"</strong></li>
+                            <li>Modify the title and content in the dialog</li>
+                            <li>Click <strong className="text-foreground">"Save Changes"</strong></li>
+                          </ol>
+                          <p><strong className="text-foreground">Variable substitution:</strong> Use double braces like <code className="bg-muted px-1 rounded">{'{{client_name}}'}</code> to auto-fill client data.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="proposal-4">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-amber-500" />
+                            Downloading & Sending
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Download as PDF:</strong> Click the <strong>Download</strong> button to save a PDF locally.</p>
+                          <p><strong className="text-foreground">Send to client:</strong> Click <strong>Send</strong> to email the proposal directly (requires email configured).</p>
+                          <p className="text-sm text-green-600 dark:text-green-400">Tip: The cover page automatically displays your logo and project title.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
+
+                {/* CI/CD Integration */}
+                <Card className="border-blue-500/20 bg-blue-500/5">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <GitBranch className="h-5 w-5 text-blue-500" />
+                      Continuous Integration (CI)
+                      <Badge variant="secondary" className="ml-auto">New</Badge>
+                    </CardTitle>
+                    <CardDescription>Run automated tests directly from the app.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="ci-1">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Settings className="h-4 w-4 text-blue-500" />
+                            Setting Up GitHub Token
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">To enable CI triggers from the app:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Go to <strong>GitHub → Settings → Developer Settings</strong></li>
+                            <li>Click <strong>Personal Access Tokens → Tokens (classic)</strong></li>
+                            <li>Create a new token with these scopes:
+                              <ul className="list-disc pl-5 mt-1">
+                                <li><code className="bg-muted px-1 rounded">repo</code> - Full repository access</li>
+                                <li><code className="bg-muted px-1 rounded">workflow</code> - Trigger workflows</li>
+                              </ul>
+                            </li>
+                            <li>Add to your environment: <code className="bg-muted px-1 rounded">GITHUB_TOKEN=ghp_your_token</code></li>
+                          </ol>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="ci-2">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Play className="h-4 w-4 text-green-500" />
+                            Running Tests
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">From the Settings page:</strong></p>
+                          <ol className="list-decimal pl-5 space-y-1">
+                            <li>Go to <strong className="text-foreground">Settings</strong></li>
+                            <li>Find the <strong className="text-foreground">Continuous Integration</strong> card</li>
+                            <li>Toggle <strong>Include E2E Tests</strong> on/off</li>
+                            <li>Click <strong className="text-foreground">"Run Tests Now"</strong></li>
+                          </ol>
+                          <p><strong className="text-foreground">What runs:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><strong>TypeScript Check:</strong> ~30 seconds</li>
+                            <li><strong>Unit Tests:</strong> 167 tests, ~60 seconds</li>
+                            <li><strong>E2E Tests:</strong> Browser automation, ~2 minutes</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="ci-3">
+                        <AccordionTrigger className="text-left">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            Understanding Test Results
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-3">
+                          <p><strong className="text-foreground">Status badges:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1">
+                            <li><span className="text-green-600 font-medium">Passed (Green):</span> All tests succeeded</li>
+                            <li><span className="text-yellow-600 font-medium">Running (Yellow):</span> Tests in progress</li>
+                            <li><span className="text-red-600 font-medium">Failed (Red):</span> Some tests failed</li>
+                          </ul>
+                          <p className="text-sm mt-2">Click the external link icon to view full details on GitHub.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </CardContent>
+                </Card>
+
+                {/* Keyboard Shortcuts */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5" />
+                      Keyboard Shortcuts
+                    </CardTitle>
+                    <CardDescription>Speed up your workflow with these shortcuts.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-2">
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="font-medium">Save lead/deal</span>
+                        <code className="bg-muted px-2 py-1 rounded text-sm">⌘+S or Ctrl+S</code>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="font-medium">Close modal/dialog</span>
+                        <code className="bg-muted px-2 py-1 rounded text-sm">Escape</code>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                        <span className="font-medium">Navigate back</span>
+                        <code className="bg-muted px-2 py-1 rounded text-sm">Alt+←</code>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Integrations Overview */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Integration Setup
+                    </CardTitle>
+                    <CardDescription>Required environment variables for each integration.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="int-qbo">
+                        <AccordionTrigger>QuickBooks Online</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-2">
+                          <p><strong className="text-foreground">Required variables:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1 font-mono text-sm">
+                            <li>QUICKBOOKS_CLIENT_ID</li>
+                            <li>QUICKBOOKS_CLIENT_SECRET</li>
+                            <li>QUICKBOOKS_REDIRECT_URI</li>
+                          </ul>
+                          <p className="text-sm mt-2">Get these from the Intuit Developer Portal.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="int-pandadoc">
+                        <AccordionTrigger>PandaDoc</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-2">
+                          <p><strong className="text-foreground">Required:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1 font-mono text-sm">
+                            <li>PANDADOC_API_KEY</li>
+                          </ul>
+                          <p className="text-sm mt-2">Create an API key in PandaDoc Settings → Integrations.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="int-ghl">
+                        <AccordionTrigger>GoHighLevel</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-2">
+                          <p><strong className="text-foreground">Required:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1 font-mono text-sm">
+                            <li>GHL_API_KEY</li>
+                            <li>GHL_LOCATION_ID</li>
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="int-github">
+                        <AccordionTrigger>GitHub CI</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-2">
+                          <p><strong className="text-foreground">Required:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1 font-mono text-sm">
+                            <li>GITHUB_TOKEN (with repo and workflow scopes)</li>
+                          </ul>
+                          <p className="text-sm mt-2">Used for triggering CI tests from Settings.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+
+                      <AccordionItem value="int-google">
+                        <AccordionTrigger>Google APIs</AccordionTrigger>
+                        <AccordionContent className="text-muted-foreground space-y-2">
+                          <p><strong className="text-foreground">Required for distance calculation:</strong></p>
+                          <ul className="list-disc pl-5 space-y-1 font-mono text-sm">
+                            <li>GOOGLE_MAPS_API_KEY</li>
+                          </ul>
+                          <p className="text-sm mt-2">Enable Distance Matrix API in Google Cloud Console.</p>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </CardContent>
                 </Card>
               </TabsContent>
