@@ -17,6 +17,7 @@ import { performanceLoggerMiddleware } from "./middleware/performanceLogger";
 import { getEnv } from "./config/env";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./swagger";
+import { ensureSchemaColumns } from "./migrations/ensureSchema";
 
 
 // Validate environment configuration on startup
@@ -132,6 +133,9 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
+  // Ensure database schema is up to date (adds missing columns)
+  await ensureSchemaColumns();
+  
   await registerRoutes(httpServer, app);
 
   app.use("/api/*", notFoundHandler);
