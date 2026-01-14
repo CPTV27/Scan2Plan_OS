@@ -46,6 +46,7 @@ import signaturesRouter from "./routes/signatures";
 import vectorsRouter from "./routes/vectors";
 import mauticRouter from "./routes/mautic";
 import helpCenterRouter from "./routes/help-center";
+import researchRouter from "./routes/research";
 
 
 export async function registerRoutes(
@@ -163,6 +164,9 @@ export async function registerRoutes(
 
   // Help Center (Editable Articles)
   app.use("/api/help", helpCenterRouter);
+
+  // Research & Insights
+  app.use("/api/research", researchRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
