@@ -388,7 +388,7 @@ The price estimate is based on a square footage estimate. The total cost of the 
         name: "General Terms",
         slug: "general-terms",
         category: "terms",
-        sortOrder: 9.5,
+        sortOrder: 10,
         isDefault: true,
         variables: [],
         content: `## Terms & Conditions
@@ -447,7 +447,7 @@ Scan2Plan's liability is limited to the contract value. We are not responsible f
         name: "Terms & Conditions",
         slug: "terms-conditions",
         category: "legal",
-        sortOrder: 10.5,
+        sortOrder: 11,
         isDefault: true,
         variables: [],
         content: `## Scan2Plan Terms & Conditions
