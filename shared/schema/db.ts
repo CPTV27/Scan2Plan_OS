@@ -2388,3 +2388,103 @@ export const insertMarketingIntelSchema = createInsertSchema(marketingIntel).omi
 });
 export type InsertMarketingIntel = z.infer<typeof insertMarketingIntelSchema>;
 export type MarketingIntelRecord = typeof marketingIntel.$inferSelect;
+
+// === AI LEARNING MEMORY SYSTEM ===
+// Facts the AI has learned from research, deals, and user corrections
+
+export const AI_MEMORY_CATEGORIES = [
+  "competitor",       // Competitor intelligence
+  "regulation",       // Laws, codes, compliance requirements
+  "technique",        // Best practices, methods
+  "client",           // Client-specific knowledge
+  "pricing",          // Pricing patterns and insights
+  "failure",          // What went wrong (lessons learned)
+  "success",          // What worked well
+  "market",           // Market trends and data
+  "technology",       // Tech trends, equipment info
+] as const;
+export type AIMemoryCategory = typeof AI_MEMORY_CATEGORIES[number];
+
+export const AI_MEMORY_SOURCES = [
+  "agent_research",   // From agent pipeline
+  "deal_outcome",     // From won/lost deals
+  "user_correction",  // Human correction
+  "web_search",       // Web research
+  "document",         // Extracted from documents
+  "manual_entry",     // Manually added
+] as const;
+export type AIMemorySource = typeof AI_MEMORY_SOURCES[number];
+
+export const aiResearchMemory = pgTable("ai_research_memory", {
+  id: serial("id").primaryKey(),
+  topic: text("topic").notNull(),                    // "competitor_terracon", "nyc_ll97_compliance"
+  category: text("category").notNull().$type<AIMemoryCategory>(),
+  summary: text("summary").notNull(),                // Key finding
+  details: jsonb("details").$type<Record<string, any>>(),  // Structured data
+  sourceType: text("source_type").$type<AIMemorySource>(),
+  sourceUrl: text("source_url"),
+  sourceId: integer("source_id"),                    // FK to source record (deal, intel item, etc.)
+  confidence: integer("confidence").default(70),     // 0-100
+  citationCount: integer("citation_count").default(0), // Times referenced by agents
+  lastCitedAt: timestamp("last_cited_at"),
+  isVerified: boolean("is_verified").default(false), // Human verified?
+  verifiedBy: text("verified_by"),
+  verifiedAt: timestamp("verified_at"),
+  expiresAt: timestamp("expires_at"),                // Some facts expire
+  tags: jsonb("tags").$type<string[]>().default([]),
+  relatedMemoryIds: jsonb("related_memory_ids").$type<number[]>(), // Links to related facts
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiResearchMemorySchema = createInsertSchema(aiResearchMemory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAiResearchMemory = z.infer<typeof insertAiResearchMemorySchema>;
+export type AiResearchMemory = typeof aiResearchMemory.$inferSelect;
+
+// What agents learned from each interaction
+export const aiLearningLogs = pgTable("ai_learning_logs", {
+  id: serial("id").primaryKey(),
+  agent: text("agent").notNull().$type<AgentType>(), // "strategist", "composer", etc.
+  interactionType: text("interaction_type").notNull(), // "pipeline_run", "user_correction", "deal_outcome"
+  interactionId: integer("interaction_id"),          // FK to relevant table
+  learnedFacts: jsonb("learned_facts").$type<Array<{
+    topic: string;
+    category: AIMemoryCategory;
+    summary: string;
+    confidence: number;
+  }>>(),
+  confidenceDelta: integer("confidence_delta"),      // How much to adjust existing knowledge
+  appliedToMemoryIds: jsonb("applied_to_memory_ids").$type<number[]>(), // Which memory records were updated
+  reasoning: text("reasoning"),                      // Why the agent learned this
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiLearningLogSchema = createInsertSchema(aiLearningLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAiLearningLog = z.infer<typeof insertAiLearningLogSchema>;
+export type AiLearningLog = typeof aiLearningLogs.$inferSelect;
+
+// Track when memory is used (feedback loop)
+export const aiFactCitations = pgTable("ai_fact_citations", {
+  id: serial("id").primaryKey(),
+  memoryId: integer("memory_id").notNull(),          // FK to ai_research_memory
+  agent: text("agent").notNull().$type<AgentType>(),
+  context: text("context"),                          // Why it was cited
+  usedInOutputId: integer("used_in_output_id"),      // FK to agent output
+  wasHelpful: boolean("was_helpful"),                // Feedback loop
+  feedback: text("feedback"),                        // Optional explanation
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiFactCitationSchema = createInsertSchema(aiFactCitations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAiFactCitation = z.infer<typeof insertAiFactCitationSchema>;
+export type AiFactCitation = typeof aiFactCitations.$inferSelect;
