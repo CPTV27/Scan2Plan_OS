@@ -99,6 +99,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
         return calculatePricing(
             areas.map(a => ({
                 id: a.id,
+                name: a.name,
                 buildingType: a.buildingType,
                 squareFeet: a.squareFeet,
                 lod: a.lod,
@@ -174,12 +175,13 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                     lod: area.lod,
                     scope: area.scope,
                     squareFeet: area.squareFeet,
+                    name: area.name,
                 }))
             );
 
             // Generate SKU manifest
             const lineItemSkus = await generateQuoteSkus({
-                areas: areasWithProducts,
+                areas: areasWithProducts as any, // Type assertion - enriched areas include all required fields
                 services,
                 risks,
                 paymentTerms,
@@ -201,15 +203,9 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
             };
 
             if (quoteId) {
-                return apiRequest(`/api/cpq/quotes/${quoteId}`, {
-                    method: "PATCH",
-                    body: JSON.stringify(quoteData),
-                });
+                return apiRequest("PATCH", `/api/cpq/quotes/${quoteId}`, quoteData);
             } else {
-                return apiRequest("/api/cpq/quotes", {
-                    method: "POST",
-                    body: JSON.stringify(quoteData),
-                });
+                return apiRequest("POST", "/api/cpq/quotes", quoteData);
             }
         },
         onSuccess: () => {
@@ -333,7 +329,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                                             <SelectContent>
                                                 {BUILDING_TYPES.map((type) => (
                                                     <SelectItem key={type.id} value={type.id}>
-                                                        {type.name}
+                                                        {type.label}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -363,7 +359,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {LOD_OPTIONS.map((lod) => (
-                                                    <SelectItem key={lod.value} value={lod.value}>
+                                                    <SelectItem key={lod.id} value={lod.id}>
                                                         {lod.label}
                                                     </SelectItem>
                                                 ))}
@@ -381,7 +377,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {SCOPE_OPTIONS.map((scope) => (
-                                                    <SelectItem key={scope.value} value={scope.value}>
+                                                    <SelectItem key={scope.id} value={scope.id}>
                                                         {scope.label}
                                                     </SelectItem>
                                                 ))}
@@ -405,7 +401,7 @@ export default function QuoteConfigurator({ leadId, quoteId, onClose }: QuoteCon
                                                     htmlFor={`${area.id}-${discipline.id}`}
                                                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                                 >
-                                                    {discipline.name}
+                                                    {discipline.label}
                                                 </label>
                                             </div>
                                         ))}
