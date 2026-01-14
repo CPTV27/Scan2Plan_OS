@@ -2188,3 +2188,38 @@ export const insertCompanyCapabilitySchema = createInsertSchema(companyCapabilit
 });
 export type InsertCompanyCapability = z.infer<typeof insertCompanyCapabilitySchema>;
 export type CompanyCapability = typeof companyCapabilities.$inferSelect;
+
+// === INTEL FEED SOURCES (Configuration for BidNet API, RSS, Webhooks) ===
+export const INTEL_SOURCE_TYPES = ["bidnet_api", "rss", "webhook"] as const;
+export type IntelSourceType = typeof INTEL_SOURCE_TYPES[number];
+
+export const INTEL_SYNC_STATUSES = ["success", "error"] as const;
+export type IntelSyncStatus = typeof INTEL_SYNC_STATUSES[number];
+
+export const intelFeedSources = pgTable("intel_feed_sources", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull().$type<IntelSourceType>(),
+  config: jsonb("config").$type<{
+    apiKey?: string;
+    apiUrl?: string;
+    feedUrl?: string;
+    webhookSecret?: string;
+    filters?: Record<string, any>;
+    syncIntervalMinutes?: number;
+  }>(),
+  isActive: boolean("is_active").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSyncStatus: text("last_sync_status").$type<IntelSyncStatus | null>(),
+  lastSyncError: text("last_sync_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertIntelFeedSourceSchema = createInsertSchema(intelFeedSources).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertIntelFeedSource = z.infer<typeof insertIntelFeedSourceSchema>;
+export type IntelFeedSource = typeof intelFeedSources.$inferSelect;

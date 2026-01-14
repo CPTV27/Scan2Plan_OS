@@ -39,6 +39,7 @@ import { proposalTemplatesRouter, proposalTemplateGroupsRouter, generatedProposa
 import { githubActionsRouter } from "./routes/githubActions";
 import { sequencesRouter, initSequenceScheduler } from "./routes/sequences";
 import intelFeedsRouter from "./routes/intel-feeds";
+import intelSourceConfigRouter from "./routes/intel-source-config";
 import xIntegrationRouter from "./routes/x-integration";
 import rfpAutomationRouter from "./routes/rfp-automation";
 import signaturesRouter from "./routes/signatures";
@@ -140,6 +141,9 @@ export async function registerRoutes(
 
   // Intel Feeds (Regional Intel News)
   app.use("/api/intel-feeds", intelFeedsRouter);
+
+  // Intel Feed Sources Configuration
+  app.use("/api/intel-sources", intelSourceConfigRouter);
 
   // X.com Integration
   app.use("/api/x", xIntegrationRouter);
