@@ -43,6 +43,7 @@ import xIntegrationRouter from "./routes/x-integration";
 import rfpAutomationRouter from "./routes/rfp-automation";
 import signaturesRouter from "./routes/signatures";
 import vectorsRouter from "./routes/vectors";
+import mauticRouter from "./routes/mautic";
 
 
 export async function registerRoutes(
@@ -151,6 +152,9 @@ export async function registerRoutes(
 
   // Vector Search (ChromaDB)
   app.use("/api/vectors", vectorsRouter);
+
+  // Marketing Automation (Mautic)
+  app.use("/api/mautic", mauticRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {
