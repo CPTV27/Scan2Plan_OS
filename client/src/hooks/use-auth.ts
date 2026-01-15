@@ -6,7 +6,14 @@ async function fetchUser(): Promise<User | null> {
     credentials: "include",
   });
 
-  if (response.status === 401) {
+  // Return null for auth-related errors (don't throw)
+  if (response.status === 401 || response.status === 403) {
+    return null;
+  }
+
+  // Handle rate limiting gracefully - return null instead of throwing
+  if (response.status === 429) {
+    console.warn("[useAuth] Rate limited, will retry later");
     return null;
   }
 
@@ -26,8 +33,18 @@ export function useAuth() {
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
-    retry: false,
+    retry: (failureCount, error: any) => {
+      // Don't retry on rate limit or auth errors
+      if (error?.message?.includes("429") || error?.message?.includes("403")) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: 3000, // 3 seconds between retries
     staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: false,
+    refetchInterval: false,
   });
 
   const logoutMutation = useMutation({
@@ -45,3 +62,4 @@ export function useAuth() {
     isLoggingOut: logoutMutation.isPending,
   };
 }
+
