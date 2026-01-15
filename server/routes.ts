@@ -50,6 +50,7 @@ import researchRouter from "./routes/research";
 import promptEngineRouter from "./routes/prompt-engine";
 import agentRouter from "./routes/agent";
 import cpqChatRouter from "./routes/cpq-chat";
+import publicSignatureRouter from "./routes/publicSignature";
 
 
 export async function registerRoutes(
@@ -105,6 +106,9 @@ export async function registerRoutes(
 
   registerChatRoutes(app);
   registerImageRoutes(app);
+
+  // Public routes (no auth required)
+  app.use(publicSignatureRouter);
 
   // Health checks (no auth required)
   registerHealthRoutes(app);

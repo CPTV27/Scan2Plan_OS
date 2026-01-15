@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { FileEdit, Sparkles, PenTool, Check, Clock } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { FileEdit, Sparkles, PenTool, Check, Clock, Send, Copy } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { SignatureCapture } from "@/components/SignatureCapture";
@@ -22,6 +23,44 @@ export function ProposalTab({ lead }: ProposalTabProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [sendingLink, setSendingLink] = useState(false);
+
+  const handleSendSignatureLink = async () => {
+    setSendingLink(true);
+    try {
+      const response = await apiRequest("POST", `/api/leads/${lead.id}/send-signature-link`, {
+        recipientEmail: lead.contactEmail,
+        recipientName: lead.clientName,
+      });
+      const data = await response.json();
+
+      setSignatureUrl(data.signatureUrl);
+
+      toast({
+        title: "Signature link generated",
+        description: "Copy the link below to send to your client",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to generate link",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (signatureUrl) {
+      navigator.clipboard.writeText(signatureUrl);
+      toast({
+        title: "Link copied!",
+        description: "Signature link copied to clipboard",
+      });
+    }
+  };
 
   const handleSignatureComplete = async (signatureData: {
     signatureImage: string;
@@ -88,7 +127,7 @@ export function ProposalTab({ lead }: ProposalTabProps) {
                   Client Signature
                 </CardTitle>
                 <CardDescription>
-                  Capture client signature to finalize the proposal
+                  Send proposal to client for electronic signature
                 </CardDescription>
               </div>
               {isSigned && (
@@ -131,15 +170,47 @@ export function ProposalTab({ lead }: ProposalTabProps) {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className="gap-1">
-                  <Clock className="w-3 h-3" />
-                  Awaiting Signature
-                </Badge>
-                <Button onClick={() => setShowSignatureDialog(true)}>
-                  <PenTool className="w-4 h-4 mr-2" />
-                  Capture Signature
-                </Button>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="gap-1">
+                    <Clock className="w-3 h-3" />
+                    Awaiting Signature
+                  </Badge>
+                  <Button
+                    onClick={handleSendSignatureLink}
+                    disabled={sendingLink}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {sendingLink ? "Generating..." : "Send for Signature"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSignatureDialog(true)}
+                  >
+                    <PenTool className="w-4 h-4 mr-2" />
+                    Sign In-Person
+                  </Button>
+                </div>
+
+                {signatureUrl && (
+                  <div className="p-3 bg-muted rounded-lg space-y-2">
+                    <p className="text-sm font-medium">Signature Link:</p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={signatureUrl}
+                        readOnly
+                        className="font-mono text-xs"
+                      />
+                      <Button size="sm" onClick={handleCopyLink}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Send this link to your client to sign electronically. Link expires in 7 days.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
