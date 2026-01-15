@@ -847,7 +847,9 @@ router.post(
 import { MEETING_TO_RFP_PROMPT, type RFPFromTranscript } from "../services/prompts/meeting-to-rfp";
 import OpenAI from "openai";
 
-const openai = new OpenAI();
+const openai = new OpenAI({
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY
+});
 
 /**
  * POST /api/agent/transcript-to-rfp
