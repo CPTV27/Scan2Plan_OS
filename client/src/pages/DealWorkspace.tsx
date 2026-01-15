@@ -107,9 +107,9 @@ import {
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
 import { SITE_READINESS_QUESTIONS, type SiteReadinessQuestion } from "@shared/siteReadinessQuestions";
-import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab, QuoteBuilderTab } from "@/features/deals/components";
+import { QboEstimateBadge, TierAEstimatorCard, MarketingInfluenceWidget, VersionHistoryTab, DocumentsTab, QuoteVersionDialog, ProposalTab, PandaDocTab, LeadDetailsTab } from "@/features/deals/components";
 import { EngagementTab } from "@/features/deals/components/EngagementTab";
-import QuoteConfigurator from "@/features/cpq/QuoteConfigurator";
+import SimpleQuoteBuilder from "@/features/deals/components/SimpleQuoteBuilder";
 import { CpqImportModal } from "@/features/cpq/CpqImportModal";
 import type { MappedConfiguratorData, CpqExportData } from "@/features/cpq/cpqImportUtils";
 import { EnrollSequenceDialog } from "@/features/sequences/components/EnrollSequenceDialog";
@@ -1037,37 +1037,14 @@ export default function DealWorkspace() {
 
           {/* Conditional Content */}
           <ErrorBoundary fallbackTitle="Quote Builder Error" fallbackMessage="Failed to load quote builder. Please try refreshing.">
-            {quoteBuilderMode === 'simple' ? (
-              <QuoteConfigurator
-                leadId={leadId}
-                onClose={() => handleTabChange("lead")}
-                importedData={importedCpqData}
-                onClearImport={() => setImportedCpqData(null)}
-                // Shared state props - use memoized normalized areas
-                sharedAreas={normalizedAreas}
-                onAreasChange={updateSharedAreas}
-                sharedLandscape={sharedConfig.landscape}
-                onLandscapeChange={updateSharedLandscape}
-                sharedLocation={sharedConfig.projectLocation}
-                onLocationChange={updateSharedLocation}
-              />
-            ) : (
-              <QuoteBuilderTab
-                lead={lead}
-                leadId={leadId}
-                toast={toast}
-                onQuoteSaved={() => {
-                  setEditingFromQuote(null);
-                  handleTabChange("history");
-                }}
-                existingQuotes={quotes}
-                sourceQuote={editingFromQuote}
-                onClearSourceQuote={() => setEditingFromQuote(null)}
-                onPaymentTermsChange={(terms) => {
-                  form.setValue("paymentTerms", terms, { shouldDirty: false });
-                }}
-              />
-            )}
+            <SimpleQuoteBuilder
+              lead={lead}
+              leadId={leadId}
+              onQuoteSaved={() => {
+                handleTabChange("history");
+              }}
+              existingQuotes={quotes}
+            />
           </ErrorBoundary>
         </TabsContent>
 
