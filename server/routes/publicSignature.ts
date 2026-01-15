@@ -121,7 +121,10 @@ publicSignatureRouter.post(
             } as any);
         }
 
-        const signatureUrl = `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/sign/${token}`;
+        // Use request host for proper URL generation
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const host = req.get('host') || req.hostname;
+        const signatureUrl = `${protocol}://${host}/sign/${token}`;
 
         log(`[Signature Link] Generated for lead ${leadId}: ${signatureUrl}`);
 
