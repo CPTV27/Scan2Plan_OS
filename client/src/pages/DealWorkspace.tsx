@@ -161,7 +161,6 @@ export default function DealWorkspace() {
   const [showProposalDialog, setShowProposalDialog] = useState(false);
   const [viewingQuote, setViewingQuote] = useState<CpqQuote | null>(null);
   const [editingFromQuote, setEditingFromQuote] = useState<CpqQuote | null>(null);
-  const [quoteBuilderMode, setQuoteBuilderMode] = useState<'simple' | 'advanced'>('simple');
   const [showCpqImportModal, setShowCpqImportModal] = useState(false);
   const [importedCpqData, setImportedCpqData] = useState<MappedConfiguratorData | null>(null);
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
@@ -1117,7 +1116,6 @@ export default function DealWorkspace() {
         onOpenChange={setShowCpqImportModal}
         onImport={(data, rawData) => {
           setImportedCpqData(data);
-          setQuoteBuilderMode('simple'); // Switch to simple mode for imported data
           setShowCpqImportModal(false);
         }}
       />
