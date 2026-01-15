@@ -93,6 +93,7 @@ export const cpqCalculateResponseSchema = z.object({
     services: z.number(),
     paymentPremium: z.number(),
   }),
+  areaSubtotals: z.record(z.string(), z.number()).optional(), // Per-area subtotals keyed by area ID
   integrityStatus: z.enum(["pass", "warning", "blocked"]),
   integrityFlags: z.array(cpqIntegrityFlagSchema).optional(),
   marginTarget: z.number().optional(),

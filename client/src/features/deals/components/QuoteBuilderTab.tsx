@@ -517,6 +517,33 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         }
       });
 
+      // Calculate per-area subtotals by matching area names in line item labels
+      const areaSubtotals: Record<string, number> = {};
+
+      // Initialize all areas
+      areas.forEach(a => { areaSubtotals[a.id] = 0; });
+      landscapeAreas.forEach(a => { areaSubtotals[a.id] = 0; });
+
+      // Sum line items by area name match
+      result.items.forEach(item => {
+        // Find matching area by name in label
+        const matchingArea = areas.find(a => a.name && item.label.startsWith(a.name + " -"));
+        const matchingLandscape = landscapeAreas.find(a => a.name && item.label.startsWith(a.name + " -"));
+
+        if (matchingArea) {
+          areaSubtotals[matchingArea.id] = (areaSubtotals[matchingArea.id] || 0) + item.value;
+        } else if (matchingLandscape) {
+          areaSubtotals[matchingLandscape.id] = (areaSubtotals[matchingLandscape.id] || 0) + item.value;
+        } else if (item.label.includes("Landscape -")) {
+          // Match landscape areas by name
+          landscapeAreas.forEach(la => {
+            if (la.name && item.label.includes(la.name)) {
+              areaSubtotals[la.id] = (areaSubtotals[la.id] || 0) + item.value;
+            }
+          });
+        }
+      });
+
       return {
         result: {
           success: true,
@@ -538,6 +565,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
             services: result.disciplineTotals.services,
             paymentPremium: paymentPremiumTotal,
           },
+          areaSubtotals, // Per-area subtotals
           integrityStatus,
           integrityFlags,
           marginTarget,
@@ -997,6 +1025,14 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                         ))}
                       </div>
                     )}
+
+                    {/* Area Subtotal */}
+                    {pricingResult?.areaSubtotals?.[area.id] && pricingResult.areaSubtotals[area.id] > 0 && (
+                      <div className="flex items-center justify-between pt-2 mt-2 border-t text-sm">
+                        <span className="font-medium text-muted-foreground">Area Subtotal</span>
+                        <span className="font-bold text-primary">${pricingResult.areaSubtotals[area.id].toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </CardContent>
@@ -1089,6 +1125,14 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                           </Select>
                         </div>
                       </div>
+
+                      {/* Landscape Area Subtotal */}
+                      {pricingResult?.areaSubtotals?.[area.id] && pricingResult.areaSubtotals[area.id] > 0 && (
+                        <div className="flex items-center justify-between pt-2 mt-2 border-t text-sm">
+                          <span className="font-medium text-muted-foreground">Landscape Subtotal</span>
+                          <span className="font-bold text-green-600">${pricingResult.areaSubtotals[area.id].toLocaleString()}</span>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
