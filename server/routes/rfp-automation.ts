@@ -13,6 +13,7 @@ import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { storage } from "../storage";
 import { log } from "../lib/logger";
 import { aiClient } from "../services/ai/aiClient";
+import { qualifyRfp, type QualificationResult, type ExtractedRfpData } from "../services/rfpQualification";
 
 const router = Router();
 
@@ -49,13 +50,37 @@ router.post("/upload", isAuthenticated, async (req: Request, res: Response) => {
             try {
                 const extractedData = await extractRfpData(fileContent, fileName);
 
+                // Run S2P Scoping Bot qualification
+                const qualification = await qualifyRfp(extractedData as ExtractedRfpData, fileContent);
+
+                // Determine status based on qualification
+                let newStatus: RfpStatus = "extracted";
+                if (qualification.status === "disqualified") {
+                    newStatus = "rejected"; // Auto-reject disqualified RFPs
+                }
+
                 await db.update(rfpSubmissions)
                     .set({
-                        status: "extracted" as RfpStatus,
-                        extractedData,
+                        status: newStatus,
+                        extractedData: {
+                            ...extractedData,
+                            qualification: {
+                                status: qualification.status,
+                                confidenceScore: qualification.confidenceScore,
+                                priorityScore: qualification.priorityScore,
+                                recommendationTier: qualification.recommendationTier,
+                                rationale: qualification.rationale,
+                                flags: qualification.flags,
+                                preferredKeywords: qualification.preferredKeywordsFound,
+                                disqualifyingKeywords: qualification.disqualifyingKeywordsFound,
+                                disqualificationReason: qualification.disqualificationReason,
+                            }
+                        },
                         updatedAt: new Date()
                     })
                     .where(eq(rfpSubmissions.id, rfp.id));
+
+                log(`[RFP] Qualified ${rfp.id}: ${qualification.status} (confidence: ${qualification.confidenceScore}%, priority: ${qualification.priorityScore})`);
             } catch (extractError) {
                 log(`ERROR: RFP extraction failed for ${rfp.id}: ${extractError}`);
                 await db.update(rfpSubmissions)
@@ -92,14 +117,38 @@ router.post("/:id/extract", isAuthenticated, async (req: Request, res: Response)
 
         const extractedData = await extractRfpData(content, rfp.originalFileName || "RFP");
 
+        // Run S2P Scoping Bot qualification
+        const qualification = await qualifyRfp(extractedData as ExtractedRfpData, content);
+
+        // Determine status based on qualification
+        let newStatus: RfpStatus = "extracted";
+        if (qualification.status === "disqualified") {
+            newStatus = "rejected";
+        }
+
         const [updated] = await db.update(rfpSubmissions)
             .set({
-                status: "extracted" as RfpStatus,
-                extractedData,
+                status: newStatus,
+                extractedData: {
+                    ...extractedData,
+                    qualification: {
+                        status: qualification.status,
+                        confidenceScore: qualification.confidenceScore,
+                        priorityScore: qualification.priorityScore,
+                        recommendationTier: qualification.recommendationTier,
+                        rationale: qualification.rationale,
+                        flags: qualification.flags,
+                        preferredKeywords: qualification.preferredKeywordsFound,
+                        disqualifyingKeywords: qualification.disqualifyingKeywordsFound,
+                        disqualificationReason: qualification.disqualificationReason,
+                    }
+                },
                 updatedAt: new Date()
             })
             .where(eq(rfpSubmissions.id, parseInt(id)))
             .returning();
+
+        log(`[RFP] Manual extraction qualified ${id}: ${qualification.status}`);
 
         res.json(updated);
     } catch (error) {
