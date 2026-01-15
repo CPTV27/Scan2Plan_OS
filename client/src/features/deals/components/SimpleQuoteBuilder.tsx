@@ -875,6 +875,78 @@ export default function SimpleQuoteBuilder({
 
             const data = await response.json();
 
+            // Apply actions from AI
+            if (data.actions && Array.isArray(data.actions)) {
+                data.actions.forEach((action: any) => {
+                    switch (action.type) {
+                        case "toggleDiscipline":
+                            if (action.areaId && action.discipline) {
+                                // Find area - if areaId is "1", find first area
+                                const targetArea = areas.find(a => a.id === action.areaId) || areas[0];
+                                if (targetArea) {
+                                    toggleDiscipline(targetArea.id, action.discipline);
+                                }
+                            }
+                            break;
+                        case "updateArea":
+                            if (action.areaId && action.updates) {
+                                const targetArea = areas.find(a => a.id === action.areaId) || areas[0];
+                                if (targetArea) {
+                                    setAreas(prev => prev.map(a =>
+                                        a.id === targetArea.id ? { ...a, ...action.updates } : a
+                                    ));
+                                }
+                            }
+                            break;
+                        case "addArea":
+                            addArea();
+                            break;
+                        case "addLandscape":
+                            addLandscapeArea();
+                            // Update the newly added landscape with provided values
+                            setTimeout(() => {
+                                setLandscapeAreas(prev => {
+                                    if (prev.length > 0) {
+                                        const lastId = prev[prev.length - 1].id;
+                                        return prev.map(a => a.id === lastId ? {
+                                            ...a,
+                                            name: action.name || a.name,
+                                            type: action.landscapeType || a.type,
+                                            acres: action.acres || a.acres,
+                                            lod: action.lod || a.lod,
+                                        } : a);
+                                    }
+                                    return prev;
+                                });
+                            }, 100);
+                            break;
+                        case "toggleRisk":
+                            if (action.risk) {
+                                setRisks(prev => ({
+                                    ...prev,
+                                    [action.risk]: !prev[action.risk as keyof RiskConfig]
+                                }));
+                            }
+                            break;
+                        case "setDispatchLocation":
+                            if (action.location) {
+                                setTravel(prev => ({ ...prev, dispatchLocation: action.location }));
+                            }
+                            break;
+                        case "setDistance":
+                            if (action.distance !== undefined) {
+                                setTravel(prev => ({ ...prev, distance: action.distance }));
+                            }
+                            break;
+                        case "setPaymentTerms":
+                            if (action.terms) {
+                                setPaymentTerms(action.terms);
+                            }
+                            break;
+                    }
+                });
+            }
+
             const assistantMessage: ChatMessage = {
                 role: "assistant",
                 content: data.response || "I processed your request.",

@@ -226,10 +226,14 @@ ALWAYS respond with valid JSON in this exact format:
 }
 \`\`\`
 
-If the user asks a question that doesn't require changes, return an empty actions array.
-If you're unsure what the user wants, ask clarifying questions.
+## IMPORTANT INSTRUCTIONS:
+1. BE ACTION-ORIENTED: When the user asks you to add, change, or configure something, DO IT immediately using the appropriate actions. Don't ask for clarification unless absolutely necessary.
+2. USE THE FIRST AREA: If the user says "add MEP" without specifying which area, apply it to area "1" (the first area). Use areaId "1" for the first area.
+3. INFER INTENT: If someone says "add MEP and structure", return MULTIPLE toggleDiscipline actions.
+4. For toggleDiscipline, use lowercase discipline codes: "mepf", "arch", "structure", "site"
+5. For risks, use: "occupied", "hazardous", "no_power"
 
-Be helpful, concise, and action-oriented. When you make changes, summarize what you did.`;
+Be helpful and action-oriented. When you make changes, briefly confirm what you did.`;
 }
 
 // POST /api/cpq/chat
