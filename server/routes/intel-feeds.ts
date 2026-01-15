@@ -5,6 +5,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { processUnprocessedItems, getProcessedIntelItems, getPipelineResult, markPipelineRunRead } from "../services/intelPipelineWorker";
 import { enrichContacts, batchEnrichContacts } from "../services/contactEnrichment";
+import { getSlaQueue, getSlaQueueSummary, generateOutreachEmail, prepareLeadsFromQueue, getSequenceForType } from "../services/outreachAutomation";
 
 const router = Router();
 
@@ -451,6 +452,93 @@ router.post("/enrich-batch", isAuthenticated, requireRole("ceo"), async (req, re
     } catch (error) {
         console.error("Error batch enriching contacts:", error);
         res.status(500).json({ message: "Failed to batch enrich contacts" });
+    }
+});
+
+// === SLA QUEUE & OUTREACH AUTOMATION ===
+
+// GET /api/intel-feeds/sla-queue - Get 48-hour SLA queue
+router.get("/sla-queue", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const { limit = "50", type, status } = req.query;
+
+        const items = await getSlaQueue({
+            limit: parseInt(limit as string),
+            type: type as IntelNewsType,
+            status: status as "on_track" | "at_risk" | "overdue",
+        });
+
+        res.json(items);
+    } catch (error) {
+        console.error("Error fetching SLA queue:", error);
+        res.status(500).json({ message: "Failed to fetch SLA queue" });
+    }
+});
+
+// GET /api/intel-feeds/sla-queue/summary - Get SLA queue statistics
+router.get("/sla-queue/summary", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const summary = await getSlaQueueSummary();
+        res.json(summary);
+    } catch (error) {
+        console.error("Error fetching SLA summary:", error);
+        res.status(500).json({ message: "Failed to fetch SLA summary" });
+    }
+});
+
+// POST /api/intel-feeds/:id/generate-outreach - Generate outreach email for item
+router.post("/:id/generate-outreach", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { contactIndex = 0 } = req.body;
+
+        // Get the item from SLA queue
+        const items = await getSlaQueue({ limit: 500 });
+        const item = items.find(i => i.id === parseInt(id));
+
+        if (!item) {
+            return res.status(404).json({ message: "Item not found in SLA queue" });
+        }
+
+        if (item.contacts.length === 0) {
+            return res.status(400).json({
+                message: "No contacts enriched for this item. Run /enrich first."
+            });
+        }
+
+        const contact = item.contacts[contactIndex] || item.contacts[0];
+        const email = generateOutreachEmail(item, contact);
+        const sequence = getSequenceForType(item.type);
+
+        res.json({
+            email,
+            contact,
+            sequence: sequence?.name || null,
+            nextSteps: sequence?.steps || [],
+        });
+    } catch (error) {
+        console.error("Error generating outreach:", error);
+        res.status(500).json({ message: "Failed to generate outreach" });
+    }
+});
+
+// POST /api/intel-feeds/sla-queue/prepare-leads - Create leads from queue for Mautic sync
+router.post("/sla-queue/prepare-leads", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const { limit = 20 } = req.body;
+
+        const items = await getSlaQueue({ limit });
+        const created = await prepareLeadsFromQueue(items);
+
+        res.json({
+            success: true,
+            leadsCreated: created,
+            fromItems: items.length,
+            message: `Created ${created} leads from ${items.length} queue items. Run /api/mautic/contacts/sync to push to Mautic.`,
+        });
+    } catch (error) {
+        console.error("Error preparing leads:", error);
+        res.status(500).json({ message: "Failed to prepare leads" });
     }
 });
 
