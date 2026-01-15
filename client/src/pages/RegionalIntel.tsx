@@ -9,19 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  Target, Loader2, Gavel, Eye, ExternalLink, Building, Cpu, 
-  Banknote, Calendar, Users, TrendingUp, Pencil, Check, X, 
+import {
+  Target, Loader2, Gavel, Eye, ExternalLink, Building, Cpu,
+  Banknote, Calendar, Users, TrendingUp, Pencil, Check, X,
   RefreshCw, ChevronDown, Rss, Webhook, Bot, Mail, CheckCircle,
-  AlertCircle, Clock, Sparkles
+  AlertCircle, Clock, Sparkles, Timer, UserSearch, Send, ClipboardCheck, FileText
 } from "lucide-react";
 import type { IntelNewsItem, IntelFeedSource, IntelPipelineRun } from "@shared/schema";
 import { format, formatDistanceToNow } from "date-fns";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-const FEED_CONFIG: Record<string, { 
-  icon: typeof Target; 
+const FEED_CONFIG: Record<string, {
+  icon: typeof Target;
   description: string;
   cardClass: string;
   iconClass: string;
@@ -29,8 +29,8 @@ const FEED_CONFIG: Record<string, {
   itemClass: string;
   ringClass: string;
 }> = {
-  opportunity: { 
-    icon: Target, 
+  opportunity: {
+    icon: Target,
     description: "RFPs and bidding opportunities",
     cardClass: "border-green-500/20 bg-green-500/5",
     iconClass: "text-green-500",
@@ -38,8 +38,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-green-500/20 bg-green-500/5",
     ringClass: "ring-green-500/40"
   },
-  policy: { 
-    icon: Gavel, 
+  policy: {
+    icon: Gavel,
     description: "Regulatory and policy updates",
     cardClass: "border-amber-500/20 bg-amber-500/5",
     iconClass: "text-amber-500",
@@ -47,8 +47,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-amber-500/20 bg-amber-500/5",
     ringClass: "ring-amber-500/40"
   },
-  competitor: { 
-    icon: Eye, 
+  competitor: {
+    icon: Eye,
     description: "Competitor news and movements",
     cardClass: "border-red-500/20 bg-red-500/5",
     iconClass: "text-red-500",
@@ -56,8 +56,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-red-500/20 bg-red-500/5",
     ringClass: "ring-red-500/40"
   },
-  project: { 
-    icon: Building, 
+  project: {
+    icon: Building,
     description: "New construction projects",
     cardClass: "border-blue-500/20 bg-blue-500/5",
     iconClass: "text-blue-500",
@@ -65,8 +65,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-blue-500/20 bg-blue-500/5",
     ringClass: "ring-blue-500/40"
   },
-  technology: { 
-    icon: Cpu, 
+  technology: {
+    icon: Cpu,
     description: "Scanning and BIM tech news",
     cardClass: "border-purple-500/20 bg-purple-500/5",
     iconClass: "text-purple-500",
@@ -74,8 +74,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-purple-500/20 bg-purple-500/5",
     ringClass: "ring-purple-500/40"
   },
-  funding: { 
-    icon: Banknote, 
+  funding: {
+    icon: Banknote,
     description: "Grants and funding opportunities",
     cardClass: "border-emerald-500/20 bg-emerald-500/5",
     iconClass: "text-emerald-500",
@@ -83,8 +83,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-emerald-500/20 bg-emerald-500/5",
     ringClass: "ring-emerald-500/40"
   },
-  event: { 
-    icon: Calendar, 
+  event: {
+    icon: Calendar,
     description: "Industry events and conferences",
     cardClass: "border-orange-500/20 bg-orange-500/5",
     iconClass: "text-orange-500",
@@ -92,8 +92,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-orange-500/20 bg-orange-500/5",
     ringClass: "ring-orange-500/40"
   },
-  talent: { 
-    icon: Users, 
+  talent: {
+    icon: Users,
     description: "Hiring trends and talent market",
     cardClass: "border-pink-500/20 bg-pink-500/5",
     iconClass: "text-pink-500",
@@ -101,8 +101,8 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-pink-500/20 bg-pink-500/5",
     ringClass: "ring-pink-500/40"
   },
-  market: { 
-    icon: TrendingUp, 
+  market: {
+    icon: TrendingUp,
     description: "Market trends and analysis",
     cardClass: "border-cyan-500/20 bg-cyan-500/5",
     iconClass: "text-cyan-500",
@@ -110,16 +110,44 @@ const FEED_CONFIG: Record<string, {
     itemClass: "border-cyan-500/20 bg-cyan-500/5",
     ringClass: "ring-cyan-500/40"
   },
+  // Lead Intelligence Trigger Pod Types
+  permit: {
+    icon: FileText,
+    description: "Building permit filings",
+    cardClass: "border-indigo-500/20 bg-indigo-500/5",
+    iconClass: "text-indigo-500",
+    borderClass: "border-indigo-500/20",
+    itemClass: "border-indigo-500/20 bg-indigo-500/5",
+    ringClass: "ring-indigo-500/40"
+  },
+  compliance: {
+    icon: ClipboardCheck,
+    description: "Compliance triggers (LL11/LL87/LL97)",
+    cardClass: "border-rose-500/20 bg-rose-500/5",
+    iconClass: "text-rose-500",
+    borderClass: "border-rose-500/20",
+    itemClass: "border-rose-500/20 bg-rose-500/5",
+    ringClass: "ring-rose-500/40"
+  },
+  procurement: {
+    icon: Banknote,
+    description: "Public procurement opportunities",
+    cardClass: "border-teal-500/20 bg-teal-500/5",
+    iconClass: "text-teal-500",
+    borderClass: "border-teal-500/20",
+    itemClass: "border-teal-500/20 bg-teal-500/5",
+    ringClass: "ring-teal-500/40"
+  },
 };
 
-function FeedCard({ 
-  source, 
-  items, 
+function FeedCard({
+  source,
+  items,
   isLoading,
   onUpdate,
   onSync,
-  onMarkRead 
-}: { 
+  onMarkRead
+}: {
   source: IntelFeedSource;
   items: IntelNewsItem[];
   isLoading: boolean;
@@ -130,11 +158,11 @@ function FeedCard({
   const [isEditing, setIsEditing] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState(source.config?.searchPrompt || "");
   const [isExpanded, setIsExpanded] = useState(true);
-  
+
   const targetType = source.config?.targetType || "opportunity";
   const config = FEED_CONFIG[targetType] || FEED_CONFIG.opportunity;
   const Icon = config.icon;
-  
+
   const handleSave = () => {
     onUpdate(source.id, {
       config: { ...(source.config || {}), searchPrompt: editedPrompt }
@@ -148,8 +176,8 @@ function FeedCard({
   };
 
   return (
-    <Card 
-      className={config.cardClass} 
+    <Card
+      className={config.cardClass}
       data-testid={`card-feed-${targetType}`}
     >
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
@@ -183,7 +211,7 @@ function FeedCard({
             </Badge>
           </CardDescription>
         </CardHeader>
-        
+
         <CollapsibleContent>
           <CardContent className="space-y-3">
             <div className={`p-3 rounded-lg border ${config.borderClass} bg-background/50`}>
@@ -200,10 +228,10 @@ function FeedCard({
                       </Button>
                     </>
                   ) : (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
                       onClick={() => setIsEditing(true)}
                       data-testid={`button-edit-prompt-${source.id}`}
                     >
@@ -229,12 +257,12 @@ function FeedCard({
 
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
-                {source.lastSyncAt 
+                {source.lastSyncAt
                   ? `Last sync: ${formatDistanceToNow(new Date(source.lastSyncAt), { addSuffix: true })}`
                   : "Never synced"}
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => onSync(source.id)}
                 disabled={!source.isActive}
@@ -253,8 +281,8 @@ function FeedCard({
                 </div>
               ) : items.length > 0 ? (
                 items.slice(0, 5).map((item) => (
-                  <div 
-                    key={item.id} 
+                  <div
+                    key={item.id}
                     className={`p-2 rounded-lg border ${config.itemClass} cursor-pointer hover-elevate ${!item.isRead ? `ring-1 ${config.ringClass}` : ''}`}
                     onClick={() => !item.isRead && onMarkRead(item.id)}
                     data-testid={`intel-item-${item.id}`}
@@ -273,9 +301,9 @@ function FeedCard({
                         <Badge variant="outline" className="text-xs">{item.region}</Badge>
                       )}
                       {item.sourceUrl && (
-                        <a 
-                          href={item.sourceUrl} 
-                          target="_blank" 
+                        <a
+                          href={item.sourceUrl}
+                          target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                           className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -316,17 +344,62 @@ interface ProcessingStats {
   avgAuditScore: number;
 }
 
-function ProcessedIntelCard({ 
-  processedItem, 
-  onMarkRead 
-}: { 
+// Lead Intelligence SLA Queue Types
+interface SlaContact {
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+  source: string;
+  confidence: number;
+}
+
+interface SlaQueueItem {
+  id: number;
+  type: string;
+  title: string;
+  address?: string;
+  contacts: SlaContact[];
+  relevanceScore: number;
+  slaStatus: "on_track" | "at_risk" | "overdue";
+  hoursUntilSla: number;
+  triggerDate: string;
+  recommendedAction: string;
+  template?: {
+    subject: string;
+    previewHook: string;
+    ctaText: string;
+  };
+}
+
+interface SlaQueueSummary {
+  total: number;
+  onTrack: number;
+  atRisk: number;
+  overdue: number;
+  byType: Record<string, number>;
+  avgRelevanceScore: number;
+}
+
+interface OutreachEmail {
+  to: string;
+  subject: string;
+  body: string;
+  plainText: string;
+}
+
+function ProcessedIntelCard({
+  processedItem,
+  onMarkRead
+}: {
   processedItem: ProcessedIntelItem;
   onMarkRead: (runId: number) => void;
 }) {
   const { item, run } = processedItem;
   const config = FEED_CONFIG[item.type] || FEED_CONFIG.market;
   const Icon = config.icon;
-  
+
   const getVerdictBadge = (verdict: string | null) => {
     switch (verdict) {
       case "approved":
@@ -341,7 +414,7 @@ function ProcessedIntelCard({
   };
 
   return (
-    <Card 
+    <Card
       className={`cursor-pointer hover-elevate ${!run.isRead ? 'ring-2 ring-primary/40' : ''}`}
       onClick={() => !run.isRead && onMarkRead(run.id)}
       data-testid={`processed-intel-${run.id}`}
@@ -377,7 +450,7 @@ function ProcessedIntelCard({
             <p className="text-sm">{run.executiveSummary}</p>
           </div>
         )}
-        
+
         {run.recommendedActions && Array.isArray(run.recommendedActions) && run.recommendedActions.length > 0 && (
           <div className="space-y-1">
             <div className="text-xs font-medium flex items-center gap-1">
@@ -393,7 +466,7 @@ function ProcessedIntelCard({
             </ul>
           </div>
         )}
-        
+
         {run.draftEmail && (
           <Collapsible>
             <CollapsibleTrigger className="flex items-center gap-1 text-xs text-primary hover:underline">
@@ -410,9 +483,9 @@ function ProcessedIntelCard({
 
         <div className="flex items-center justify-between pt-2 border-t">
           {item.sourceUrl && (
-            <a 
-              href={item.sourceUrl} 
-              target="_blank" 
+            <a
+              href={item.sourceUrl}
+              target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="text-xs text-primary hover:underline flex items-center gap-1"
@@ -455,6 +528,20 @@ export default function RegionalIntel() {
     refetchInterval: 30000,
   });
 
+  // Lead Intelligence SLA Queue
+  const { data: slaQueue = [], isLoading: slaLoading } = useQuery<SlaQueueItem[]>({
+    queryKey: ["/api/intel-feeds/sla-queue"],
+    refetchInterval: 60000,
+  });
+
+  const { data: slaSummary } = useQuery<SlaQueueSummary>({
+    queryKey: ["/api/intel-feeds/sla-queue/summary"],
+    refetchInterval: 60000,
+  });
+
+  const [selectedSlaItem, setSelectedSlaItem] = useState<SlaQueueItem | null>(null);
+  const [generatedEmail, setGeneratedEmail] = useState<OutreachEmail | null>(null);
+
   const updateSourceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<IntelFeedSource> }) => {
       return apiRequest("PUT", `/api/intel-sources/${id}`, data);
@@ -477,14 +564,14 @@ export default function RegionalIntel() {
       queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/intel-sources"] });
       if (data.itemsProcessed > 0) {
-        toast({ 
-          title: "Sync Complete", 
-          description: `Found ${data.itemsProcessed} new items!` 
+        toast({
+          title: "Sync Complete",
+          description: `Found ${data.itemsProcessed} new items!`
         });
       } else {
-        toast({ 
-          title: "Sync Complete", 
-          description: data.message || "No new items found." 
+        toast({
+          title: "Sync Complete",
+          description: data.message || "No new items found."
         });
       }
     },
@@ -527,6 +614,72 @@ export default function RegionalIntel() {
     },
     onError: () => {
       toast({ title: "Processing failed", description: "Could not process items.", variant: "destructive" });
+    },
+  });
+
+  // Lead Intelligence Mutations
+  const syncTriggerPodsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/intel-source-config/sync-trigger-pods");
+      return res.json();
+    },
+    onSuccess: (data: { totalAdded: number; summary: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/sla-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/sla-queue/summary"] });
+      toast({
+        title: "Trigger Pods Synced",
+        description: `Added ${data.totalAdded} new leads. ${data.summary}`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Sync failed", description: "Could not sync trigger pods.", variant: "destructive" });
+    },
+  });
+
+  const enrichContactMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/intel-feeds/${id}/enrich`);
+      return res.json();
+    },
+    onSuccess: (data: { contacts: SlaContact[] }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/intel-feeds/sla-queue"] });
+      toast({
+        title: "Contacts Enriched",
+        description: `Found ${data.contacts.length} contacts.`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Enrichment failed", description: "Could not enrich contacts.", variant: "destructive" });
+    },
+  });
+
+  const generateOutreachMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/intel-feeds/${id}/generate-outreach`);
+      return res.json();
+    },
+    onSuccess: (data: { email: OutreachEmail }) => {
+      setGeneratedEmail(data.email);
+      toast({ title: "Email Generated", description: "Outreach email is ready." });
+    },
+    onError: () => {
+      toast({ title: "Generation failed", description: "Could not generate email.", variant: "destructive" });
+    },
+  });
+
+  const prepareLeadsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/intel-feeds/sla-queue/prepare-leads", { limit: 20 });
+      return res.json();
+    },
+    onSuccess: (data: { leadsCreated: number; message: string }) => {
+      toast({
+        title: "Leads Created",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Could not create leads.", variant: "destructive" });
     },
   });
 
@@ -576,10 +729,20 @@ export default function RegionalIntel() {
                   <Rss className="w-4 h-4 mr-2" /> Feed Sources
                 </TabsTrigger>
                 <TabsTrigger value="processed" data-testid="tab-processed">
-                  <Bot className="w-4 h-4 mr-2" /> 
+                  <Bot className="w-4 h-4 mr-2" />
                   Processed Intel
                   {(processingStats?.unread || 0) > 0 && (
                     <Badge variant="secondary" className="ml-2 text-xs">{processingStats?.unread}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="leads" data-testid="tab-leads">
+                  <Timer className="w-4 h-4 mr-2" />
+                  Lead Intelligence
+                  {(slaSummary?.overdue || 0) > 0 && (
+                    <Badge variant="destructive" className="ml-2 text-xs">{slaSummary?.overdue}</Badge>
+                  )}
+                  {(slaSummary?.atRisk || 0) > 0 && (slaSummary?.overdue || 0) === 0 && (
+                    <Badge className="ml-2 text-xs bg-amber-500">{slaSummary?.atRisk}</Badge>
                   )}
                 </TabsTrigger>
               </TabsList>
@@ -694,6 +857,236 @@ export default function RegionalIntel() {
                     >
                       <Rss className="w-4 h-4 mr-2" /> Go to Feed Sources
                     </Button>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Lead Intelligence Tab */}
+              <TabsContent value="leads" className="space-y-4">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <Card className="p-4">
+                    <div className="text-2xl font-bold">{slaSummary?.total || 0}</div>
+                    <div className="text-xs text-muted-foreground">Total Queue</div>
+                  </Card>
+                  <Card className="p-4 border-green-500/20 bg-green-500/5">
+                    <div className="text-2xl font-bold text-green-600">{slaSummary?.onTrack || 0}</div>
+                    <div className="text-xs text-muted-foreground">On Track</div>
+                  </Card>
+                  <Card className="p-4 border-amber-500/20 bg-amber-500/5">
+                    <div className="text-2xl font-bold text-amber-600">{slaSummary?.atRisk || 0}</div>
+                    <div className="text-xs text-muted-foreground">At Risk</div>
+                  </Card>
+                  <Card className="p-4 border-red-500/20 bg-red-500/5">
+                    <div className="text-2xl font-bold text-red-600">{slaSummary?.overdue || 0}</div>
+                    <div className="text-xs text-muted-foreground">Overdue</div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-2xl font-bold">{slaSummary?.avgRelevanceScore || 0}</div>
+                    <div className="text-xs text-muted-foreground">Avg Score</div>
+                  </Card>
+                </div>
+
+                {/* Actions Bar */}
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() => syncTriggerPodsMutation.mutate()}
+                      disabled={syncTriggerPodsMutation.isPending}
+                      data-testid="button-sync-triggers"
+                    >
+                      {syncTriggerPodsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Sync Trigger Pods
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => prepareLeadsMutation.mutate()}
+                      disabled={prepareLeadsMutation.isPending || slaQueue.length === 0}
+                    >
+                      {prepareLeadsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      Push to Mautic
+                    </Button>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    48-hour SLA Queue • Sorted by urgency
+                  </div>
+                </div>
+
+                {/* SLA Queue Items */}
+                {slaLoading ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Skeleton key={i} className="h-48" />
+                    ))}
+                  </div>
+                ) : slaQueue.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {slaQueue.map((item) => {
+                      const config = FEED_CONFIG[item.type] || FEED_CONFIG.permit;
+                      const Icon = config.icon;
+                      const statusColors = {
+                        on_track: "border-green-500/30 bg-green-500/5",
+                        at_risk: "border-amber-500/30 bg-amber-500/5",
+                        overdue: "border-red-500/30 bg-red-500/5",
+                      };
+
+                      return (
+                        <Card
+                          key={item.id}
+                          className={`cursor-pointer hover-elevate ${statusColors[item.slaStatus]} ${selectedSlaItem?.id === item.id ? 'ring-2 ring-primary' : ''}`}
+                          onClick={() => setSelectedSlaItem(item)}
+                          data-testid={`sla-item-${item.id}`}
+                        >
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded-md ${config.cardClass}`}>
+                                  <Icon className={`w-4 h-4 ${config.iconClass}`} />
+                                </div>
+                                <Badge variant="outline" className="text-xs">{item.type}</Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={item.slaStatus === "overdue" ? "destructive" : item.slaStatus === "at_risk" ? "secondary" : "outline"}
+                                  className="text-xs"
+                                >
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {item.slaStatus === "overdue"
+                                    ? "Overdue"
+                                    : `${Math.round(item.hoursUntilSla)}h left`
+                                  }
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  Score: {item.relevanceScore}
+                                </Badge>
+                              </div>
+                            </div>
+                            <CardTitle className="text-base line-clamp-2">{item.title}</CardTitle>
+                            {item.address && (
+                              <CardDescription className="text-xs">{item.address}</CardDescription>
+                            )}
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {/* Contacts */}
+                            {item.contacts.length > 0 ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Users className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-xs">{item.contacts.length} contacts</span>
+                                {item.contacts.slice(0, 2).map((c, i) => (
+                                  <Badge key={i} variant="outline" className="text-xs">
+                                    {c.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <UserSearch className="w-3 h-3" />
+                                No contacts enriched yet
+                              </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 pt-2 border-t">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  enrichContactMutation.mutate(item.id);
+                                }}
+                                disabled={enrichContactMutation.isPending}
+                              >
+                                <UserSearch className="w-3 h-3 mr-1" />
+                                Enrich
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSlaItem(item);
+                                  generateOutreachMutation.mutate(item.id);
+                                }}
+                                disabled={generateOutreachMutation.isPending || item.contacts.length === 0}
+                              >
+                                <Mail className="w-3 h-3 mr-1" />
+                                Generate Email
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Card className="p-8 text-center">
+                    <Timer className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Leads in Queue</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Sync trigger pods to pull in permit filings and compliance items from NYC DOB.
+                    </p>
+                    <Button
+                      onClick={() => syncTriggerPodsMutation.mutate()}
+                      disabled={syncTriggerPodsMutation.isPending}
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Sync Trigger Pods
+                    </Button>
+                  </Card>
+                )}
+
+                {/* Generated Email Preview */}
+                {generatedEmail && selectedSlaItem && (
+                  <Card className="mt-4 border-primary/30">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          Generated Outreach Email
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setGeneratedEmail(null)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <CardDescription>For: {selectedSlaItem.title}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">To:</span>
+                        <p className="text-sm">{generatedEmail.to || "No email address"}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Subject:</span>
+                        <p className="text-sm font-medium">{generatedEmail.subject}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-muted-foreground">Body:</span>
+                        <div className="p-3 mt-1 rounded-lg bg-muted/50 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto">
+                          {generatedEmail.body}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedEmail.body);
+                            toast({ title: "Copied!", description: "Email copied to clipboard." });
+                          }}
+                        >
+                          Copy to Clipboard
+                        </Button>
+                      </div>
+                    </CardContent>
                   </Card>
                 )}
               </TabsContent>
