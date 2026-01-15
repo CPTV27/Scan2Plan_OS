@@ -49,10 +49,15 @@ import {
     FileJson,
     Loader2,
     MapPin,
+    MessageCircle,
     Plus,
     Save,
+    Send,
+    Sparkles,
     Trash2,
+    TreePine,
     Upload,
+    X,
     Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -326,10 +331,51 @@ export default function SimpleQuoteBuilder({
     const [importError, setImportError] = useState<string | null>(null);
     const [expandedSections, setExpandedSections] = useState({
         areas: true,
+        landscape: false,
         travel: false,
         risks: false,
         services: false,
     });
+
+    // Landscape areas state
+    interface LandscapeArea {
+        id: string;
+        name: string;
+        type: "built" | "natural";
+        acres: string;
+        lod: "200" | "300" | "350";
+    }
+    const [landscapeAreas, setLandscapeAreas] = useState<LandscapeArea[]>([]);
+
+    const addLandscapeArea = () => {
+        const newId = `landscape-${Date.now()}`;
+        setLandscapeAreas(prev => [...prev, {
+            id: newId,
+            name: `Landscape ${prev.length + 1}`,
+            type: "built",
+            acres: "",
+            lod: "300"
+        }]);
+    };
+
+    const updateLandscapeArea = (id: string, updates: Partial<LandscapeArea>) => {
+        setLandscapeAreas(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+    };
+
+    const removeLandscapeArea = (id: string) => {
+        setLandscapeAreas(prev => prev.filter(a => a.id !== id));
+    };
+
+    // AI Chat state
+    interface ChatMessage {
+        role: "user" | "assistant";
+        content: string;
+        timestamp: Date;
+    }
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [chatInput, setChatInput] = useState("");
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isChatLoading, setIsChatLoading] = useState(false);
 
     // Initialize from lead data
     useEffect(() => {
@@ -778,621 +824,878 @@ export default function SimpleQuoteBuilder({
         setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
     };
 
+    // AI Chat - Send message
+    const sendChatMessage = async () => {
+        if (!chatInput.trim() || isChatLoading) return;
+
+        const userMessage: ChatMessage = {
+            role: "user",
+            content: chatInput.trim(),
+            timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, userMessage]);
+        setChatInput("");
+        setIsChatLoading(true);
+
+        try {
+            const response = await apiRequest("POST", "/api/cpq/chat", {
+                message: userMessage.content,
+                quoteState: {
+                    areas: areas.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        buildingType: a.buildingType,
+                        squareFeet: a.squareFeet.toString(),
+                        disciplines: Object.entries(a.disciplines)
+                            .filter(([_, v]) => v?.enabled)
+                            .map(([k]) => k)
+                    })),
+                    landscapeAreas: landscapeAreas.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        type: a.type,
+                        acres: a.acres,
+                        lod: a.lod
+                    })),
+                    dispatchLocation: travel.dispatchLocation,
+                    distance: travel.distance,
+                    risks: Object.entries(risks).filter(([_, v]) => v).map(([k]) => k),
+                    paymentTerms,
+                },
+                leadContext: {
+                    projectName: lead.projectName,
+                    clientName: lead.clientName,
+                    projectAddress: lead.projectAddress
+                },
+                conversationHistory: chatMessages.slice(-6).map(m => ({
+                    role: m.role,
+                    content: m.content
+                }))
+            });
+
+            const data = await response.json();
+
+            const assistantMessage: ChatMessage = {
+                role: "assistant",
+                content: data.response || "I processed your request.",
+                timestamp: new Date()
+            };
+            setChatMessages(prev => [...prev, assistantMessage]);
+
+        } catch (error) {
+            console.error("Chat error:", error);
+            setChatMessages(prev => [...prev, {
+                role: "assistant",
+                content: "Sorry, I encountered an error. Please try again.",
+                timestamp: new Date()
+            }]);
+        } finally {
+            setIsChatLoading(false);
+        }
+    };
+
     return (
-        <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Calculator className="w-5 h-5 text-primary" />
-                        <h3 className="text-lg font-semibold">CPQ Quote Editor</h3>
-                        <Badge variant="outline" className="text-xs">
-                            {totals.totalSqft.toLocaleString()} sqft
-                        </Badge>
-                        {totals.totalSqft >= TIER_A_THRESHOLD && (
-                            <Badge className="bg-amber-500 text-white text-xs">
-                                Tier A
+        <>
+            <ScrollArea className="h-full">
+                <div className="space-y-4 p-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-primary" />
+                            <h3 className="text-lg font-semibold">CPQ Quote Editor</h3>
+                            <Badge variant="outline" className="text-xs">
+                                {totals.totalSqft.toLocaleString()} sqft
                             </Badge>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                        >
-                            <a
-                                href="https://cpq.scan2plan.dev"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                <ExternalLink className="w-4 h-4 mr-2" />
-                                Open CPQ
-                            </a>
-                        </Button>
-                        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                    <FileJson className="w-4 h-4 mr-2" />
-                                    Import CPQ
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                                <DialogHeader>
-                                    <DialogTitle>Import from External CPQ</DialogTitle>
-                                    <DialogDescription>
-                                        Paste JSON output from your CPQ application, or upload a JSON file.
-                                    </DialogDescription>
-                                </DialogHeader>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <Label>Upload JSON File</Label>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept=".json"
-                                            className="hidden"
-                                            onChange={handleFileUpload}
-                                        />
-                                        <Button
-                                            variant="outline"
-                                            className="w-full mt-2"
-                                            onClick={() => fileInputRef.current?.click()}
-                                        >
-                                            <Upload className="w-4 h-4 mr-2" />
-                                            Choose File
-                                        </Button>
-                                    </div>
-
-                                    <div className="relative">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <span className="w-full border-t" />
-                                        </div>
-                                        <div className="relative flex justify-center text-xs uppercase">
-                                            <span className="bg-background px-2 text-muted-foreground">Or paste JSON</span>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <Label>JSON Data</Label>
-                                        <textarea
-                                            className="w-full h-48 mt-2 p-3 border rounded-md font-mono text-xs"
-                                            placeholder='{"areas": [{"name": "Main", "squareFeet": 50000, "disciplines": {"arch": {"enabled": true, "lod": "300"}}}]}'
-                                            value={importJson}
-                                            onChange={(e) => setImportJson(e.target.value)}
-                                        />
-                                    </div>
-
-                                    {importError && (
-                                        <p className="text-sm text-destructive">{importError}</p>
-                                    )}
-                                </div>
-
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-                                        Cancel
-                                    </Button>
-                                    <Button onClick={handleImport} disabled={!importJson.trim()}>
-                                        Import
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        <Button onClick={handleSave} disabled={isSaving}>
-                            {isSaving ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                                <Save className="w-4 h-4 mr-2" />
+                            {totals.totalSqft >= TIER_A_THRESHOLD && (
+                                <Badge className="bg-amber-500 text-white text-xs">
+                                    Tier A
+                                </Badge>
                             )}
-                            Save Quote
-                        </Button>
-                    </div>
-                </div>
+                        </div>
 
-                {/* Areas Section */}
-                <Collapsible open={expandedSections.areas} onOpenChange={() => toggleSection("areas")}>
-                    <Card>
-                        <CollapsibleTrigger asChild>
-                            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <Building2 className="w-4 h-4" />
-                                        Project Areas
-                                        <Badge variant="secondary" className="ml-2">{areas.length}</Badge>
-                                    </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-primary">
-                                            ${totals.areasTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
-                                        {expandedSections.areas ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                    </div>
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent className="space-y-4 pt-0">
-                                {totals.areas.map((area, index) => (
-                                    <div
-                                        key={area.id}
-                                        className="p-4 rounded-lg border bg-muted/30 space-y-4"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium">Area {index + 1}</span>
-                                                <Badge variant="outline" className="text-xs">
-                                                    ${area.clientPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </Badge>
-                                            </div>
-                                            {areas.length > 1 && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => removeArea(area.id)}
-                                                    className="text-destructive hover:text-destructive"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                            )}
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                            >
+                                <a
+                                    href="https://cpq.scan2plan.dev"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    Open CPQ
+                                </a>
+                            </Button>
+                            <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <FileJson className="w-4 h-4 mr-2" />
+                                        Import CPQ
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl">
+                                    <DialogHeader>
+                                        <DialogTitle>Import from External CPQ</DialogTitle>
+                                        <DialogDescription>
+                                            Paste JSON output from your CPQ application, or upload a JSON file.
+                                        </DialogDescription>
+                                    </DialogHeader>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <Label>Upload JSON File</Label>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".json"
+                                                className="hidden"
+                                                onChange={handleFileUpload}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                className="w-full mt-2"
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                <Upload className="w-4 h-4 mr-2" />
+                                                Choose File
+                                            </Button>
                                         </div>
 
-                                        {/* Basic Info */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            <div className="col-span-2">
-                                                <Label className="text-xs">Area Name</Label>
-                                                <Input
-                                                    value={area.name}
-                                                    onChange={(e) => updateArea(area.id, { name: e.target.value })}
-                                                    placeholder="Main Building"
-                                                />
+                                        <div className="relative">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <span className="w-full border-t" />
+                                            </div>
+                                            <div className="relative flex justify-center text-xs uppercase">
+                                                <span className="bg-background px-2 text-muted-foreground">Or paste JSON</span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <Label>JSON Data</Label>
+                                            <textarea
+                                                className="w-full h-48 mt-2 p-3 border rounded-md font-mono text-xs"
+                                                placeholder='{"areas": [{"name": "Main", "squareFeet": 50000, "disciplines": {"arch": {"enabled": true, "lod": "300"}}}]}'
+                                                value={importJson}
+                                                onChange={(e) => setImportJson(e.target.value)}
+                                            />
+                                        </div>
+
+                                        {importError && (
+                                            <p className="text-sm text-destructive">{importError}</p>
+                                        )}
+                                    </div>
+
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button onClick={handleImport} disabled={!importJson.trim()}>
+                                            Import
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+
+                            <Button onClick={handleSave} disabled={isSaving}>
+                                {isSaving ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4 mr-2" />
+                                )}
+                                Save Quote
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Areas Section */}
+                    <Collapsible open={expandedSections.areas} onOpenChange={() => toggleSection("areas")}>
+                        <Card>
+                            <CollapsibleTrigger asChild>
+                                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Building2 className="w-4 h-4" />
+                                            Project Areas
+                                            <Badge variant="secondary" className="ml-2">{areas.length}</Badge>
+                                        </CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-primary">
+                                                ${totals.areasTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </span>
+                                            {expandedSections.areas ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-4 pt-0">
+                                    {totals.areas.map((area, index) => (
+                                        <div
+                                            key={area.id}
+                                            className="p-4 rounded-lg border bg-muted/30 space-y-4"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">Area {index + 1}</span>
+                                                    <Badge variant="outline" className="text-xs">
+                                                        ${area.clientPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    </Badge>
+                                                </div>
+                                                {areas.length > 1 && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => removeArea(area.id)}
+                                                        className="text-destructive hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                )}
                                             </div>
 
-                                            <div>
-                                                <Label className="text-xs">Building Type</Label>
-                                                <Select
-                                                    value={area.buildingType}
-                                                    onValueChange={(value) => updateArea(area.id, { buildingType: value })}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {Object.entries(CPQ_BUILDING_TYPES).map(([value, label]) => (
-                                                            <SelectItem key={value} value={value}>
-                                                                {label}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                            {/* Basic Info */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="col-span-2">
+                                                    <Label className="text-xs">Area Name</Label>
+                                                    <Input
+                                                        value={area.name}
+                                                        onChange={(e) => updateArea(area.id, { name: e.target.value })}
+                                                        placeholder="Main Building"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label className="text-xs">Building Type</Label>
+                                                    <Select
+                                                        value={area.buildingType}
+                                                        onValueChange={(value) => updateArea(area.id, { buildingType: value })}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {Object.entries(CPQ_BUILDING_TYPES).map(([value, label]) => (
+                                                                <SelectItem key={value} value={value}>
+                                                                    {label}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div>
+                                                    {isLandscapeType(area.buildingType) ? (
+                                                        <>
+                                                            <Label className="text-xs">Acres</Label>
+                                                            <Input
+                                                                type="number"
+                                                                step="0.1"
+                                                                value={area.acres || ""}
+                                                                onChange={(e) => updateArea(area.id, {
+                                                                    acres: parseFloat(e.target.value) || 0,
+                                                                    squareFeet: Math.round((parseFloat(e.target.value) || 0) * SQFT_PER_ACRE)
+                                                                })}
+                                                                placeholder="5.0"
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Label className="text-xs">Square Footage</Label>
+                                                            <Input
+                                                                type="number"
+                                                                value={area.squareFeet || ""}
+                                                                onChange={(e) => updateArea(area.id, { squareFeet: parseInt(e.target.value) || 0 })}
+                                                                placeholder="50,000"
+                                                            />
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
 
+                                            {/* Special type notices */}
+                                            {isACTType(area.buildingType) && (
+                                                <div className="px-3 py-2 rounded bg-yellow-500/10 border border-yellow-500/30 text-xs text-yellow-600">
+                                                    ACT pricing: $2.00/sqft fixed rate
+                                                </div>
+                                            )}
+                                            {isMatterportType(area.buildingType) && (
+                                                <div className="px-3 py-2 rounded bg-purple-500/10 border border-purple-500/30 text-xs text-purple-600">
+                                                    Matterport only: $0.10/sqft fixed rate
+                                                </div>
+                                            )}
+                                            {isLandscapeType(area.buildingType) && (
+                                                <div className="px-3 py-2 rounded bg-green-500/10 border border-green-500/30 text-xs text-green-600">
+                                                    Landscape: Per-acre pricing (LOD-based rates)
+                                                </div>
+                                            )}
+
+                                            {/* Disciplines */}
                                             <div>
-                                                {isLandscapeType(area.buildingType) ? (
-                                                    <>
+                                                <Label className="text-xs mb-2 block">Disciplines</Label>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    {(["arch", "mepf", "structure", "site"] as const).map((disc) => {
+                                                        const config = area.disciplines[disc];
+                                                        const isEnabled = config?.enabled;
+
+                                                        return (
+                                                            <div
+                                                                key={disc}
+                                                                className={`p-3 rounded-lg border ${isEnabled ? "bg-primary/5 border-primary/30" : "bg-muted/50"}`}
+                                                            >
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <Checkbox
+                                                                        checked={isEnabled}
+                                                                        onCheckedChange={() => toggleDiscipline(area.id, disc)}
+                                                                    />
+                                                                    <span className="text-sm font-medium uppercase">{disc === "site" ? "GRADE" : disc}</span>
+                                                                </div>
+
+                                                                {isEnabled && (
+                                                                    <div className="space-y-2">
+                                                                        <Select
+                                                                            value={config?.lod || "300"}
+                                                                            onValueChange={(v) => updateDiscipline(area.id, disc, { lod: v as "200" | "300" | "350" })}
+                                                                        >
+                                                                            <SelectTrigger className="h-8">
+                                                                                <SelectValue />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem value="200">LOD 200</SelectItem>
+                                                                                <SelectItem value="300">LOD 300</SelectItem>
+                                                                                <SelectItem value="350">LOD 350</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+
+                                                                        {disc === "arch" && (
+                                                                            <>
+                                                                                <Select
+                                                                                    value={config?.scope || "full"}
+                                                                                    onValueChange={(v) => updateDiscipline(area.id, disc, { scope: v as "full" | "interior" | "exterior" | "mixed" })}
+                                                                                >
+                                                                                    <SelectTrigger className="h-8">
+                                                                                        <SelectValue />
+                                                                                    </SelectTrigger>
+                                                                                    <SelectContent>
+                                                                                        <SelectItem value="full">Full</SelectItem>
+                                                                                        <SelectItem value="interior">Interior (65%)</SelectItem>
+                                                                                        <SelectItem value="exterior">Exterior (35%)</SelectItem>
+                                                                                        <SelectItem value="mixed">Mixed (Int+Ext)</SelectItem>
+                                                                                    </SelectContent>
+                                                                                </Select>
+
+                                                                                {/* Mixed scope - separate LODs for interior/exterior */}
+                                                                                {config?.scope === "mixed" && (
+                                                                                    <div className="grid grid-cols-2 gap-1">
+                                                                                        <div>
+                                                                                            <Label className="text-[10px] text-muted-foreground">Int LOD</Label>
+                                                                                            <Select
+                                                                                                value={config?.mixedInteriorLod || "300"}
+                                                                                                onValueChange={(v) => updateDiscipline(area.id, disc, { mixedInteriorLod: v as "200" | "300" | "350" })}
+                                                                                            >
+                                                                                                <SelectTrigger className="h-7 text-xs">
+                                                                                                    <SelectValue />
+                                                                                                </SelectTrigger>
+                                                                                                <SelectContent>
+                                                                                                    <SelectItem value="200">200</SelectItem>
+                                                                                                    <SelectItem value="300">300</SelectItem>
+                                                                                                    <SelectItem value="350">350</SelectItem>
+                                                                                                </SelectContent>
+                                                                                            </Select>
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <Label className="text-[10px] text-muted-foreground">Ext LOD</Label>
+                                                                                            <Select
+                                                                                                value={config?.mixedExteriorLod || "300"}
+                                                                                                onValueChange={(v) => updateDiscipline(area.id, disc, { mixedExteriorLod: v as "200" | "300" | "350" })}
+                                                                                            >
+                                                                                                <SelectTrigger className="h-7 text-xs">
+                                                                                                    <SelectValue />
+                                                                                                </SelectTrigger>
+                                                                                                <SelectContent>
+                                                                                                    <SelectItem value="200">200</SelectItem>
+                                                                                                    <SelectItem value="300">300</SelectItem>
+                                                                                                    <SelectItem value="350">350</SelectItem>
+                                                                                                </SelectContent>
+                                                                                            </Select>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <Button variant="outline" onClick={addArea} className="w-full">
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Area
+                                    </Button>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
+
+                    {/* Landscape Section */}
+                    <Collapsible open={expandedSections.landscape} onOpenChange={() => toggleSection("landscape")}>
+                        <Card>
+                            <CollapsibleTrigger asChild>
+                                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <TreePine className="w-4 h-4" />
+                                            Landscape
+                                        </CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline">{landscapeAreas.length} areas</Badge>
+                                            {expandedSections.landscape ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-4 pt-0">
+                                    {landscapeAreas.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                            No landscape areas. Click below to add one.
+                                        </p>
+                                    ) : (
+                                        landscapeAreas.map((area) => (
+                                            <div key={area.id} className="p-3 border rounded-lg space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <Input
+                                                        placeholder="Landscape Name"
+                                                        value={area.name}
+                                                        onChange={(e) => updateLandscapeArea(area.id, { name: e.target.value })}
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeLandscapeArea(area.id)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 text-destructive" />
+                                                    </Button>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div>
+                                                        <Label className="text-xs">Type</Label>
+                                                        <Select
+                                                            value={area.type}
+                                                            onValueChange={(v: "built" | "natural") => updateLandscapeArea(area.id, { type: v })}
+                                                        >
+                                                            <SelectTrigger className="h-9">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="built">Built (Manicured)</SelectItem>
+                                                                <SelectItem value="natural">Natural (Wooded)</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div>
                                                         <Label className="text-xs">Acres</Label>
                                                         <Input
                                                             type="number"
-                                                            step="0.1"
-                                                            value={area.acres || ""}
-                                                            onChange={(e) => updateArea(area.id, {
-                                                                acres: parseFloat(e.target.value) || 0,
-                                                                squareFeet: Math.round((parseFloat(e.target.value) || 0) * SQFT_PER_ACRE)
-                                                            })}
-                                                            placeholder="5.0"
+                                                            placeholder="5"
+                                                            value={area.acres}
+                                                            onChange={(e) => updateLandscapeArea(area.id, { acres: e.target.value })}
                                                         />
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Label className="text-xs">Square Footage</Label>
-                                                        <Input
-                                                            type="number"
-                                                            value={area.squareFeet || ""}
-                                                            onChange={(e) => updateArea(area.id, { squareFeet: parseInt(e.target.value) || 0 })}
-                                                            placeholder="50,000"
-                                                        />
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Special type notices */}
-                                        {isACTType(area.buildingType) && (
-                                            <div className="px-3 py-2 rounded bg-yellow-500/10 border border-yellow-500/30 text-xs text-yellow-600">
-                                                ACT pricing: $2.00/sqft fixed rate
-                                            </div>
-                                        )}
-                                        {isMatterportType(area.buildingType) && (
-                                            <div className="px-3 py-2 rounded bg-purple-500/10 border border-purple-500/30 text-xs text-purple-600">
-                                                Matterport only: $0.10/sqft fixed rate
-                                            </div>
-                                        )}
-                                        {isLandscapeType(area.buildingType) && (
-                                            <div className="px-3 py-2 rounded bg-green-500/10 border border-green-500/30 text-xs text-green-600">
-                                                Landscape: Per-acre pricing (LOD-based rates)
-                                            </div>
-                                        )}
-
-                                        {/* Disciplines */}
-                                        <div>
-                                            <Label className="text-xs mb-2 block">Disciplines</Label>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                {(["arch", "mepf", "structure", "site"] as const).map((disc) => {
-                                                    const config = area.disciplines[disc];
-                                                    const isEnabled = config?.enabled;
-
-                                                    return (
-                                                        <div
-                                                            key={disc}
-                                                            className={`p-3 rounded-lg border ${isEnabled ? "bg-primary/5 border-primary/30" : "bg-muted/50"}`}
+                                                    </div>
+                                                    <div>
+                                                        <Label className="text-xs">LOD</Label>
+                                                        <Select
+                                                            value={area.lod}
+                                                            onValueChange={(v: "200" | "300" | "350") => updateLandscapeArea(area.id, { lod: v })}
                                                         >
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <Checkbox
-                                                                    checked={isEnabled}
-                                                                    onCheckedChange={() => toggleDiscipline(area.id, disc)}
-                                                                />
-                                                                <span className="text-sm font-medium uppercase">{disc}</span>
-                                                            </div>
+                                                            <SelectTrigger className="h-9">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="200">LOD 200</SelectItem>
+                                                                <SelectItem value="300">LOD 300</SelectItem>
+                                                                <SelectItem value="350">LOD 350</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                    <Button variant="outline" onClick={addLandscapeArea} className="w-full">
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Landscape
+                                    </Button>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
 
-                                                            {isEnabled && (
-                                                                <div className="space-y-2">
-                                                                    <Select
-                                                                        value={config?.lod || "300"}
-                                                                        onValueChange={(v) => updateDiscipline(area.id, disc, { lod: v as "200" | "300" | "350" })}
-                                                                    >
-                                                                        <SelectTrigger className="h-8">
-                                                                            <SelectValue />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            <SelectItem value="200">LOD 200</SelectItem>
-                                                                            <SelectItem value="300">LOD 300</SelectItem>
-                                                                            <SelectItem value="350">LOD 350</SelectItem>
-                                                                        </SelectContent>
-                                                                    </Select>
+                    {/* Travel Section */}
+                    <Collapsible open={expandedSections.travel} onOpenChange={() => toggleSection("travel")}>
+                        <Card>
+                            <CollapsibleTrigger asChild>
+                                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Car className="w-4 h-4" />
+                                            Travel
+                                        </CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-primary">
+                                                ${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </span>
+                                            {expandedSections.travel ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <CardContent className="pt-0">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <Label className="text-xs">Dispatch Location</Label>
+                                            <Select
+                                                value={travel.dispatchLocation}
+                                                onValueChange={(v) => setTravel(prev => ({ ...prev, dispatchLocation: v as any }))}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="troy">Troy, NY</SelectItem>
+                                                    <SelectItem value="woodstock">Woodstock, GA</SelectItem>
+                                                    <SelectItem value="boise">Boise, ID</SelectItem>
+                                                    <SelectItem value="brooklyn">Brooklyn, NY</SelectItem>
+                                                    <SelectItem value="fly_out">Fly Out</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
 
-                                                                    {disc === "arch" && (
-                                                                        <>
-                                                                            <Select
-                                                                                value={config?.scope || "full"}
-                                                                                onValueChange={(v) => updateDiscipline(area.id, disc, { scope: v as "full" | "interior" | "exterior" | "mixed" })}
-                                                                            >
-                                                                                <SelectTrigger className="h-8">
-                                                                                    <SelectValue />
-                                                                                </SelectTrigger>
-                                                                                <SelectContent>
-                                                                                    <SelectItem value="full">Full</SelectItem>
-                                                                                    <SelectItem value="interior">Interior (65%)</SelectItem>
-                                                                                    <SelectItem value="exterior">Exterior (35%)</SelectItem>
-                                                                                    <SelectItem value="mixed">Mixed (Int+Ext)</SelectItem>
-                                                                                </SelectContent>
-                                                                            </Select>
+                                        <div>
+                                            <Label className="text-xs">Distance (miles)</Label>
+                                            <Input
+                                                type="number"
+                                                value={travel.distance || ""}
+                                                onChange={(e) => setTravel(prev => ({ ...prev, distance: parseInt(e.target.value) || 0 }))}
+                                                placeholder="0"
+                                            />
+                                        </div>
 
-                                                                            {/* Mixed scope - separate LODs for interior/exterior */}
-                                                                            {config?.scope === "mixed" && (
-                                                                                <div className="grid grid-cols-2 gap-1">
-                                                                                    <div>
-                                                                                        <Label className="text-[10px] text-muted-foreground">Int LOD</Label>
-                                                                                        <Select
-                                                                                            value={config?.mixedInteriorLod || "300"}
-                                                                                            onValueChange={(v) => updateDiscipline(area.id, disc, { mixedInteriorLod: v as "200" | "300" | "350" })}
-                                                                                        >
-                                                                                            <SelectTrigger className="h-7 text-xs">
-                                                                                                <SelectValue />
-                                                                                            </SelectTrigger>
-                                                                                            <SelectContent>
-                                                                                                <SelectItem value="200">200</SelectItem>
-                                                                                                <SelectItem value="300">300</SelectItem>
-                                                                                                <SelectItem value="350">350</SelectItem>
-                                                                                            </SelectContent>
-                                                                                        </Select>
-                                                                                    </div>
-                                                                                    <div>
-                                                                                        <Label className="text-[10px] text-muted-foreground">Ext LOD</Label>
-                                                                                        <Select
-                                                                                            value={config?.mixedExteriorLod || "300"}
-                                                                                            onValueChange={(v) => updateDiscipline(area.id, disc, { mixedExteriorLod: v as "200" | "300" | "350" })}
-                                                                                        >
-                                                                                            <SelectTrigger className="h-7 text-xs">
-                                                                                                <SelectValue />
-                                                                                            </SelectTrigger>
-                                                                                            <SelectContent>
-                                                                                                <SelectItem value="200">200</SelectItem>
-                                                                                                <SelectItem value="300">300</SelectItem>
-                                                                                                <SelectItem value="350">350</SelectItem>
-                                                                                            </SelectContent>
-                                                                                        </Select>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                                        <div>
+                                            <Label className="text-xs">Calculated Cost</Label>
+                                            <div className="h-10 px-3 flex items-center rounded-md border bg-muted font-semibold">
+                                                ${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
 
-                                <Button variant="outline" onClick={addArea} className="w-full">
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Area
-                                </Button>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Card>
-                </Collapsible>
+                    {/* Risk Premiums Section */}
+                    <Collapsible open={expandedSections.risks} onOpenChange={() => toggleSection("risks")}>
+                        <Card>
+                            <CollapsibleTrigger asChild>
+                                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4" />
+                                            Risk Premiums
+                                            {totals.riskPercent > 0 && (
+                                                <Badge variant="destructive" className="ml-2">+{totals.riskPercent}%</Badge>
+                                            )}
+                                        </CardTitle>
+                                        {expandedSections.risks ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                    </div>
+                                </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <CardContent className="pt-0">
+                                    <p className="text-xs text-muted-foreground mb-3">Risk premiums apply to Architecture discipline only</p>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="flex items-center gap-2 p-3 rounded-lg border">
+                                            <Checkbox
+                                                checked={risks.occupied}
+                                                onCheckedChange={(c) => setRisks(prev => ({ ...prev, occupied: !!c }))}
+                                            />
+                                            <div>
+                                                <span className="text-sm font-medium">Occupied</span>
+                                                <p className="text-xs text-muted-foreground">+15%</p>
+                                            </div>
+                                        </div>
 
-                {/* Travel Section */}
-                <Collapsible open={expandedSections.travel} onOpenChange={() => toggleSection("travel")}>
+                                        <div className="flex items-center gap-2 p-3 rounded-lg border">
+                                            <Checkbox
+                                                checked={risks.hazardous}
+                                                onCheckedChange={(c) => setRisks(prev => ({ ...prev, hazardous: !!c }))}
+                                            />
+                                            <div>
+                                                <span className="text-sm font-medium">Hazardous</span>
+                                                <p className="text-xs text-muted-foreground">+25%</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 p-3 rounded-lg border">
+                                            <Checkbox
+                                                checked={risks.no_power}
+                                                onCheckedChange={(c) => setRisks(prev => ({ ...prev, no_power: !!c }))}
+                                            />
+                                            <div>
+                                                <span className="text-sm font-medium">No Power</span>
+                                                <p className="text-xs text-muted-foreground">+20%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
+
+                    {/* Services Section */}
+                    <Collapsible open={expandedSections.services} onOpenChange={() => toggleSection("services")}>
+                        <Card>
+                            <CollapsibleTrigger asChild>
+                                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Zap className="w-4 h-4" />
+                                            Additional Services
+                                        </CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-semibold text-primary">
+                                                ${totals.servicesTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </span>
+                                            {expandedSections.services ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <CardContent className="pt-0">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex items-center gap-2 p-3 rounded-lg border">
+                                            <Checkbox
+                                                checked={services.matterport}
+                                                onCheckedChange={(c) => setServices(prev => ({ ...prev, matterport: !!c }))}
+                                            />
+                                            <div>
+                                                <span className="text-sm font-medium">Matterport</span>
+                                                <p className="text-xs text-muted-foreground">$0.10/sqft</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Additional Elevations</Label>
+                                            <Input
+                                                type="number"
+                                                value={services.additionalElevations || ""}
+                                                onChange={(e) => setServices(prev => ({ ...prev, additionalElevations: parseInt(e.target.value) || 0 }))}
+                                                placeholder="0"
+                                            />
+                                            {services.additionalElevations > 0 && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    = ${calculateElevationPrice(services.additionalElevations).toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
+
+                    {/* Quote Summary */}
                     <Card>
-                        <CollapsibleTrigger asChild>
-                            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <Car className="w-4 h-4" />
-                                        Travel
-                                    </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-primary">
-                                            ${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
-                                        {expandedSections.travel ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                    </div>
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent className="pt-0">
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <Label className="text-xs">Dispatch Location</Label>
-                                        <Select
-                                            value={travel.dispatchLocation}
-                                            onValueChange={(v) => setTravel(prev => ({ ...prev, dispatchLocation: v as any }))}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="troy">Troy, NY</SelectItem>
-                                                <SelectItem value="woodstock">Woodstock, GA</SelectItem>
-                                                <SelectItem value="boise">Boise, ID</SelectItem>
-                                                <SelectItem value="brooklyn">Brooklyn, NY</SelectItem>
-                                                <SelectItem value="fly_out">Fly Out</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div>
-                                        <Label className="text-xs">Distance (miles)</Label>
-                                        <Input
-                                            type="number"
-                                            value={travel.distance || ""}
-                                            onChange={(e) => setTravel(prev => ({ ...prev, distance: parseInt(e.target.value) || 0 }))}
-                                            placeholder="0"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <Label className="text-xs">Calculated Cost</Label>
-                                        <div className="h-10 px-3 flex items-center rounded-md border bg-muted font-semibold">
-                                            ${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Card>
-                </Collapsible>
-
-                {/* Risk Premiums Section */}
-                <Collapsible open={expandedSections.risks} onOpenChange={() => toggleSection("risks")}>
-                    <Card>
-                        <CollapsibleTrigger asChild>
-                            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4" />
-                                        Risk Premiums
-                                        {totals.riskPercent > 0 && (
-                                            <Badge variant="destructive" className="ml-2">+{totals.riskPercent}%</Badge>
-                                        )}
-                                    </CardTitle>
-                                    {expandedSections.risks ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent className="pt-0">
-                                <p className="text-xs text-muted-foreground mb-3">Risk premiums apply to Architecture discipline only</p>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="flex items-center gap-2 p-3 rounded-lg border">
-                                        <Checkbox
-                                            checked={risks.occupied}
-                                            onCheckedChange={(c) => setRisks(prev => ({ ...prev, occupied: !!c }))}
-                                        />
-                                        <div>
-                                            <span className="text-sm font-medium">Occupied</span>
-                                            <p className="text-xs text-muted-foreground">+15%</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 p-3 rounded-lg border">
-                                        <Checkbox
-                                            checked={risks.hazardous}
-                                            onCheckedChange={(c) => setRisks(prev => ({ ...prev, hazardous: !!c }))}
-                                        />
-                                        <div>
-                                            <span className="text-sm font-medium">Hazardous</span>
-                                            <p className="text-xs text-muted-foreground">+25%</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 p-3 rounded-lg border">
-                                        <Checkbox
-                                            checked={risks.no_power}
-                                            onCheckedChange={(c) => setRisks(prev => ({ ...prev, no_power: !!c }))}
-                                        />
-                                        <div>
-                                            <span className="text-sm font-medium">No Power</span>
-                                            <p className="text-xs text-muted-foreground">+20%</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Card>
-                </Collapsible>
-
-                {/* Services Section */}
-                <Collapsible open={expandedSections.services} onOpenChange={() => toggleSection("services")}>
-                    <Card>
-                        <CollapsibleTrigger asChild>
-                            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/50">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <Zap className="w-4 h-4" />
-                                        Additional Services
-                                    </CardTitle>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-primary">
-                                            ${totals.servicesTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
-                                        {expandedSections.services ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                    </div>
-                                </div>
-                            </CardHeader>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                            <CardContent className="pt-0">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="flex items-center gap-2 p-3 rounded-lg border">
-                                        <Checkbox
-                                            checked={services.matterport}
-                                            onCheckedChange={(c) => setServices(prev => ({ ...prev, matterport: !!c }))}
-                                        />
-                                        <div>
-                                            <span className="text-sm font-medium">Matterport</span>
-                                            <p className="text-xs text-muted-foreground">$0.10/sqft</p>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <Label className="text-xs">Additional Elevations</Label>
-                                        <Input
-                                            type="number"
-                                            value={services.additionalElevations || ""}
-                                            onChange={(e) => setServices(prev => ({ ...prev, additionalElevations: parseInt(e.target.value) || 0 }))}
-                                            placeholder="0"
-                                        />
-                                        {services.additionalElevations > 0 && (
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                = ${calculateElevationPrice(services.additionalElevations).toLocaleString()}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Card>
-                </Collapsible>
-
-                {/* Quote Summary */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <DollarSign className="w-4 h-4" />
-                            Quote Summary
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Areas Subtotal</span>
-                            <span>${totals.areasTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-
-                        {totals.travelTotal > 0 && (
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" />
+                                Quote Summary
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
                             <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Travel</span>
-                                <span>${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span className="text-muted-foreground">Areas Subtotal</span>
+                                <span>${totals.areasTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
-                        )}
 
-                        {totals.servicesTotal > 0 && (
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Services</span>
-                                <span>${totals.servicesTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                            </div>
-                        )}
-
-                        <Separator />
-
-                        <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Subtotal</span>
-                            <span>${totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                        </div>
-
-                        {/* Payment Terms */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Label className="text-sm text-muted-foreground">Payment Terms</Label>
-                                <Select value={paymentTerms} onValueChange={setPaymentTerms}>
-                                    <SelectTrigger className="w-40 h-8">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {CPQ_PAYMENT_TERMS.filter(t => t !== "other").map((term) => (
-                                            <SelectItem key={term} value={term}>
-                                                {CPQ_PAYMENT_TERMS_DISPLAY[term]}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {totals.paymentPremium > 0 && (
-                                <span className="text-sm">+${totals.paymentPremium.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            {totals.travelTotal > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Travel</span>
+                                    <span>${totals.travelTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
                             )}
-                        </div>
 
-                        <Separator />
+                            {totals.servicesTotal > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Services</span>
+                                    <span>${totals.servicesTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
+                            )}
 
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold text-lg">Total</span>
-                                {totals.hasOverride && (
-                                    <Badge variant="secondary" className="text-xs">Override</Badge>
+                            <Separator />
+
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span>${totals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+
+                            {/* Payment Terms */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-sm text-muted-foreground">Payment Terms</Label>
+                                    <Select value={paymentTerms} onValueChange={setPaymentTerms}>
+                                        <SelectTrigger className="w-40 h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {CPQ_PAYMENT_TERMS.filter(t => t !== "other").map((term) => (
+                                                <SelectItem key={term} value={term}>
+                                                    {CPQ_PAYMENT_TERMS_DISPLAY[term]}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {totals.paymentPremium > 0 && (
+                                    <span className="text-sm">+${totals.paymentPremium.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                 )}
                             </div>
+
+                            <Separator />
+
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-lg">Total</span>
+                                    {totals.hasOverride && (
+                                        <Badge variant="secondary" className="text-xs">Override</Badge>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {!totals.hasOverride ? (
+                                        <span className="text-2xl font-bold text-primary">
+                                            ${totals.finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </span>
+                                    ) : (
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            className="w-36 text-right font-bold text-lg"
+                                            value={manualTotalOverride || ""}
+                                            onChange={(e) => setManualTotalOverride(parseFloat(e.target.value) || null)}
+                                        />
+                                    )}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setManualTotalOverride(totals.hasOverride ? null : totals.calculatedTotal)}
+                                    >
+                                        {totals.hasOverride ? "Auto" : "Override"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </ScrollArea>
+
+            {/* AI Chat Panel - Floating */}
+            {
+                isChatOpen && (
+                    <div className="fixed bottom-20 right-6 w-96 h-[500px] bg-background border rounded-lg shadow-xl z-50 flex flex-col">
+                        <div className="flex items-center justify-between p-3 border-b bg-primary/5">
                             <div className="flex items-center gap-2">
-                                {!totals.hasOverride ? (
-                                    <span className="text-2xl font-bold text-primary">
-                                        ${totals.finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </span>
-                                ) : (
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        className="w-36 text-right font-bold text-lg"
-                                        value={manualTotalOverride || ""}
-                                        onChange={(e) => setManualTotalOverride(parseFloat(e.target.value) || null)}
-                                    />
-                                )}
+                                <Sparkles className="w-4 h-4 text-primary" />
+                                <span className="font-medium">Quote Assistant</span>
+                            </div>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setIsChatOpen(false)}
+                                className="h-7 w-7"
+                            >
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
+
+                        <ScrollArea className="flex-1 p-3">
+                            {chatMessages.length === 0 ? (
+                                <div className="text-center text-muted-foreground text-sm py-8">
+                                    <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                    <p>Hi! I can help you configure this quote.</p>
+                                    <p className="mt-2 text-xs">Try saying:</p>
+                                    <ul className="mt-1 text-xs space-y-1">
+                                        <li>"Add MEP to this quote"</li>
+                                        <li>"Change to LOD 350"</li>
+                                        <li>"Add occupied building risk"</li>
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {chatMessages.map((msg, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                                        >
+                                            <div
+                                                className={`max-w-[85%] p-2 rounded-lg text-sm ${msg.role === "user"
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "bg-muted"
+                                                    }`}
+                                            >
+                                                {msg.content}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isChatLoading && (
+                                        <div className="flex justify-start">
+                                            <div className="bg-muted p-2 rounded-lg">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </ScrollArea>
+
+                        <div className="p-3 border-t">
+                            <div className="flex gap-2">
+                                <Input
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    placeholder="Ask about pricing..."
+                                    onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+                                    disabled={isChatLoading}
+                                />
                                 <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setManualTotalOverride(totals.hasOverride ? null : totals.calculatedTotal)}
+                                    size="icon"
+                                    onClick={sendChatMessage}
+                                    disabled={isChatLoading || !chatInput.trim()}
                                 >
-                                    {totals.hasOverride ? "Auto" : "Override"}
+                                    <Send className="w-4 h-4" />
                                 </Button>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </ScrollArea>
+                    </div>
+                )
+            }
+
+            {/* Chat Toggle Button - Floating */}
+            <Button
+                size="icon"
+                className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg z-40"
+                onClick={() => setIsChatOpen(!isChatOpen)}
+            >
+                {isChatOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+            </Button>
+        </>
     );
 }
