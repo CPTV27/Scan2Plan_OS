@@ -74,6 +74,7 @@ export async function registerRoutes(
     { path: '/site-readiness/', type: 'prefix' },
     { path: '/public/site-readiness/', type: 'prefix' },
     { path: '/webhooks/', type: 'prefix' },
+    { path: '/public/', type: 'prefix' },
   ];
 
   const publicPatterns: RegExp[] = [
