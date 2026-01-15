@@ -433,3 +433,31 @@ leadsCoreRouter.delete(
         res.status(204).send();
     })
 );
+
+// POST /api/leads/:id/signature - Save client signature
+leadsCoreRouter.post(
+    "/api/leads/:id/signature",
+    isAuthenticated,
+    requireRole("ceo", "sales"),
+    asyncHandler(async (req, res) => {
+        const leadId = Number(req.params.id);
+        const { signatureImage, signerName, signerEmail } = req.body;
+
+        if (!signatureImage || !signerName || !signerEmail) {
+            return res.status(400).json({
+                message: "signatureImage, signerName, and signerEmail are required"
+            });
+        }
+
+        const lead = await storage.updateLead(leadId, {
+            signatureImage,
+            signerName,
+            signerEmail,
+            signedAt: new Date(),
+        } as any);
+
+        log(`[Signature] Lead ${leadId} signed by ${signerName} (${signerEmail})`);
+
+        res.json(lead);
+    })
+);

@@ -178,6 +178,11 @@ export const leads = pgTable("leads", {
   // Soft Delete (60-day trash can)
   deletedAt: timestamp("deleted_at"), // When record was moved to trash (null = active)
   deletedBy: text("deleted_by"), // User ID who deleted the record
+  // Client Signature (open-source alternative to PandaDoc)
+  signatureImage: text("signature_image"), // Base64 PNG of signature
+  signerName: text("signer_name"), // Full name of person who signed
+  signerEmail: text("signer_email"), // Email of person who signed
+  signedAt: timestamp("signed_at"), // When proposal was signed
   // Mautic Marketing Automation
   mauticContactId: text("mautic_contact_id"), // Mautic Contact ID for marketing sync
 

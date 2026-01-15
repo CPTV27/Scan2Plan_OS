@@ -124,7 +124,11 @@ const mockLead: Lead = {
   closedAt: null,
   lossReason: null,
   wonReason: null,
-  mauticContactId: null
+  mauticContactId: null,
+  signatureImage: null,
+  signerName: null,
+  signerEmail: null,
+  signedAt: null
 };
 
 const mockDocuments: LeadDocument[] = [
