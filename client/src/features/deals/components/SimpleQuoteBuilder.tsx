@@ -943,6 +943,20 @@ export default function SimpleQuoteBuilder({
                                 setPaymentTerms(action.terms);
                             }
                             break;
+                        case "toggleMatterport":
+                            setServices(prev => ({
+                                ...prev,
+                                matterport: action.enabled !== undefined ? action.enabled : !prev.matterport
+                            }));
+                            break;
+                        case "setAdditionalElevations":
+                            if (action.count !== undefined) {
+                                setServices(prev => ({
+                                    ...prev,
+                                    additionalElevations: action.count
+                                }));
+                            }
+                            break;
                     }
                 });
             }
