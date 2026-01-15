@@ -49,6 +49,7 @@ import helpCenterRouter from "./routes/help-center";
 import researchRouter from "./routes/research";
 import promptEngineRouter from "./routes/prompt-engine";
 import agentRouter from "./routes/agent";
+import cpqChatRouter from "./routes/cpq-chat";
 
 
 export async function registerRoutes(
@@ -175,6 +176,9 @@ export async function registerRoutes(
 
   // Autonomous Agent
   app.use("/api/agent", agentRouter);
+
+  // CPQ AI Chat Assistant
+  app.use("/api/cpq/chat", cpqChatRouter);
 
   app.post("/api/projects/:projectId/completion-checklist", isAuthenticated, requireRole("ceo", "production"), asyncHandler(async (req: Request, res: Response) => {
     try {

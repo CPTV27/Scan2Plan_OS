@@ -28,8 +28,10 @@ import {
   History,
   Loader2,
   MapPin,
+  MessageCircle,
   Plus,
   Save,
+  Send,
   Sparkles,
   Trash2,
   TreePine,
@@ -178,6 +180,18 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const [isSaving, setIsSaving] = useState(false);
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
   const [pricingError, setPricingError] = useState<string | null>(null);
+
+  // AI Chat State
+  interface ChatMessage {
+    role: "user" | "assistant";
+    content: string;
+    timestamp: Date;
+    actions?: Array<{ type: string;[key: string]: any }>;
+  }
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   useEffect(() => {
     if (sourceQuote && sourceQuote.id !== loadedSourceQuoteId) {
@@ -423,6 +437,153 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
     if (lowerLabel.includes("matterport") || lowerLabel.includes("cad") || lowerLabel.includes("elevation") || lowerLabel.includes("facade")) return "service";
     if (lowerLabel.includes("discount") || lowerLabel.includes("terms") || lowerLabel.includes("adjustment")) return "subtotal";
     return "discipline";
+  };
+
+  // AI Chat - Send message and apply actions
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+
+    const userMessage: ChatMessage = {
+      role: "user",
+      content: chatInput.trim(),
+      timestamp: new Date()
+    };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput("");
+    setIsChatLoading(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/cpq/chat", {
+        message: userMessage.content,
+        quoteState: {
+          areas: areas.map(a => ({
+            id: a.id,
+            name: a.name,
+            buildingType: a.buildingType,
+            squareFeet: a.squareFeet,
+            disciplines: a.disciplines
+          })),
+          landscapeAreas: landscapeAreas.map(a => ({
+            id: a.id,
+            name: a.name,
+            type: a.type,
+            acres: a.acres,
+            lod: a.lod
+          })),
+          dispatchLocation,
+          distance: distance ? parseFloat(distance) : 0,
+          risks,
+          paymentTerms,
+          marginTarget
+        },
+        leadContext: {
+          projectName: lead.projectName,
+          clientName: lead.clientName,
+          projectAddress: lead.projectAddress
+        },
+        conversationHistory: chatMessages.slice(-6).map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      });
+
+      const data = await response.json();
+
+      // Apply actions from AI
+      if (data.actions && Array.isArray(data.actions)) {
+        data.actions.forEach((action: any) => {
+          switch (action.type) {
+            case "toggleDiscipline":
+              if (action.areaId && action.discipline) {
+                toggleDiscipline(action.areaId, action.discipline);
+              }
+              break;
+            case "updateArea":
+              if (action.areaId && action.updates) {
+                updateArea(action.areaId, action.updates);
+              }
+              break;
+            case "addArea":
+              addArea();
+              // Update the newly added area with provided values
+              setTimeout(() => {
+                const newAreaId = (areas.length + 1).toString();
+                if (action.name || action.buildingType || action.squareFeet) {
+                  updateArea(newAreaId, {
+                    name: action.name,
+                    buildingType: action.buildingType,
+                    squareFeet: action.squareFeet
+                  });
+                }
+              }, 0);
+              break;
+            case "addLandscape":
+              addLandscapeArea();
+              setTimeout(() => {
+                const newId = landscapeAreas.length > 0
+                  ? landscapeAreas[landscapeAreas.length - 1]?.id
+                  : undefined;
+                if (newId && (action.name || action.landscapeType || action.acres)) {
+                  updateLandscapeArea(newId, {
+                    name: action.name,
+                    type: action.landscapeType,
+                    acres: action.acres,
+                    lod: action.lod || "300"
+                  });
+                }
+              }, 0);
+              break;
+            case "toggleRisk":
+              if (action.risk) {
+                setRisks(prev =>
+                  prev.includes(action.risk)
+                    ? prev.filter(r => r !== action.risk)
+                    : [...prev, action.risk]
+                );
+              }
+              break;
+            case "setDispatchLocation":
+              if (action.location) {
+                handleDispatchLocationChange(action.location);
+              }
+              break;
+            case "setDistance":
+              if (action.distance !== undefined) {
+                setDistance(action.distance.toString());
+              }
+              break;
+            case "setPaymentTerms":
+              if (action.terms) {
+                setPaymentTerms(action.terms);
+              }
+              break;
+            case "setMarginTarget":
+              if (action.margin !== undefined) {
+                setMarginTarget(action.margin);
+              }
+              break;
+          }
+        });
+      }
+
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: data.response || "I processed your request.",
+        timestamp: new Date(),
+        actions: data.actions
+      };
+      setChatMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.error("Chat error:", error);
+      setChatMessages(prev => [...prev, {
+        role: "assistant",
+        content: "Sorry, I encountered an error. Please try again.",
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   const pricingMemo = useMemo((): { result: CpqCalculateResponse | null; error: string | null } => {
@@ -860,6 +1021,106 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* AI Chat Panel - Floating */}
+          {isChatOpen && (
+            <div className="fixed bottom-20 right-6 w-96 h-[500px] bg-background border rounded-lg shadow-xl z-50 flex flex-col" data-testid="chat-panel">
+              <div className="flex items-center justify-between p-3 border-b bg-primary/5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-medium">Quote Assistant</span>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setIsChatOpen(false)}
+                  className="h-7 w-7"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <ScrollArea className="flex-1 p-3">
+                {chatMessages.length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>Hi! I can help you configure this quote.</p>
+                    <p className="mt-2 text-xs">Try saying:</p>
+                    <ul className="mt-1 text-xs space-y-1">
+                      <li>"Add MEP to this quote"</li>
+                      <li>"Change to LOD 350"</li>
+                      <li>"Add occupied building risk"</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {chatMessages.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] p-2 rounded-lg text-sm ${msg.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                            }`}
+                        >
+                          {msg.content}
+                          {msg.actions && msg.actions.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {msg.actions.map((action, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs">
+                                  {action.type}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isChatLoading && (
+                      <div className="flex justify-start">
+                        <div className="bg-muted p-2 rounded-lg">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+
+              <div className="p-3 border-t">
+                <div className="flex gap-2">
+                  <Input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask about pricing..."
+                    onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+                    disabled={isChatLoading}
+                    data-testid="chat-input"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={sendChatMessage}
+                    disabled={isChatLoading || !chatInput.trim()}
+                    data-testid="chat-send"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Chat Toggle Button - Floating */}
+          <Button
+            size="icon"
+            className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg z-40"
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            data-testid="chat-toggle"
+          >
+            {isChatOpen ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+          </Button>
+
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
