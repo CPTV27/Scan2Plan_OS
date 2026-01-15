@@ -2004,6 +2004,10 @@ export const INTEL_NEWS_TYPES = [
   "event",           // Industry conferences & networking
   "talent",          // Hiring trends & talent market
   "market",          // Market trends & analysis
+  // Trigger Pod Types (P9.1, P16, P17)
+  "permit",          // Building permit filings (NYC DOB, Boston ISD)
+  "compliance",      // Compliance triggers (LL11, LL87, LL97, BERDO)
+  "procurement",     // Public procurement (PASSPort, NYSCR, DASNY)
 ] as const;
 export type IntelNewsType = typeof INTEL_NEWS_TYPES[number];
 
@@ -2256,7 +2260,29 @@ export type InsertCompanyCapability = z.infer<typeof insertCompanyCapabilitySche
 export type CompanyCapability = typeof companyCapabilities.$inferSelect;
 
 // === INTEL FEED SOURCES (Configuration for BidNet API, RSS, Webhooks) ===
-export const INTEL_SOURCE_TYPES = ["bidnet_api", "rss", "webhook"] as const;
+export const INTEL_SOURCE_TYPES = [
+  "bidnet_api",       // BidNet API
+  "rss",              // RSS feed
+  "webhook",          // Webhook receiver
+  // Permit Sources (P9.1)
+  "nyc_dob_bis",      // NYC DOB BIS API (ic3t-wcy2)
+  "nyc_dob_now",      // NYC DOB NOW API (w9ak-ipjd)
+  "boston_isd",       // Boston ISD permits
+  "nyc_pluto",        // NYC PLUTO for size/type enrichment
+  // Compliance Sources (P16)
+  "nyc_ll11",         // LL11/FISP facade compliance
+  "nyc_ll87",         // LL87 energy audit filings
+  "nyc_ll97",         // LL97 covered buildings list
+  "boston_berdo",     // Boston BERDO
+  "cambridge_beudo",  // Cambridge BEUDO
+  // Procurement Sources (P17)
+  "nyc_passport",     // NYC PASSPort Public
+  "nys_contract_reporter", // NYS Contract Reporter
+  "dasny",            // DASNY term consultants
+  "panynj",           // Port Authority NY/NJ
+  "massport",         // Massport
+  "mbta",             // MBTA
+] as const;
 export type IntelSourceType = typeof INTEL_SOURCE_TYPES[number];
 
 export const INTEL_SYNC_STATUSES = ["success", "error"] as const;

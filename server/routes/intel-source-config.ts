@@ -4,6 +4,8 @@ import { intelFeedSources, intelNewsItems, insertIntelFeedSourceSchema, type Int
 import { eq } from "drizzle-orm";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { processUnprocessedItems } from "../services/intelPipelineWorker";
+import { syncTriggerPodSource, syncAllTriggerPods, type TriggerPodSourceType } from "../services/triggerPodIngestion";
+
 
 // Simple RSS parser helper
 async function parseRSSFeed(feedUrl: string): Promise<Array<{
@@ -286,6 +288,29 @@ router.post("/:id/sync", isAuthenticated, requireRole("ceo"), async (req, res) =
                     syncResult = { success: true, message: "Webhook sources sync on-demand when data arrives", itemsProcessed: 0 };
                     break;
                 }
+                // Trigger Pod Sources (P9.1, P16, P17)
+                case "nyc_dob_bis":
+                case "nyc_dob_now":
+                case "nyc_ll11":
+                case "nyc_ll87":
+                case "nyc_ll97":
+                case "boston_isd":
+                case "boston_berdo":
+                case "cambridge_beudo":
+                case "nyc_passport":
+                case "nys_contract_reporter":
+                case "dasny":
+                case "panynj":
+                case "massport":
+                case "mbta": {
+                    const result = await syncTriggerPodSource(source.type as TriggerPodSourceType);
+                    syncResult = {
+                        success: result.success,
+                        message: result.message,
+                        itemsProcessed: result.itemsAdded,
+                    };
+                    break;
+                }
             }
 
             await db
@@ -479,6 +504,25 @@ router.post("/seed-defaults", isAuthenticated, requireRole("ceo"), async (req, r
     } catch (error) {
         console.error("Error seeding default feeds:", error);
         res.status(500).json({ message: "Failed to seed default feeds" });
+    }
+});
+
+// POST /intel-source-config/sync-trigger-pods - Sync all trigger pod sources (CEO only)
+router.post("/sync-trigger-pods", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        console.log("[TriggerPods] Starting full sync of all trigger pod sources...");
+        const result = await syncAllTriggerPods();
+
+        res.json({
+            success: result.total.success,
+            summary: result.total.message,
+            totalProcessed: result.total.itemsProcessed,
+            totalAdded: result.total.itemsAdded,
+            bySource: result.bySource,
+        });
+    } catch (error) {
+        console.error("Error syncing trigger pods:", error);
+        res.status(500).json({ message: "Failed to sync trigger pods" });
     }
 });
 
