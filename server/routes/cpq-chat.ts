@@ -155,6 +155,8 @@ ${PRICING_KNOWLEDGE}
 
 ## Current Quote State
 
+**IMPORTANT**: The project details below are ALREADY FILLED IN on the Lead Details page. You have all the information you need about the project. Do NOT ask for the project name, client name, or address - you already know them.
+
 **Project**: ${leadContext?.projectName || "New Quote"}
 **Client**: ${leadContext?.clientName || "Unknown"}
 **Address**: ${leadContext?.projectAddress || "Not specified"}
