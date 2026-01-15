@@ -6,8 +6,8 @@
  */
 
 import { db } from "../db";
-import { 
-  cpqQuotes, quoteVersions, cpqPricingMatrix, cpqUpteamPricingMatrix, 
+import {
+  cpqQuotes, quoteVersions, cpqPricingMatrix, cpqUpteamPricingMatrix,
   cpqCadPricingMatrix, cpqPricingParameters, pandaDocDocuments,
   type CpqQuote, type InsertCpqQuote,
   type QuoteVersion, type InsertQuoteVersion,
@@ -47,11 +47,11 @@ export class CpqQuoteRepository {
   async generateNextQuoteNumber(): Promise<string> {
     const currentYear = new Date().getFullYear();
     const yearPrefix = `S2P-${currentYear}-`;
-    
+
     const quotesThisYear = await db.select({ qn: cpqQuotes.quoteNumber })
       .from(cpqQuotes)
       .where(sql`${cpqQuotes.quoteNumber} LIKE ${yearPrefix + '%'}`);
-    
+
     let maxSeq = 0;
     for (const q of quotesThisYear) {
       if (q.qn) {
@@ -62,7 +62,7 @@ export class CpqQuoteRepository {
         }
       }
     }
-    
+
     const nextSeq = maxSeq + 1;
     return `S2P-${currentYear}-${String(nextSeq).padStart(4, '0')}`;
   }
@@ -72,42 +72,42 @@ export class CpqQuoteRepository {
     if (!quoteNumber) {
       quoteNumber = await this.generateNextQuoteNumber();
     }
-    
+
     const providedVersionNumber = (insertQuote as any).versionNumber;
     let versionNumber = providedVersionNumber ?? 1;
     let shouldBeLatest = true;
-    
+
     if (insertQuote.leadId) {
       const existingQuotes = await db.select().from(cpqQuotes)
         .where(eq(cpqQuotes.leadId, insertQuote.leadId));
-      
+
       const maxVersion = Math.max(...existingQuotes.map(q => q.versionNumber), 0);
-      
+
       if (providedVersionNumber === undefined || providedVersionNumber === null) {
         versionNumber = maxVersion + 1;
       }
-      
+
       shouldBeLatest = maxVersion === 0 || versionNumber > maxVersion;
-      
+
       if (shouldBeLatest && existingQuotes.length > 0) {
         await db.update(cpqQuotes)
           .set({ isLatest: false })
           .where(eq(cpqQuotes.leadId, insertQuote.leadId));
       }
     }
-    
+
     const [quote] = await db.insert(cpqQuotes).values({
       ...insertQuote,
       quoteNumber,
       versionNumber,
       isLatest: shouldBeLatest,
-    }).returning();
+    } as typeof cpqQuotes.$inferInsert).returning();
     return quote;
   }
 
   async updateCpqQuote(id: number, updates: Partial<InsertCpqQuote>): Promise<CpqQuote | undefined> {
     const [updated] = await db.update(cpqQuotes)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as Partial<typeof cpqQuotes.$inferInsert>)
       .where(eq(cpqQuotes.id, id))
       .returning();
     return updated;
@@ -209,7 +209,7 @@ export const cpqQuoteStorage = {
   create: (quote: InsertCpqQuote): Promise<CpqQuote> => cpqQuoteRepo.createCpqQuote(quote),
   update: (id: number, updates: Partial<InsertCpqQuote>): Promise<CpqQuote | undefined> => cpqQuoteRepo.updateCpqQuote(id, updates),
   delete: (id: number): Promise<void> => cpqQuoteRepo.deleteCpqQuote(id),
-  createVersion: (sourceQuoteId: number, versionName: string | undefined, createdBy: string): Promise<CpqQuote> => 
+  createVersion: (sourceQuoteId: number, versionName: string | undefined, createdBy: string): Promise<CpqQuote> =>
     cpqQuoteRepo.createCpqQuoteVersion(sourceQuoteId, versionName, createdBy),
 };
 

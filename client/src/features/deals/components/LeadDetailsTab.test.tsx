@@ -123,7 +123,8 @@ const mockLead: Lead = {
   missingInfo: null,
   closedAt: null,
   lossReason: null,
-  wonReason: null
+  wonReason: null,
+  mauticContactId: null
 };
 
 const mockDocuments: LeadDocument[] = [
