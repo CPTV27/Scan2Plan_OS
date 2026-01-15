@@ -208,7 +208,7 @@ export default function DealWorkspace() {
   );
 
   const handleTabChange = (value: string) => {
-    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc"];
+    const validTabs = ["lead", "quote", "history", "ai", "documents", "proposal", "pandadoc", "engagement"];
     setActiveTab(validTabs.includes(value) ? value : "lead");
   };
   const queryClient = useQueryClient();
