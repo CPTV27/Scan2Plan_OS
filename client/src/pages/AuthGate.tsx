@@ -12,10 +12,21 @@ interface SessionStatus {
 }
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { data: sessionStatus, isLoading, isError } = useQuery<SessionStatus>({
+  const { data: sessionStatus, isLoading, isError, error } = useQuery<SessionStatus>({
     queryKey: ["/api/auth/session-status"],
-    retry: false,
-    refetchOnWindowFocus: true,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 429 (rate limit) or 401 (unauthorized)
+      if (error?.status === 429 || error?.status === 401) {
+        return false;
+      }
+      // Retry up to 2 times for other errors
+      return failureCount < 2;
+    },
+    retryDelay: 2000, // Wait 2 seconds between retries
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 60000, // Keep in cache for 60 seconds (formerly cacheTime)
+    refetchOnWindowFocus: false, // Don't refetch on tab focus
+    refetchInterval: false, // No polling
   });
 
   if (isError) {
@@ -30,8 +41,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={() => window.location.href = "/api/login"}
               data-testid="button-login"
             >
@@ -63,8 +74,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={() => window.location.href = "/api/login"}
               data-testid="button-login"
             >
@@ -93,8 +104,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 Your email <strong>{sessionStatus.email}</strong> is not authorized to access this application.
               </AlertDescription>
             </Alert>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full"
               onClick={() => window.location.href = "/api/logout"}
               data-testid="button-logout"
