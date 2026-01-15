@@ -17,29 +17,43 @@ import { log } from "../lib/logger";
 // CONFIGURATION - QUALIFICATION KEYWORDS
 // ============================================
 
-// Preferred project types - must include at least one
+// Preferred project types - must include at least one (from P9.1 Trigger Pod)
 export const PREFERRED_KEYWORDS = [
     // Core services
     "renovation", "renovation project", "building renovation",
     "addition", "building addition",
     "lidar", "lidar scanning", "laser scanning", "3d scanning",
-    "existing conditions", "as-built", "as built",
+    "existing conditions", "as-built", "as built", "as-built set",
     "bim", "building information model", "revit",
     "lod", "lod 300", "lod 350", "level of development",
     "architectural survey", "building survey",
-    // Project types
+    // Project types (P9.1)
     "redevelopment", "redevelopment project",
     "historic preservation", "historical preservation", "historic building",
     "adaptive reuse", "reuse project", "repurpose",
     "facility assessment", "building assessment",
     "space planning", "interior renovation",
-    "MEP survey", "mechanical survey", "electrical survey",
+    "mep survey", "mechanical survey", "electrical survey",
     // Semantic matches
     "facility overhaul", "building overhaul",
     "modernization", "building modernization",
     "retrofit", "building retrofit",
     "rehabilitation", "building rehabilitation",
     "refurbishment", "office renovation",
+    // NEW from Trigger Pods (P9.1 scope fit)
+    "tenant improvement", "ti", "fit-out", "fitout",
+    "change-of-use", "change of use",
+    "envelope", "façade", "facade",
+    "campus", "multi-building", "multi building",
+    "mep upgrade", "mep upgrades",
+    "decarbonization", "electrification",
+    "commissioning", "re-cx", "recx",
+    // Legacy/indirect phrases (Scoping Bot spec)
+    "record drawings", "measured drawings",
+    "field verify", "field verification",
+    "existing conditions survey", "building documentation",
+    "habs", "hals", "3d survey",
+    "modeling of existing", "bim for existing",
 ];
 
 // Disqualifying criteria - immediate exclusion if present
@@ -55,11 +69,16 @@ export const DISQUALIFYING_KEYWORDS = [
     "grading", "earthwork", "paving",
     // Federally funded
     "federally funded", "federal project", "federal grant",
-    "HUD", "federal assistance", "federal contract",
-    "davis-bacon", "DBE requirements",
-    // Other exclusions
+    "hud", "federal assistance", "federal contract",
+    "davis-bacon", "dbe requirements",
+    // Other exclusions (from P9.1)
     "residential single family", "single family home",
     "landscaping only", "landscape architecture only",
+    "janitorial", "abatement-only", "bird waste",
+    "signage only", "wayfinding-only",
+    "it only", "low-voltage-only",
+    "snow", "ice removal",
+    "pure cm", "pure gc",
 ];
 
 // Building types for scope alignment
@@ -71,6 +90,24 @@ export const HIGH_PRIORITY_BUILDING_TYPES = [
     "mixed-use", "mixed use",
     "retail", "shopping",
     "hospitality", "hotel",
+];
+
+// Critical-use building types (bonus scoring per Scoping Bot spec)
+export const CRITICAL_USE_BUILDING_TYPES = [
+    "healthcare", "hospital", "medical", "lab", "laboratory",
+    "airport", "utility", "power plant",
+    "education", "educational", "higher-ed", "university", "college",
+];
+
+// Compliance program keywords (P16 Compliance Trigger Pod)
+export const COMPLIANCE_KEYWORDS = [
+    "ll11", "fisp", "facade inspection",
+    "ll87", "energy audit", "eer",
+    "ll97", "ghg cap", "carbon cap",
+    "ll84", "benchmarking",
+    "berdo", "beudo",
+    "decarbonization", "electrification",
+    "building performance standard",
 ];
 
 // Geographic reference points (lat, lng)
@@ -153,8 +190,8 @@ export async function qualifyRfp(
     // Step 2: Check for preferred keywords
     const preferredFound = findKeywords(searchText, PREFERRED_KEYWORDS);
 
-    // Step 3: Calculate priority scores
-    const priorityFactors = calculatePriorityFactors(extractedData, preferredFound);
+    // Step 3: Calculate priority scores (using Scoping Bot spec: Scope 50 + Size 30 + Geo 10 + Urgency 10)
+    const priorityFactors = calculatePriorityFactors(extractedData, preferredFound, searchText);
     const priorityScore =
         priorityFactors.sqftScore +
         priorityFactors.geoScore +
@@ -253,67 +290,111 @@ function findKeywords(text: string, keywords: string[]): string[] {
 
 function calculatePriorityFactors(
     data: ExtractedRfpData,
-    preferredKeywords: string[]
+    preferredKeywords: string[],
+    searchText: string
 ): QualificationResult["priorityFactors"] {
-    // Square footage score (0-30 points) - larger = higher priority
-    let sqftScore = 0;
-    if (data.sqft) {
-        if (data.sqft >= 100000) sqftScore = 30;
-        else if (data.sqft >= 50000) sqftScore = 25;
-        else if (data.sqft >= 25000) sqftScore = 20;
-        else if (data.sqft >= 10000) sqftScore = 15;
-        else if (data.sqft >= 5000) sqftScore = 10;
-        else sqftScore = 5;
+    const lowerSearchText = searchText.toLowerCase();
+
+    // ============================================
+    // SCOPE FIT SCORE (0-50 points) - per Scoping Bot spec
+    // ============================================
+    let scopeScore = 0;
+
+    // 50: explicitly asks for existing conditions / as-builts / Scan-to-BIM / LoD/LoA
+    if (lowerSearchText.includes("existing conditions") ||
+        lowerSearchText.includes("as-built") ||
+        lowerSearchText.includes("scan-to-bim") ||
+        lowerSearchText.includes("scan to bim") ||
+        lowerSearchText.includes("lod 300") ||
+        lowerSearchText.includes("lod 350") ||
+        lowerSearchText.includes("loa")) {
+        scopeScore = 50;
+    }
+    // 40: renovation/addition Tier-A (even if deliverables vague)
+    else if (preferredKeywords.length >= 2 && data.sqft && data.sqft >= 50000) {
+        scopeScore = 40;
+    }
+    // 30: renovation/addition Tier-B
+    else if (preferredKeywords.length >= 1 && data.sqft && data.sqft >= 10000) {
+        scopeScore = 30;
+    }
+    // 20: renovation/addition Tier-C
+    else if (preferredKeywords.length >= 1 && data.sqft && data.sqft >= 3000) {
+        scopeScore = 20;
+    }
+    // 10: some preferred keywords found
+    else if (preferredKeywords.length >= 1) {
+        scopeScore = 10;
     }
 
-    // Geographic score (0-25 points) - closer to dispatch = higher
-    let geoScore = 15; // Default middle score if no address
+    // ============================================
+    // SIZE SCORE (0-30 points) - Tier A=30, B=20, C=10
+    // ============================================
+    let sqftScore = 0;
+    if (data.sqft) {
+        if (data.sqft >= 50000) sqftScore = 30;       // Tier-A
+        else if (data.sqft >= 10000) sqftScore = 20;  // Tier-B
+        else if (data.sqft >= 3000) sqftScore = 10;   // Tier-C
+        else sqftScore = 5;                            // Below minimum
+    }
+
+    // ============================================
+    // GEO PROXIMITY SCORE (0-10 points) - per Scoping Bot spec
+    // ============================================
+    let geoScore = 5; // Default if no address
     if (data.projectAddress) {
         const address = data.projectAddress.toLowerCase();
-        // Simple geographic matching
-        if (address.includes("new york") || address.includes("ny") || address.includes("brooklyn") || address.includes("manhattan")) {
-            geoScore = 25; // NYC area - highest priority
-        } else if (address.includes("troy") || address.includes("albany") || address.includes("new jersey") || address.includes("nj")) {
-            geoScore = 22; // Near Troy
-        } else if (address.includes("georgia") || address.includes("ga") || address.includes("atlanta")) {
-            geoScore = 20; // Near Woodstock
-        } else if (address.includes("idaho") || address.includes("boise")) {
-            geoScore = 18; // Near Boise
-        } else if (address.includes("california") || address.includes("texas") || address.includes("florida")) {
-            geoScore = 12; // Major markets
-        } else {
-            geoScore = 8; // Other locations
+        // Hub cities = 10
+        if (address.includes("new york") || address.includes("nyc") ||
+            address.includes("brooklyn") || address.includes("manhattan") ||
+            address.includes("troy") || address.includes("albany") ||
+            address.includes("boston") || address.includes("woodstock")) {
+            geoScore = 10;
+        }
+        // Rest of NE = 6-8
+        else if (address.includes("connecticut") || address.includes("ct") ||
+            address.includes("rhode island") || address.includes("ri") ||
+            address.includes("massachusetts") || address.includes("ma") ||
+            address.includes("vermont") || address.includes("vt") ||
+            address.includes("new hampshire") || address.includes("nh") ||
+            address.includes("maine") || address.includes("me") ||
+            address.includes("new jersey") || address.includes("nj")) {
+            geoScore = 7;
+        }
+        // Major markets outside NE = 3-5
+        else if (address.includes("georgia") || address.includes("atlanta") ||
+            address.includes("idaho") || address.includes("boise") ||
+            address.includes("california") || address.includes("texas") ||
+            address.includes("florida")) {
+            geoScore = 4;
+        }
+        // Other = 0-3
+        else {
+            geoScore = 2;
         }
     }
 
-    // Urgency score (0-25 points) - tighter deadline = higher
-    let urgencyScore = 10; // Default middle score
+    // ============================================
+    // URGENCY SCORE (0-10 points) - deadline + compliance drivers
+    // ============================================
+    let urgencyScore = 3; // Default
+
+    // Deadline urgency
     if (data.deadline) {
         const deadline = new Date(data.deadline);
         const now = new Date();
         const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (daysUntil <= 7) urgencyScore = 25;
-        else if (daysUntil <= 14) urgencyScore = 22;
-        else if (daysUntil <= 21) urgencyScore = 18;
-        else if (daysUntil <= 30) urgencyScore = 14;
-        else if (daysUntil <= 60) urgencyScore = 10;
-        else urgencyScore = 5;
+        if (daysUntil <= 21) urgencyScore = 10;
+        else if (daysUntil <= 30) urgencyScore = 8;
+        else if (daysUntil <= 60) urgencyScore = 5;
+        else urgencyScore = 3;
     }
 
-    // Scope alignment score (0-20 points) - BIM/LOD requirements = higher
-    let scopeScore = 5;
-    const scopeText = [data.scope, data.specialRequirements, ...(data.requirements || [])].join(" ").toLowerCase();
-
-    // LOD 300+ or explicit BIM = high priority
-    if (scopeText.includes("lod 300") || scopeText.includes("lod 350") || scopeText.includes("lod300") || scopeText.includes("lod350")) {
-        scopeScore = 20;
-    } else if (scopeText.includes("lod") || scopeText.includes("bim") || scopeText.includes("revit")) {
-        scopeScore = 15;
-    } else if (scopeText.includes("scan") || scopeText.includes("survey") || scopeText.includes("as-built")) {
-        scopeScore = 12;
-    } else if (preferredKeywords.length >= 3) {
-        scopeScore = 10;
+    // Compliance driver bonus (LL11/LL87/LL97/BERDO/BEUDO)
+    const hasComplianceDriver = COMPLIANCE_KEYWORDS.some(kw => lowerSearchText.includes(kw));
+    if (hasComplianceDriver && urgencyScore < 8) {
+        urgencyScore = 8; // Compliance = at least 8
     }
 
     return { sqftScore, geoScore, urgencyScore, scopeScore };
