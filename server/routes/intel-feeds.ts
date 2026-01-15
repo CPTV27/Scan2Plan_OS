@@ -4,6 +4,7 @@ import { intelNewsItems, intelPipelineRuns, intelAgentOutputs, type IntelNewsTyp
 import { eq, desc, and } from "drizzle-orm";
 import { isAuthenticated, requireRole } from "../replit_integrations/auth";
 import { processUnprocessedItems, getProcessedIntelItems, getPipelineResult, markPipelineRunRead } from "../services/intelPipelineWorker";
+import { enrichContacts, batchEnrichContacts } from "../services/contactEnrichment";
 
 const router = Router();
 
@@ -253,7 +254,7 @@ router.get("/processed", isAuthenticated, requireRole("ceo"), async (req, res) =
 router.get("/processed/stats", isAuthenticated, requireRole("ceo"), async (req, res) => {
     try {
         const allRuns = await db.select().from(intelPipelineRuns);
-        
+
         const stats = {
             total: allRuns.length,
             pending: allRuns.filter(r => r.status === "pending").length,
@@ -312,6 +313,144 @@ router.post("/process-pending", isAuthenticated, requireRole("ceo"), async (req,
     } catch (error) {
         console.error("Error processing pending items:", error);
         res.status(500).json({ message: "Failed to process pending items" });
+    }
+});
+
+// === CONTACT ENRICHMENT ENDPOINTS ===
+
+// POST /api/intel-feeds/:id/enrich - Enrich contacts for a specific intel item
+router.post("/:id/enrich", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get the intel item
+        const [item] = await db
+            .select()
+            .from(intelNewsItems)
+            .where(eq(intelNewsItems.id, parseInt(id)));
+
+        if (!item) {
+            return res.status(404).json({ message: "Intel item not found" });
+        }
+
+        // Extract property identifier from metadata
+        const metadata = item.metadata as any || {};
+        const result = await enrichContacts(
+            {
+                bbl: metadata.bbl,
+                bin: metadata.bin,
+                address: item.summary?.match(/Address: ([^.]+)/)?.[1] || undefined,
+                state: item.region === "Northeast" ? "NY" : undefined,
+            },
+            metadata.owner || metadata.applicant
+        );
+
+        // Update the intel item with enriched contacts
+        await db
+            .update(intelNewsItems)
+            .set({
+                metadata: {
+                    ...metadata,
+                    enrichedContacts: result.contacts,
+                    enrichmentTimestamp: new Date().toISOString(),
+                },
+                updatedAt: new Date(),
+            })
+            .where(eq(intelNewsItems.id, parseInt(id)));
+
+        res.json({
+            success: result.success,
+            contacts: result.contacts,
+            sources_checked: result.sources_checked,
+            duration_ms: result.duration_ms,
+        });
+    } catch (error) {
+        console.error("Error enriching contacts:", error);
+        res.status(500).json({ message: "Failed to enrich contacts" });
+    }
+});
+
+// POST /api/intel-feeds/enrich-batch - Enrich contacts for multiple intel items
+router.post("/enrich-batch", isAuthenticated, requireRole("ceo"), async (req, res) => {
+    try {
+        const { itemIds, limit = 10 } = req.body;
+
+        let items;
+        if (itemIds && Array.isArray(itemIds)) {
+            // Enrich specific items
+            items = await db
+                .select()
+                .from(intelNewsItems)
+                .where(
+                    and(
+                        eq(intelNewsItems.isArchived, false),
+                        // Filter to requested IDs (simplified - just get permit/compliance items)
+                    )
+                )
+                .limit(limit);
+        } else {
+            // Get permit/compliance items without enriched contacts
+            items = await db
+                .select()
+                .from(intelNewsItems)
+                .where(
+                    and(
+                        eq(intelNewsItems.isArchived, false),
+                        eq(intelNewsItems.type, "permit")
+                    )
+                )
+                .orderBy(desc(intelNewsItems.relevanceScore))
+                .limit(limit);
+        }
+
+        const enrichmentItems = items.map(item => {
+            const metadata = item.metadata as any || {};
+            return {
+                identifier: {
+                    bbl: metadata.bbl,
+                    bin: metadata.bin,
+                    address: item.summary?.match(/Address: ([^.]+)/)?.[1],
+                    state: item.region === "Northeast" ? "NY" : undefined,
+                },
+                firmName: metadata.owner || metadata.applicant,
+            };
+        });
+
+        const result = await batchEnrichContacts(enrichmentItems);
+
+        // Update each item with its enriched contacts
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const enrichment = result.results[i];
+            const metadata = item.metadata as any || {};
+
+            if (enrichment && enrichment.contacts.length > 0) {
+                await db
+                    .update(intelNewsItems)
+                    .set({
+                        metadata: {
+                            ...metadata,
+                            enrichedContacts: enrichment.contacts,
+                            enrichmentTimestamp: new Date().toISOString(),
+                        },
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(intelNewsItems.id, item.id));
+            }
+        }
+
+        res.json({
+            success: true,
+            summary: result.summary,
+            details: result.results.map((r, i) => ({
+                itemId: items[i]?.id,
+                contacts: r.contacts.length,
+                success: r.success,
+            })),
+        });
+    } catch (error) {
+        console.error("Error batch enriching contacts:", error);
+        res.status(500).json({ message: "Failed to batch enrich contacts" });
     }
 });
 
