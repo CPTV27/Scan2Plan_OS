@@ -27,6 +27,14 @@ export async function ensureSchemaColumns(): Promise<void> {
       ADD COLUMN IF NOT EXISTS signature_signed_at TIMESTAMP;
     `);
     
+    await client.query(`
+      ALTER TABLE leads 
+      ADD COLUMN IF NOT EXISTS signature_image TEXT,
+      ADD COLUMN IF NOT EXISTS signer_name TEXT,
+      ADD COLUMN IF NOT EXISTS signer_email TEXT,
+      ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP;
+    `);
+    
     await client.query('COMMIT');
     console.log('[Migrations] Schema columns ensured successfully');
   } catch (error) {
