@@ -997,38 +997,12 @@ export default function DealWorkspace() {
 
         {/* Quote Builder Tab */}
         <TabsContent value="quote" className="flex-1 overflow-auto m-0">
-          {/* Mode Toggle */}
-          <div className="flex items-center justify-center gap-4 p-3 border-b bg-muted/30">
-            <div className="inline-flex rounded-lg border p-1 bg-background shadow-sm">
-              <button
-                onClick={() => setQuoteBuilderMode('simple')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'simple'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-              >
-                <Sparkles className="w-4 h-4 inline mr-2" />
-                Simple Mode
-              </button>
-              <button
-                onClick={() => setQuoteBuilderMode('advanced')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${quoteBuilderMode === 'advanced'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-              >
-                <Calculator className="w-4 h-4 inline mr-2" />
-                Advanced Mode
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Simple: Quick product selection | Advanced: Full calculator with all features
-            </p>
+          {/* Import CPQ Button */}
+          <div className="flex items-center justify-end p-3 border-b bg-muted/30">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowCpqImportModal(true)}
-              className="ml-auto"
             >
               <Upload className="w-4 h-4 mr-2" />
               Import from CPQ
