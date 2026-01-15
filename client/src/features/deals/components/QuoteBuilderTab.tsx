@@ -32,6 +32,7 @@ import {
   Save,
   Sparkles,
   Trash2,
+  TreePine,
   X,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,23 +44,31 @@ import { useUpdateLead } from "@/hooks/use-leads";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Lead, CpqQuote, CpqCalculateResponse } from "@shared/schema";
-import { 
-  CPQ_BUILDING_TYPES, 
-  CPQ_API_DISCIPLINES, 
-  CPQ_API_LODS, 
-  CPQ_API_SCOPES, 
-  CPQ_API_RISKS, 
-  CPQ_API_DISPATCH_LOCATIONS, 
-  CPQ_PAYMENT_TERMS, 
-  CPQ_PAYMENT_TERMS_DISPLAY 
+import {
+  CPQ_BUILDING_TYPES,
+  CPQ_API_DISCIPLINES,
+  CPQ_API_LODS,
+  CPQ_API_SCOPES,
+  CPQ_API_RISKS,
+  CPQ_API_DISPATCH_LOCATIONS,
+  CPQ_PAYMENT_TERMS,
+  CPQ_PAYMENT_TERMS_DISPLAY
 } from "@shared/schema";
-import { 
-  calculatePricing, 
-  type Area as PricingArea, 
-  type TravelConfig, 
-  type PricingResult 
+import {
+  calculatePricing,
+  type Area as PricingArea,
+  type TravelConfig,
+  type PricingResult
 } from "@/features/cpq/pricing";
 import { FY26_GOALS } from "@shared/businessGoals";
+
+// Discipline display labels - site discipline shows as "GRADE" in UI
+const DISCIPLINE_LABELS: Record<string, string> = {
+  arch: "ARCH",
+  mepf: "MEPF",
+  structure: "STRUCTURE",
+  site: "GRADE",
+};
 
 export interface QuoteBuilderArea {
   id: string;
@@ -85,7 +94,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const queryClient = useQueryClient();
   const updateLeadMutation = useUpdateLead();
   const [loadedSourceQuoteId, setLoadedSourceQuoteId] = useState<number | null>(null);
-  
+
   const [areas, setAreas] = useState<QuoteBuilderArea[]>([{
     id: "1",
     name: "",
@@ -96,7 +105,38 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       arch: { discipline: "arch", lod: "300", scope: "full" }
     }
   }]);
-  
+
+  // Landscape areas - separate from building areas
+  interface LandscapeArea {
+    id: string;
+    name: string;
+    type: "built" | "natural"; // Built = manicured, Natural = unmaintained
+    acres: string;
+    lod: "200" | "300" | "350";
+  }
+
+  const [landscapeAreas, setLandscapeAreas] = useState<LandscapeArea[]>([]);
+
+  const addLandscapeArea = () => {
+    setLandscapeAreas(prev => [...prev, {
+      id: `landscape-${Date.now()}`,
+      name: "",
+      type: "built",
+      acres: "",
+      lod: "300"
+    }]);
+  };
+
+  const updateLandscapeArea = (id: string, updates: Partial<LandscapeArea>) => {
+    setLandscapeAreas(prev => prev.map(area =>
+      area.id === id ? { ...area, ...updates } : area
+    ));
+  };
+
+  const removeLandscapeArea = (id: string) => {
+    setLandscapeAreas(prev => prev.filter(area => area.id !== id));
+  };
+
   const [dispatchLocation, setDispatchLocation] = useState<string>((lead as any).dispatchLocation?.toLowerCase() || "woodstock");
   const [distance, setDistance] = useState<string>("");
   const [risks, setRisks] = useState<string[]>([]);
@@ -106,7 +146,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const [additionalElevations, setAdditionalElevations] = useState<string>("");
   const [servicesAffirmed, setServicesAffirmed] = useState(false);
   const [paymentTerms, setPaymentTermsLocal] = useState<string>(lead.paymentTerms || "standard");
-  
+
   // Sync local paymentTerms when lead.paymentTerms changes externally (e.g., from LeadDetails or query refetch)
   useEffect(() => {
     const leadValue = lead.paymentTerms || "standard";
@@ -114,13 +154,13 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       setPaymentTermsLocal(leadValue);
     }
   }, [lead.paymentTerms]);
-  
+
   const setPaymentTerms = async (terms: string) => {
     const previousValue = paymentTerms;
     setPaymentTermsLocal(terms);
     // Notify parent to update form state immediately (prevents race condition)
     onPaymentTermsChange?.(terms);
-    
+
     try {
       await updateLeadMutation.mutateAsync({ id: leadId, paymentTerms: terms });
     } catch (error) {
@@ -134,7 +174,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       });
     }
   };
-  
+
   const [isSaving, setIsSaving] = useState(false);
   const [marginTarget, setMarginTarget] = useState<number>(0.45);
   const [pricingError, setPricingError] = useState<string | null>(null);
@@ -146,7 +186,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         const hydratedAreas: QuoteBuilderArea[] = quoteAreas.map((area: any, idx: number) => {
           const disciplines = area.disciplines || [];
           const disciplineLods: Record<string, { discipline: string; lod: string; scope: string }> = {};
-          
+
           if (Array.isArray(disciplines)) {
             disciplines.forEach((disc: any) => {
               if (typeof disc === 'string') {
@@ -160,7 +200,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
               }
             });
           }
-          
+
           return {
             id: (idx + 1).toString(),
             name: area.name || `Area ${idx + 1}`,
@@ -172,10 +212,10 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         });
         setAreas(hydratedAreas);
       }
-      
+
       if (sourceQuote.travel) {
-        const travelData = typeof sourceQuote.travel === 'string' 
-          ? JSON.parse(sourceQuote.travel) 
+        const travelData = typeof sourceQuote.travel === 'string'
+          ? JSON.parse(sourceQuote.travel)
           : sourceQuote.travel;
         if (travelData.dispatchLocation) {
           setDispatchLocation(travelData.dispatchLocation.toLowerCase());
@@ -193,31 +233,31 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
           setDistance(sourceQuote.distance.toString());
         }
       }
-      
+
       if (sourceQuote.risks && Array.isArray(sourceQuote.risks)) {
         setRisks(sourceQuote.risks as string[]);
         setRisksAffirmed((sourceQuote.risks as string[]).length > 0);
       }
-      
+
       if (sourceQuote.services) {
-        const services = typeof sourceQuote.services === 'string' 
-          ? JSON.parse(sourceQuote.services) 
+        const services = typeof sourceQuote.services === 'string'
+          ? JSON.parse(sourceQuote.services)
           : sourceQuote.services;
         if (services.matterport) setMatterport(true);
         if (services.actScan) setActScan(true);
         if (services.additionalElevations) setAdditionalElevations(services.additionalElevations.toString());
         setServicesAffirmed(true);
       }
-      
+
       if (sourceQuote.paymentTerms) {
         setPaymentTermsLocal(sourceQuote.paymentTerms);
       }
-      
+
       const breakdown = sourceQuote.pricingBreakdown as any;
       if (breakdown?.marginTarget) {
         setMarginTarget(breakdown.marginTarget);
       }
-      
+
       setLoadedSourceQuoteId(sourceQuote.id);
     }
   }, [sourceQuote, loadedSourceQuoteId]);
@@ -242,13 +282,13 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   useEffect(() => {
     let distanceApplied = false;
     let dispatchApplied = false;
-    
+
     // First priority: existing quotes
     if (existingQuotes && existingQuotes.length > 0 && !sourceQuote) {
       const latestQuote = existingQuotes.find(q => q.isLatest) || existingQuotes[0];
       if (latestQuote?.travel) {
-        const travelData = typeof latestQuote.travel === 'string' 
-          ? JSON.parse(latestQuote.travel) 
+        const travelData = typeof latestQuote.travel === 'string'
+          ? JSON.parse(latestQuote.travel)
           : latestQuote.travel;
         if (travelData.dispatchLocation) {
           setDispatchLocation(travelData.dispatchLocation.toLowerCase());
@@ -264,20 +304,20 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         }
       }
     }
-    
+
     // Second priority: lead's googleIntel travel data (auto-calculated from address)
     // Only use if existing quote didn't provide valid data
     if (lead && !sourceQuote) {
       const googleIntel = (lead as any).googleIntel;
       const travelInsights = googleIntel?.travelInsights;
-      
+
       if (!distanceApplied && travelInsights?.available && travelInsights?.distanceMiles !== undefined) {
         const distMiles = travelInsights.distanceMiles;
         if (typeof distMiles === 'number' && !isNaN(distMiles) && distMiles > 0) {
           setDistance(Math.round(distMiles).toString());
         }
       }
-      
+
       // Also sync dispatch location from lead if not already set
       if (!dispatchApplied) {
         const leadDispatch = (lead as any).dispatchLocation;
@@ -315,11 +355,11 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const toggleDiscipline = (areaId: string, discipline: string) => {
     const area = areas.find(a => a.id === areaId);
     if (!area) return;
-    
+
     const hasDiscipline = area.disciplines.includes(discipline);
     let newDisciplines: string[];
     let newLods = { ...area.disciplineLods };
-    
+
     if (hasDiscipline) {
       newDisciplines = area.disciplines.filter(d => d !== discipline);
       delete newLods[discipline];
@@ -327,14 +367,14 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       newDisciplines = [...area.disciplines, discipline];
       newLods[discipline] = { discipline, lod: "300", scope: "full" };
     }
-    
+
     updateArea(areaId, { disciplines: newDisciplines, disciplineLods: newLods });
   };
 
   const updateDisciplineLod = (areaId: string, discipline: string, field: "lod" | "scope", value: string) => {
     const area = areas.find(a => a.id === areaId);
     if (!area) return;
-    
+
     const newLods = {
       ...area.disciplineLods,
       [discipline]: {
@@ -342,7 +382,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
         [field]: value
       }
     };
-    
+
     updateArea(areaId, { disciplineLods: newLods });
   };
 
@@ -356,17 +396,17 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
 
   const handleDispatchLocationChange = async (newLocation: string) => {
     setDispatchLocation(newLocation);
-    
+
     // Recalculate distance from new dispatch location
     const projectAddress = lead?.projectAddress;
     if (!projectAddress) return;
-    
+
     try {
       const response = await fetch(
         `/api/location/travel-distance?destination=${encodeURIComponent(projectAddress)}&dispatchLocation=${encodeURIComponent(newLocation)}`
       );
       const data = await response.json();
-      
+
       if (data.available && data.distanceMiles) {
         setDistance(data.distanceMiles.toString());
       }
@@ -386,21 +426,43 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   };
 
   const pricingMemo = useMemo((): { result: CpqCalculateResponse | null; error: string | null } => {
-    if (!areas.length || areas.every(a => !a.squareFeet || parseInt(a.squareFeet) <= 0)) {
+    const hasBuildings = areas.some(a => a.squareFeet && parseInt(a.squareFeet) > 0);
+    const hasLandscape = landscapeAreas.some(a => a.acres && parseFloat(a.acres) > 0);
+
+    if (!hasBuildings && !hasLandscape) {
       return { result: null, error: null };
     }
 
     try {
-      const pricingAreas: PricingArea[] = areas.map(a => ({
-        id: a.id,
-        name: a.name,
-        buildingType: a.buildingType,
-        squareFeet: a.squareFeet,
-        lod: "300",
-        disciplines: a.disciplines,
-        disciplineLods: a.disciplineLods,
-        scope: "full",
-      }));
+      // Building areas
+      const pricingAreas: PricingArea[] = areas
+        .filter(a => a.squareFeet && parseInt(a.squareFeet) > 0)
+        .map(a => ({
+          id: a.id,
+          name: a.name,
+          buildingType: a.buildingType,
+          squareFeet: a.squareFeet,
+          lod: "300",
+          disciplines: a.disciplines,
+          disciplineLods: a.disciplineLods,
+          scope: "full",
+        }));
+
+      // Landscape areas - use buildingType 14 (built) or 15 (natural)
+      const landscapePricingAreas: PricingArea[] = landscapeAreas
+        .filter(a => a.acres && parseFloat(a.acres) > 0)
+        .map(a => ({
+          id: a.id,
+          name: a.name || "Landscape",
+          buildingType: a.type === "built" ? "14" : "15",
+          squareFeet: a.acres, // For landscape, this is treated as acres
+          lod: a.lod,
+          disciplines: ["site"],
+          disciplineLods: { site: { discipline: "site", lod: a.lod, scope: "full" } },
+          scope: "full",
+        }));
+
+      const allAreas = [...pricingAreas, ...landscapePricingAreas];
 
       const travel: TravelConfig | null = dispatchLocation ? {
         dispatchLocation,
@@ -413,7 +475,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       if (additionalElevations) servicesConfig.additionalElevations = parseInt(additionalElevations);
 
       const result: PricingResult = calculatePricing(
-        pricingAreas,
+        allAreas,
         servicesConfig,
         travel,
         risks,
@@ -422,15 +484,15 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       );
 
       const grossMargin = result.totalClientPrice - result.totalUpteamCost;
-      const grossMarginPercent = result.totalClientPrice > 0 
-        ? (grossMargin / result.totalClientPrice) * 100 
+      const grossMarginPercent = result.totalClientPrice > 0
+        ? (grossMargin / result.totalClientPrice) * 100
         : 0;
 
       let integrityStatus: "pass" | "warning" | "blocked" = "pass";
       const integrityFlags: { code: string; message: string; severity: "warning" | "error" }[] = [];
       const marginFloorPercent = FY26_GOALS.MARGIN_FLOOR * 100;
       const marginGuardrailPercent = FY26_GOALS.MARGIN_STRETCH * 100;
-      
+
       if (grossMarginPercent < marginFloorPercent) {
         integrityStatus = "blocked";
         integrityFlags.push({
@@ -489,16 +551,16 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       console.error("Pricing calculation error:", error);
       return { result: null, error: errorMessage };
     }
-  }, [areas, dispatchLocation, distance, matterport, actScan, additionalElevations, risks, paymentTerms, marginTarget]);
-  
+  }, [areas, landscapeAreas, dispatchLocation, distance, matterport, actScan, additionalElevations, risks, paymentTerms, marginTarget]);
+
   const pricingResult = pricingMemo.result;
-  
+
   useEffect(() => {
     if (pricingMemo.error !== pricingError) {
       setPricingError(pricingMemo.error);
     }
   }, [pricingMemo.error, pricingError]);
-  
+
   useEffect(() => {
     if (pricingError) {
       toast({ title: "Pricing Error", description: pricingError, variant: "destructive" });
@@ -545,36 +607,36 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
 
       const response = await apiRequest("POST", `/api/leads/${leadId}/cpq-quotes`, quoteData);
       const responseData = await response.json();
-      
+
       if (!response.ok) {
         if (responseData.errors && Array.isArray(responseData.errors)) {
           const primaryError = responseData.errors[0];
           const errorCode = primaryError.code;
-          
+
           if (errorCode === "MARGIN_BELOW_FLOOR") {
-            toast({ 
-              title: "Quote Blocked", 
+            toast({
+              title: "Quote Blocked",
               description: primaryError.message,
-              variant: "destructive" 
+              variant: "destructive"
             });
           } else if (errorCode === "PRICE_INTEGRITY_FAILED") {
-            toast({ 
-              title: "Price Mismatch", 
+            toast({
+              title: "Price Mismatch",
               description: primaryError.message,
-              variant: "destructive" 
+              variant: "destructive"
             });
           } else {
-            toast({ 
-              title: "Validation Error", 
+            toast({
+              title: "Validation Error",
               description: primaryError.message,
-              variant: "destructive" 
+              variant: "destructive"
             });
           }
         } else {
-          toast({ 
-            title: "Error", 
-            description: responseData.message || "Failed to save quote", 
-            variant: "destructive" 
+          toast({
+            title: "Error",
+            description: responseData.message || "Failed to save quote",
+            variant: "destructive"
           });
         }
         return;
@@ -582,7 +644,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
 
       if (responseData.warnings && responseData.warnings.length > 0) {
         responseData.warnings.forEach((warning: { code: string; message: string }) => {
-          toast({ 
+          toast({
             title: warning.code === "TIER_A_PROJECT" ? "Tier A Project" : "Quote Warning",
             description: warning.message,
           });
@@ -590,12 +652,12 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
       }
 
       setLoadedSourceQuoteId(null);
-      
+
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId, "cpq-quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/leads", leadId] });
-      
-      const versionMsg = sourceQuote 
-        ? `New version created from Version ${sourceQuote.versionNumber}` 
+
+      const versionMsg = sourceQuote
+        ? `New version created from Version ${sourceQuote.versionNumber}`
         : "Quote has been saved successfully";
       toast({ title: "Quote Saved", description: versionMsg });
       onQuoteSaved();
@@ -641,23 +703,23 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
    */
   const calculateConfidenceScore = useMemo(() => {
     let score = 0;
-    
+
     const primaryArea = areas[0];
     if (!primaryArea) return 0;
-    
+
     if (primaryArea.buildingType && primaryArea.buildingType.length > 0) {
       score += CONFIDENCE_WEIGHTS.buildingType * 100;
     }
-    
+
     const sqftValue = parseInt(primaryArea.squareFeet);
     if (sqftValue && sqftValue > 0) {
       score += CONFIDENCE_WEIGHTS.sqft * 100;
     }
-    
+
     if (primaryArea.disciplines.length > 0) {
       score += CONFIDENCE_WEIGHTS.disciplines * 100;
     }
-    
+
     const hasMepf = primaryArea.disciplines.includes("mepf");
     const mepfConfig = primaryArea.disciplineLods["mepf"];
     const mepfHasCustomConfig = hasMepf && mepfConfig && (
@@ -668,25 +730,25 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
     } else if (hasMepf) {
       score += (CONFIDENCE_WEIGHTS.mepScope * 100) / 2;
     }
-    
+
     if (dispatchLocation && dispatchLocation.length > 0) {
       score += CONFIDENCE_WEIGHTS.dispatchLocation * 100;
     }
-    
+
     if (risks.length > 0 || risksAffirmed) {
       score += CONFIDENCE_WEIGHTS.siteStatus * 100;
     }
-    
+
     const hasServices = actScan || matterport || (additionalElevations && parseInt(additionalElevations) > 0);
     if (hasServices || servicesAffirmed) {
       score += CONFIDENCE_WEIGHTS.actScanning * 100;
     }
-    
+
     const distValue = parseFloat(distance);
     if (distValue && distValue > 0) {
       score += CONFIDENCE_WEIGHTS.distance * 100;
     }
-    
+
     return Math.round(score);
   }, [areas, dispatchLocation, risks, risksAffirmed, actScan, matterport, additionalElevations, servicesAffirmed, distance]);
 
@@ -714,12 +776,12 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
 
   const ConfidenceBadge = () => {
     const score = calculateConfidenceScore;
-    const colorClass = score >= 90 
+    const colorClass = score >= 90
       ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-      : score >= 70 
+      : score >= 70
         ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
         : "bg-muted text-muted-foreground border-muted-foreground/30";
-    
+
     return (
       <Badge variant="outline" className={`${colorClass} gap-1`} data-testid="badge-quote-confidence">
         <span className="text-xs">Confidence:</span>
@@ -731,10 +793,10 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
   const getIntegrityBadge = () => {
     if (!pricingResult) return null;
     const status = pricingResult.integrityStatus;
-    const colors = status === "pass" ? "bg-green-500/10 text-green-600 border-green-500/30" 
+    const colors = status === "pass" ? "bg-green-500/10 text-green-600 border-green-500/30"
       : status === "warning" ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/30"
-      : "bg-red-500/10 text-red-600 border-red-500/30";
-    
+        : "bg-red-500/10 text-red-600 border-red-500/30";
+
     return (
       <Badge variant="outline" className={colors} data-testid="badge-integrity-status">
         {status === "pass" ? "Pass" : status === "warning" ? "Warning" : "Blocked"}
@@ -750,9 +812,9 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
             <History className="w-4 h-4" />
             <AlertTitle className="flex items-center justify-between">
               <span>Editing from Version {sourceQuote.versionNumber}</span>
-              <Button 
-                size="sm" 
-                variant="ghost" 
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => {
                   onClearSourceQuote?.();
                   setLoadedSourceQuoteId(null);
@@ -837,9 +899,9 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                         data-testid={`input-area-name-${area.id}`}
                       />
                       {areas.length > 1 && (
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           className="text-destructive"
                           onClick={() => removeArea(area.id)}
                           data-testid={`button-remove-area-${area.id}`}
@@ -852,11 +914,11 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <Label className="text-xs">Building Type</Label>
-                        <Select 
-                          value={area.buildingType} 
+                        <Select
+                          value={area.buildingType}
                           onValueChange={(v) => updateArea(area.id, { buildingType: v })}
                         >
-                          <SelectTrigger 
+                          <SelectTrigger
                             className={idx === 0 ? getHungryFieldClass("buildingType") : ""}
                             data-testid={`select-building-type-${area.id}`}
                           >
@@ -894,7 +956,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                             className="h-7 text-xs"
                             data-testid={`toggle-discipline-${area.id}-${disc}`}
                           >
-                            {disc.toUpperCase()}
+                            {DISCIPLINE_LABELS[disc] || disc.toUpperCase()}
                           </Button>
                         ))}
                       </div>
@@ -904,7 +966,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                       <div className="space-y-2">
                         {area.disciplines.map((disc) => (
                           <div key={disc} className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                            <span className="text-xs font-medium w-16">{disc.toUpperCase()}</span>
+                            <span className="text-xs font-medium w-16">{DISCIPLINE_LABELS[disc] || disc.toUpperCase()}</span>
                             <Select
                               value={area.disciplineLods[disc]?.lod || "300"}
                               onValueChange={(v) => updateDisciplineLod(area.id, disc, "lod", v)}
@@ -940,6 +1002,99 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
               </CardContent>
             </Card>
 
+            {/* Landscape Section */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <TreePine className="w-4 h-4" />
+                    Landscape
+                  </span>
+                  <Button size="sm" variant="outline" onClick={addLandscapeArea} data-testid="button-add-landscape">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Landscape
+                  </Button>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Add outdoor/site work priced per acre
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {landscapeAreas.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-sm">
+                    No landscape areas added
+                  </div>
+                ) : (
+                  landscapeAreas.map((area, idx) => (
+                    <div key={area.id} className="p-3 border rounded-lg space-y-3 bg-green-50/30 dark:bg-green-950/10" data-testid={`landscape-${area.id}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <Input
+                          placeholder={`Landscape ${idx + 1}`}
+                          value={area.name}
+                          onChange={(e) => updateLandscapeArea(area.id, { name: e.target.value })}
+                          className="flex-1"
+                          data-testid={`input-landscape-name-${area.id}`}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeLandscapeArea(area.id)}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          data-testid={`button-remove-landscape-${area.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Type</Label>
+                          <Select
+                            value={area.type}
+                            onValueChange={(v: "built" | "natural") => updateLandscapeArea(area.id, { type: v })}
+                          >
+                            <SelectTrigger className="h-9" data-testid={`select-landscape-type-${area.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="built">Built (Manicured)</SelectItem>
+                              <SelectItem value="natural">Natural (Wooded)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs">Acres</Label>
+                          <Input
+                            type="number"
+                            placeholder="5"
+                            value={area.acres}
+                            onChange={(e) => updateLandscapeArea(area.id, { acres: e.target.value })}
+                            data-testid={`input-landscape-acres-${area.id}`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">LOD</Label>
+                          <Select
+                            value={area.lod}
+                            onValueChange={(v: "200" | "300" | "350") => updateLandscapeArea(area.id, { lod: v })}
+                          >
+                            <SelectTrigger className="h-9" data-testid={`select-landscape-lod-${area.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="200">LOD 200 - Basic Topo</SelectItem>
+                              <SelectItem value="300">LOD 300 - Detailed</SelectItem>
+                              <SelectItem value="350">LOD 350 - High Detail</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -952,7 +1107,7 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                   <div>
                     <Label className="text-xs">Dispatch Location</Label>
                     <Select value={dispatchLocation} onValueChange={handleDispatchLocationChange}>
-                      <SelectTrigger 
+                      <SelectTrigger
                         className={getHungryFieldClass("dispatchLocation")}
                         data-testid="select-dispatch-location"
                       >
@@ -1034,28 +1189,28 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
               <CardContent className={`space-y-3 p-3 rounded-md ${getHungryFieldClass("services")}`}>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="matterport" className={servicesAffirmed ? "text-muted-foreground" : ""}>Matterport Virtual Tour</Label>
-                  <Switch 
-                    id="matterport" 
-                    checked={matterport} 
+                  <Switch
+                    id="matterport"
+                    checked={matterport}
                     disabled={servicesAffirmed}
                     onCheckedChange={(checked) => {
                       setMatterport(checked);
                       if (checked && servicesAffirmed) setServicesAffirmed(false);
-                    }} 
-                    data-testid="switch-matterport" 
+                    }}
+                    data-testid="switch-matterport"
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="actScan" className={servicesAffirmed ? "text-muted-foreground" : ""}>Above Ceiling Tile Scan</Label>
-                  <Switch 
-                    id="actScan" 
-                    checked={actScan} 
+                  <Switch
+                    id="actScan"
+                    checked={actScan}
                     disabled={servicesAffirmed}
                     onCheckedChange={(checked) => {
                       setActScan(checked);
                       if (checked && servicesAffirmed) setServicesAffirmed(false);
-                    }} 
-                    data-testid="switch-act-scan" 
+                    }}
+                    data-testid="switch-act-scan"
                   />
                 </div>
                 <div>
@@ -1232,8 +1387,8 @@ export default function QuoteBuilderTab({ lead, leadId, toast, onQuoteSaved, exi
                       </div>
                     )}
 
-                    <Button 
-                      className="w-full mt-4" 
+                    <Button
+                      className="w-full mt-4"
                       onClick={handleSaveQuote}
                       disabled={isSaving || pricingResult.integrityStatus === "blocked"}
                       data-testid="button-save-quote"
