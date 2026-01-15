@@ -254,6 +254,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     });
   }
 
+  // NOTE: Secondary password verification disabled.
+  // Replit OAuth + @scan2plan.io domain restriction is sufficient for internal tool.
+  // Original code preserved below for reference if needed in future.
+  /*
   // SECURITY: Check if password has been verified this session
   // Skip this check for password-related endpoints
   const passwordEndpoints = ['/api/auth/session-status', '/api/auth/password-status', '/api/auth/set-password', '/api/auth/verify-password'];
@@ -268,6 +272,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       });
     }
   }
+  */
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
