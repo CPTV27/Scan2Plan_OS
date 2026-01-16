@@ -1,0 +1,9 @@
+{
+  "accounts": [
+    {
+      "email": "your-email@gmail.com",
+      "account_type": "personal",
+      "extra_info": "Chase's primary account for Scan2Plan OS"
+    }
+  ]
+}

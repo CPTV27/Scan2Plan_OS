@@ -1,7 +1,9 @@
 # Ignore all credential files - NEVER commit these
-*.json
 *.keys.json
 .oauth.*
 .gauth.json
 .accounts.json
 .env
+
+# Allow template files for reference
+!*.template.json
