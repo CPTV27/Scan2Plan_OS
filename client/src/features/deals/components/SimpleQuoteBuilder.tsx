@@ -783,7 +783,12 @@ export default function SimpleQuoteBuilder({
                 integrityStatus: "pass",
                 integrityFlags: [],
                 requestData: {
-                    areas,
+                    areas: areas.map(a => ({
+                        ...a,
+                        disciplines: Object.entries(a.disciplines)
+                            .filter(([_, v]) => v?.enabled)
+                            .map(([k]) => k),
+                    })),
                     travel,
                     risks,
                     services,
