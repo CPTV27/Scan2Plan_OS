@@ -1,0 +1,7 @@
+# Ignore non-Apps Script files
+**/*.md
+**/*.template
+**/*.json
+!appsscript.json
+.clasp.json
+node_modules/**
