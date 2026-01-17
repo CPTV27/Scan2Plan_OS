@@ -15,8 +15,8 @@ import type { UserRole } from "@shared/models/auth";
 const allNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, roles: ['ceo', 'sales', 'production', 'accounting'] as UserRole[] },
   { name: 'Sales', href: '/sales', icon: Users, roles: ['ceo', 'sales', 'marketing'] as UserRole[] },
-  { name: 'Customers', href: '/customers', icon: Users, roles: ['ceo', 'sales', 'marketing'] as UserRole[] },
   { name: 'Production', href: '/production', icon: FolderKanban, roles: ['ceo', 'production'] as UserRole[] },
+  { name: 'Customers', href: '/customers', icon: Users, roles: ['ceo', 'sales', 'marketing'] as UserRole[] },
   // Hidden for Executive View: ScanTech, FieldHub, QC Console, Vendor Portal
   // { name: 'ScanTech', href: '/scan-tech', icon: Smartphone, roles: ['ceo', 'production'] as UserRole[] },
   { name: 'Financial', href: '/financial', icon: Wallet, roles: ['ceo', 'accounting'] as UserRole[] },

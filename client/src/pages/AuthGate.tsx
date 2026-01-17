@@ -12,6 +12,15 @@ interface SessionStatus {
 }
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
+  // Bypass auth entirely in local development mode
+  const isLocalDev = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  if (isLocalDev) {
+    // Skip auth checks for local development - render children directly
+    return <>{children}</>;
+  }
+
   const { data: sessionStatus, isLoading, isError, error } = useQuery<SessionStatus>({
     queryKey: ["/api/auth/session-status"],
     retry: (failureCount, error: any) => {

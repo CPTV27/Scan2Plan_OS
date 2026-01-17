@@ -511,6 +511,7 @@ export default function Sales() {
   const [search, setSearch] = useState("");
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isPdfImportOpen, setIsPdfImportOpen] = useState(false);
+  const [isCpqImportOpen, setIsCpqImportOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [movingLeadId, setMovingLeadId] = useState<number | null>(null);
   const [commLead, setCommLead] = useState<Lead | null>(null);
@@ -569,6 +570,43 @@ export default function Sales() {
     const file = e.target.files?.[0];
     if (file) {
       importMutation.mutate(file);
+    }
+  };
+
+  const cpqImportMutation = useMutation({
+    mutationFn: async (jsonContent: string) => {
+      const res = await apiRequest("POST", "/api/leads/cpq-import", JSON.parse(jsonContent));
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.leads.list.path] });
+      setIsCpqImportOpen(false);
+      toast({
+        title: "CPQ Import Complete",
+        description: `Successfully imported deal from CPQ JSON.`,
+      });
+      if (data.leadId) {
+        navigate(`/deals/${data.leadId}`);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "CPQ Import Failed",
+        description: error.message || "Could not import lead from CPQ JSON",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCpqJsonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        cpqImportMutation.mutate(content);
+      };
+      reader.readAsText(file);
     }
   };
 
@@ -857,6 +895,57 @@ export default function Sales() {
                     <FileText className="w-4 h-4 mr-2" /> Import PDFs
                   </Button>
                   <GHLImport />
+                  <Dialog open={isCpqImportOpen} onOpenChange={setIsCpqImportOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" data-testid="button-cpq-import">
+                        <Calculator className="w-4 h-4 mr-2" /> CPQ Import
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Import from CPQ JSON</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            <Calculator className="w-4 h-4" />
+                            CPQ JSON Format
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Upload a .json file exported from the CPQ tool to automatically create a new lead/client in the pipeline.
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted rounded-lg p-8 gap-3">
+                          <Upload className="w-8 h-8 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">Select a CPQ JSON file to import</p>
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept=".json"
+                              className="hidden"
+                              onChange={handleCpqJsonUpload}
+                              disabled={cpqImportMutation.isPending}
+                              data-testid="input-cpq-json-file"
+                            />
+                            <Button
+                              variant="default"
+                              className="pointer-events-none"
+                              disabled={cpqImportMutation.isPending}
+                            >
+                              {cpqImportMutation.isPending ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Importing...
+                                </>
+                              ) : (
+                                <>Choose JSON File</>
+                              )}
+                            </Button>
+                          </label>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <Button
                     variant="ghost"
                     onClick={() => navigate("/sales/trash")}

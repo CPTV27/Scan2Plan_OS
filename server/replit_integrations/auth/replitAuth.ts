@@ -239,12 +239,28 @@ function isEmailDomainAllowed(email: string | undefined | null): boolean {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
-  const isDevMode = process.env.AUTH_DEV_MODE === 'true';
+  const isLocalDev = !process.env.REPL_ID;
+
+  // Completely bypass auth for local development
+  if (isLocalDev) {
+    // Create a mock user for local development
+    if (!req.user) {
+      (req as any).user = {
+        claims: {
+          sub: "local-dev-user",
+          email: "elijah@scan2plan.io",
+          first_name: "Local",
+          last_name: "Developer",
+        },
+        access_token: "local-dev-token",
+        refresh_token: "local-dev-refresh",
+        expires_at: Math.floor(Date.now() / 1000) + 3600 * 24 * 365, // 1 year
+      };
+    }
+    return next();
+  }
 
   if (!req.isAuthenticated()) {
-    if (isDevMode) {
-      log("DEBUG: [Auth] Not authenticated in dev mode, auto-login required");
-    }
     return res.status(401).json({ message: "Unauthorized" });
   }
 
