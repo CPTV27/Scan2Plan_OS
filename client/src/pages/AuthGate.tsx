@@ -37,7 +37,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <CardTitle>Sign In Required</CardTitle>
             <CardDescription>
-              Please sign in with your Replit account to continue.
+              Please sign in to continue.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -46,7 +46,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               onClick={() => window.location.href = "/api/login"}
               data-testid="button-login"
             >
-              Sign In with Replit
+              Sign In
             </Button>
           </CardContent>
         </Card>
@@ -70,7 +70,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             <Lock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <CardTitle>Sign In Required</CardTitle>
             <CardDescription>
-              Please sign in with your Replit account to continue.
+              Please sign in to continue.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -79,7 +79,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               onClick={() => window.location.href = "/api/login"}
               data-testid="button-login"
             >
-              Sign In with Replit
+              Sign In
             </Button>
           </CardContent>
         </Card>

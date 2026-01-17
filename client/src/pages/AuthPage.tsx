@@ -15,7 +15,7 @@ export default function AuthPage() {
           <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-primary/30 shadow-lg shadow-primary/20">
             <ScanLine className="w-8 h-8 text-primary" />
           </div>
-          
+
           <h1 className="text-3xl font-display font-bold mb-1">Scan2Plan-OS</h1>
           <p className="text-lg font-medium text-primary mb-2">CEO HUB</p>
           <p className="text-muted-foreground mb-8">
@@ -23,17 +23,17 @@ export default function AuthPage() {
           </p>
 
           <div className="space-y-4">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className="w-full font-bold bg-white text-black hover:bg-gray-200"
               onClick={() => window.location.href = "/api/login"}
             >
-              Sign In with Replit
+              Sign In
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            
+
             <p className="text-xs text-muted-foreground">
-              Secure enterprise login powered by Replit Auth
+              Secure enterprise authentication
             </p>
           </div>
         </div>

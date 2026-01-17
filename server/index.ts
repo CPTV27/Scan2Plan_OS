@@ -135,7 +135,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 (async () => {
   // Ensure database schema is up to date (adds missing columns)
   await ensureSchemaColumns();
-  
+
   await registerRoutes(httpServer, app);
 
   app.use("/api/*", notFoundHandler);
@@ -170,14 +170,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   setInterval(runDailyStaleness, 24 * 60 * 60 * 1000);
 
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+  const host = process.env.HOST || "127.0.0.1";
+  httpServer.listen(port, host, () => {
+    log(`serving on http://${host}:${port}`);
+  });
 })();
