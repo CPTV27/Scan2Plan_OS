@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import multer from "multer";
 import { db } from "../db";
 import {
     rfpSubmissions,
@@ -14,12 +15,110 @@ import { storage } from "../storage";
 import { log } from "../lib/logger";
 import { aiClient } from "../services/ai/aiClient";
 import { qualifyRfp, type QualificationResult, type ExtractedRfpData } from "../services/rfpQualification";
+import { rfpAnalyzer } from "../services/rfpAnalyzer";
 
 const router = Router();
+
+// Configure multer for PDF uploads
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB max
+    },
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype === "application/pdf") {
+            cb(null, true);
+        } else {
+            cb(new Error("Only PDF files are allowed"));
+        }
+    },
+});
 
 // ============================================
 // RFP UPLOAD & EXTRACTION
 // ============================================
+
+// POST /api/rfp/analyze-pdf - Direct PDF upload and analysis (NEW - Enhanced)
+router.post("/analyze-pdf", isAuthenticated, upload.single("rfp"), async (req: Request, res: Response) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: "No PDF file uploaded" });
+        }
+
+        const startTime = Date.now();
+
+        // Step 1: Analyze PDF using enhanced RFP analyzer
+        const result = await rfpAnalyzer.analyzePDF(req.file.buffer);
+
+        if (!result) {
+            return res.status(400).json({
+                message: "Failed to analyze RFP - could not extract meaningful data",
+            });
+        }
+
+        const { analysis, textLength } = result;
+
+        // Step 2: Create RFP submission record
+        const [rfp] = await db.insert(rfpSubmissions).values({
+            status: "extracted" as RfpStatus,
+            originalFileName: req.file.originalname,
+            fileType: "pdf",
+            uploadedBy: (req.user as any)?.claims?.email || "unknown",
+            extractedData: analysis, // Store full analysis
+        }).returning();
+
+        // Step 3: Convert to lead data
+        const leadData = rfpAnalyzer.convertToLeadData(analysis);
+
+        // Step 4: Get quote suggestions
+        const suggestions = rfpAnalyzer.suggestQuoteParameters(analysis);
+
+        const duration = Date.now() - startTime;
+
+        log(`[RFP] Analyzed PDF "${req.file.originalname}" in ${duration}ms - Confidence: ${analysis.confidence}%`);
+
+        res.json({
+            success: true,
+            rfp,
+            analysis: {
+                // Return core data
+                clientName: analysis.clientName,
+                contactName: analysis.contactName,
+                contactEmail: analysis.contactEmail,
+                contactPhone: analysis.contactPhone,
+                projectName: analysis.projectName,
+                projectAddress: analysis.projectAddress,
+                buildingType: analysis.buildingType,
+                sqft: analysis.sqft,
+                scope: analysis.scope,
+                lodLevel: analysis.lodLevel,
+                disciplines: analysis.disciplines,
+                deliverables: analysis.deliverables,
+                deadline: analysis.deadline,
+                budgetHint: analysis.budgetHint,
+                budgetRange: analysis.budgetRange,
+                evaluationCriteria: analysis.evaluationCriteria,
+                keyRequirements: analysis.keyRequirements,
+                unusualRequirements: analysis.unusualRequirements,
+                complianceNeeds: analysis.complianceNeeds,
+                confidence: analysis.confidence,
+                summary: analysis.summary,
+            },
+            leadData,
+            suggestions,
+            meta: {
+                textLength,
+                processingTime: duration,
+                filename: req.file.originalname,
+            },
+        });
+    } catch (error: any) {
+        log(`ERROR: [RFP] PDF analysis failed: ${error.message}`);
+        return res.status(500).json({
+            message: error.message || "Failed to analyze RFP PDF",
+        });
+    }
+});
 
 // POST /api/rfp/upload - Upload RFP for processing
 router.post("/upload", isAuthenticated, async (req: Request, res: Response) => {
