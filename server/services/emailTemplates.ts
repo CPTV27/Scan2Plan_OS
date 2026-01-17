@@ -1,91 +1,91 @@
 
 // Helper for currency formatting
 export function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 // Helper for date formatting
 export function formatDate(dateStr: string | Date | null | undefined): string {
-    if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 }
 
 // CPQ Building type ID to name mapping
 export const CPQ_BUILDING_TYPE_NAMES: Record<string, string> = {
-    "1": "Residential - Single Family",
-    "2": "Residential - Multi Family",
-    "3": "Residential - Luxury",
-    "4": "Commercial / Office",
-    "5": "Retail / Hospitality",
-    "6": "Industrial / Warehouse",
-    "7": "Institutional / Educational",
-    "8": "Healthcare",
-    "9": "Historic / Heritage",
-    "10": "Infrastructure",
+  "1": "Residential - Single Family",
+  "2": "Residential - Multi Family",
+  "3": "Residential - Luxury",
+  "4": "Commercial / Office",
+  "5": "Retail / Hospitality",
+  "6": "Industrial / Warehouse",
+  "7": "Institutional / Educational",
+  "8": "Healthcare",
+  "9": "Historic / Heritage",
+  "10": "Infrastructure",
 };
 
 export const SCOPE_NAMES: Record<string, string> = {
-    "full": "Full Building (Interior + Exterior)",
-    "interior": "Interior Only",
-    "exterior": "Exterior Only",
-    "roof": "Roof/Facades",
-    "facade": "Facade Only",
+  "full": "Full Building (Interior + Exterior)",
+  "interior": "Interior Only",
+  "exterior": "Exterior Only",
+  "roof": "Roof/Facades",
+  "facade": "Facade Only",
 };
 
 // Payment terms display names
 export const PAYMENT_TERMS_NAMES: Record<string, string> = {
-    "standard": "Due on Receipt",
-    "prepaid": "Prepaid (5% discount)",
-    "partner": "Partner Terms (10% discount)",
-    "owner": "Owner Terms (hold if delay)",
-    "50/50": "50% Deposit / 50% on Completion",
-    "net15": "Net 15",
-    "net30": "Net 30",
-    "net45": "Net 45",
-    "net60": "Net 60",
-    "net90": "Net 90",
+  "standard": "Due on Receipt",
+  "prepaid": "Prepaid (5% discount)",
+  "partner": "Partner Terms (10% discount)",
+  "owner": "Owner Terms (hold if delay)",
+  "50/50": "50% Deposit / 50% on Completion",
+  "net15": "Net 15",
+  "net30": "Net 30",
+  "net45": "Net 45",
+  "net60": "Net 60",
+  "net90": "Net 90",
 };
 
 export function generateProposalEmailHtml(lead: any, quote: any): string {
-    const clientName = lead.contactName?.split(' ')[0] || lead.clientName || 'Valued Client';
-    const projectName = lead.projectName || lead.clientName || 'Your Project';
-    const projectAddress = lead.projectAddress || '';
-    const quoteNumber = quote.quoteNumber;
-    const quoteDate = formatDate(quote.createdAt);
+  const clientName = lead.contactName?.split(' ')[0] || lead.clientName || 'Valued Client';
+  const projectName = lead.projectName || lead.clientName || 'Your Project';
+  const projectAddress = lead.projectAddress || '';
+  const quoteNumber = quote.quoteNumber;
+  const quoteDate = formatDate(quote.createdAt);
 
-    const pricingData = quote.lineItems || quote.pricingBreakdown || {};
-    const totalPrice = quote.totalPrice || quote.price || 0;
+  const pricingData = quote.lineItems || quote.pricingBreakdown || {};
+  const totalPrice = quote.totalPrice || quote.price || 0;
 
-    // Format payment terms
-    const paymentTermsKey = quote.paymentTerms || 'standard';
-    const paymentTermsDisplay = PAYMENT_TERMS_NAMES[paymentTermsKey] || PAYMENT_TERMS_NAMES['standard'];
+  // Format payment terms
+  const paymentTermsKey = quote.paymentTerms || 'standard';
+  const paymentTermsDisplay = PAYMENT_TERMS_NAMES[paymentTermsKey] || PAYMENT_TERMS_NAMES['standard'];
 
-    // Extract items by category
-    const scanningItems = (pricingData.items || []).filter((i: any) => i.category === 'scanning');
-    const modelingItems = (pricingData.items || []).filter((i: any) => i.category === 'modeling');
-    const travelItems = (pricingData.items || []).filter((i: any) => i.category === 'travel');
-    const riskItems = (pricingData.items || []).filter((i: any) => i.category === 'risk');
-    const adjustmentItems = (pricingData.items || []).filter((i: any) => i.category === 'adjustment');
+  // Extract items by category
+  const scanningItems = (pricingData.items || []).filter((i: any) => i.category === 'scanning');
+  const modelingItems = (pricingData.items || []).filter((i: any) => i.category === 'modeling');
+  const travelItems = (pricingData.items || []).filter((i: any) => i.category === 'travel');
+  const riskItems = (pricingData.items || []).filter((i: any) => i.category === 'risk');
+  const adjustmentItems = (pricingData.items || []).filter((i: any) => i.category === 'adjustment');
 
-    // Format areas for table
-    const areas = quote.scopeAreas || [];
-    const scopeTableRows = areas.map((area: any) => {
-        const buildingType = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.buildingType;
-        const scope = SCOPE_NAMES[area.scope] || area.scope;
-        const disciplines = Array.isArray(area.disciplines)
-            ? area.disciplines.map((d: string) => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')
-            : area.disciplines;
+  // Format areas for table
+  const areas = quote.scopeAreas || [];
+  const scopeTableRows = areas.map((area: any) => {
+    const buildingType = CPQ_BUILDING_TYPE_NAMES[area.buildingType] || area.buildingType;
+    const scope = SCOPE_NAMES[area.scope] || area.scope;
+    const disciplines = Array.isArray(area.disciplines)
+      ? area.disciplines.map((d: string) => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')
+      : area.disciplines;
 
-        return `
+    return `
       <tr style="border-bottom: 1px solid #e5e7eb;">
         <td style="padding: 12px; color: #4b5563;">${area.name || 'Main Area'} (${buildingType})</td>
         <td style="padding: 12px; color: #4b5563;">${scope}</td>
@@ -93,31 +93,31 @@ export function generateProposalEmailHtml(lead: any, quote: any): string {
         <td style="padding: 12px; text-align: right; color: #111827; font-weight: 500;">${Number(area.sqft).toLocaleString()} sqft</td>
       </tr>
     `;
-    }).join('');
+  }).join('');
 
-    // Helper for item rows
-    const buildItemRows = (items: any[]) => items.map((item: any) =>
-        `<tr style="border-bottom: 1px solid #f3f4f6;">
+  // Helper for item rows
+  const buildItemRows = (items: any[]) => items.map((item: any) =>
+    `<tr style="border-bottom: 1px solid #f3f4f6;">
       <td style="padding: 8px 0; color: #4b5563;">${item.name}</td>
       <td style="padding: 8px 0; text-align: right; color: #111827;">${formatCurrency(item.price)}</td>
     </tr>`
+  ).join('');
+
+  // Additional services
+  let servicesHtml = '';
+  if (pricingData?.services?.length > 0) {
+    servicesHtml = pricingData.services.map((svc: any) =>
+      `<li style="margin: 4px 0;">${svc.name}: ${formatCurrency(svc.price)}</li>`
     ).join('');
+  }
 
-    // Additional services
-    let servicesHtml = '';
-    if (pricingData?.services?.length > 0) {
-        servicesHtml = pricingData.services.map((svc: any) =>
-            `<li style="margin: 4px 0;">${svc.name}: ${formatCurrency(svc.price)}</li>`
-        ).join('');
-    }
+  // Build contact info section
+  const contactName = lead.contactName;
+  const contactEmail = lead.contactEmail;
+  const contactPhone = lead.contactPhone;
 
-    // Build contact info section
-    const contactName = lead.contactName;
-    const contactEmail = lead.contactEmail;
-    const contactPhone = lead.contactPhone;
-
-    const hasContactInfo = contactName || contactEmail || contactPhone;
-    const contactInfoHtml = hasContactInfo ? `
+  const hasContactInfo = contactName || contactEmail || contactPhone;
+  const contactInfoHtml = hasContactInfo ? `
     <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-top: 32px;">Project Contact</h3>
     <table style="width: 100%; margin: 16px 0; font-size: 14px;">
       ${contactName ? `<tr><td style="padding: 4px 0; color: #6b7280;">Contact:</td><td style="padding: 4px 0;"><strong>${contactName}</strong></td></tr>` : ''}
@@ -126,7 +126,7 @@ export function generateProposalEmailHtml(lead: any, quote: any): string {
     </table>
   ` : '';
 
-    return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -266,14 +266,14 @@ export function generateProposalEmailHtml(lead: any, quote: any): string {
 }
 
 export function generateProposalEmailText(lead: any, quote: any): string {
-    const clientName = lead.contactName || lead.company || 'Valued Client';
-    const projectName = lead.projectName || lead.clientName || 'Your Project';
-    const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
+  const clientName = lead.contactName || lead.company || 'Valued Client';
+  const projectName = lead.projectName || lead.clientName || 'Your Project';
+  const totalPrice = quote?.pricingBreakdown?.totalPrice || quote?.price || 0;
 
-    // Look up tracking URL or just use base domain as fallback if magic link not available
-    const magicLink = "https://scan2plan-os.replit.app";
+  // Look up tracking URL or just use base domain as fallback if magic link not available
+  const magicLink = process.env.APP_URL || "http://localhost:5000";
 
-    return `SCAN2PLAN - Precision 3D Laser Scanning & BIM Services
+  return `SCAN2PLAN - Precision 3D Laser Scanning & BIM Services
 
 Dear ${clientName},
 

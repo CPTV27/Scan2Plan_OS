@@ -11,7 +11,6 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;
 
 // Interface for auth storage operations
-// (IMPORTANT) These user operations are mandatory for Replit Auth.
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -54,24 +53,24 @@ class AuthStorage implements IAuthStorage {
   async setPassword(userId: string, password: string): Promise<boolean> {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
-    
+
     const [updated] = await db
       .update(users)
-      .set({ 
-        passwordHash, 
+      .set({
+        passwordHash,
         passwordSetAt: new Date(),
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
-    
+
     return !!updated;
   }
 
   async verifyPassword(userId: string, password: string): Promise<boolean> {
     const user = await this.getUser(userId);
     if (!user?.passwordHash) return false;
-    
+
     return bcrypt.compare(password, user.passwordHash);
   }
 
@@ -101,7 +100,7 @@ class AuthStorage implements IAuthStorage {
 
   async getRecentFailedAttempts(userId: string): Promise<number> {
     const lockoutWindow = new Date(Date.now() - LOCKOUT_DURATION_MINUTES * 60 * 1000);
-    
+
     const attempts = await db
       .select()
       .from(loginAttempts)
@@ -112,7 +111,7 @@ class AuthStorage implements IAuthStorage {
           gte(loginAttempts.attemptedAt, lockoutWindow)
         )
       );
-    
+
     return attempts.length;
   }
 }

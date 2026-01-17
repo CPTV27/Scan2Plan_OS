@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyWebhookSignature } from "../lib/replitConnector";
+import { verifyWebhookSignature } from "../lib/appUtils";
 import { logSecurityEvent } from "./securityLogger";
 
 /**

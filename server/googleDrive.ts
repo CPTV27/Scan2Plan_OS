@@ -1,53 +1,44 @@
 // Google Drive Integration for Scan2Plan OS
-// Connection: google-drive (Replit Connector)
+// Uses Service Account or OAuth credentials for authentication
 // Creates project folders on "Closed Won" events with standard subfolder structure
 
 import { google } from 'googleapis';
 import { log } from "./lib/logger";
-import { createReplitConnectorHeaders } from "./lib/replitConnector";
 
-let connectionSettings: any;
-
-async function getAccessToken(): Promise<string> {
-  // Always refresh if token is expired or about to expire (5 minute buffer)
-  const bufferMs = 5 * 60 * 1000;
-  const isExpired = !connectionSettings ||
-    !connectionSettings.settings?.expires_at ||
-    new Date(connectionSettings.settings.expires_at).getTime() < (Date.now() + bufferMs);
-
-  if (!isExpired && connectionSettings.settings.access_token) {
-    return connectionSettings.settings.access_token;
-  }
-
-  const { hostname, xReplitToken } = createReplitConnectorHeaders();
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-drive',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
+/**
+ * Create Google Drive auth client
+ */
+async function getGoogleDriveAuth() {
+  // Service Account JSON (recommended)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+      return new google.auth.GoogleAuth({
+        credentials,
+        scopes: [
+          'https://www.googleapis.com/auth/drive',
+          'https://www.googleapis.com/auth/drive.file',
+        ],
+      });
+    } catch (error) {
+      log(`ERROR: Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON - ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format');
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Google Drive not connected');
   }
-  return accessToken;
+
+  // Direct access token (for development/testing)
+  if (process.env.GOOGLE_ACCESS_TOKEN) {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: process.env.GOOGLE_ACCESS_TOKEN });
+    return oauth2Client;
+  }
+
+  throw new Error('Google Drive credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_ACCESS_TOKEN in .env');
 }
 
 async function getGoogleDriveClient() {
-  const accessToken = await getAccessToken();
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-  return google.drive({ version: 'v3', auth: oauth2Client });
+  const auth = await getGoogleDriveAuth();
+  return google.drive({ version: 'v3', auth });
 }
 
 export interface ProjectFolderResult {
@@ -168,7 +159,7 @@ export async function createProjectFolder(universalProjectId: string): Promise<P
 
 export async function isGoogleDriveConnected(): Promise<boolean> {
   try {
-    await getAccessToken();
+    await getGoogleDriveAuth();
     return true;
   } catch {
     return false;

@@ -27,7 +27,7 @@ export async function triggerTruthLoop(
   actualSqft: number,
   options: TruthLoopOptions = {}
 ): Promise<TruthLoopResult> {
-  const { 
+  const {
     costPerSqft = DEFAULT_COST_PER_SQFT,
     varianceThreshold = DEFAULT_VARIANCE_THRESHOLD
   } = options;
@@ -73,7 +73,7 @@ export async function triggerTruthLoop(
     }
 
     const estimatedSqft = lead.sqft ? Number(lead.sqft) : 0;
-    
+
     if (estimatedSqft === 0) {
       return {
         success: false,
@@ -109,11 +109,11 @@ export async function triggerTruthLoop(
     const posts = generateSocialContent(projectData, varianceContext);
 
     let caseStudyId: number | null = null;
-    
+
     const varianceType = isOverrun ? "Overrun" : "Under-Target";
     const caseStudyTitle = `${varianceType} Detection: ${lead.clientName || 'Client'}`;
     const impactStr = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(impactAmount);
-    
+
     const [existingCaseStudy] = await db.select()
       .from(caseStudies)
       .where(eq(caseStudies.title, caseStudyTitle));
@@ -124,7 +124,7 @@ export async function triggerTruthLoop(
       const blurb = isOverrun
         ? `${Math.abs(variance * 100).toFixed(1)}% overrun detected and flagged before delivery. Identified ${impactStr} in potential change order exposure.`
         : `${Math.abs(variance * 100).toFixed(1)}% under-estimate detected. Identified ${impactStr} in potential savings or scope expansion opportunity.`;
-      
+
       const [newCaseStudy] = await db.insert(caseStudies)
         .values({
           title: caseStudyTitle,
@@ -166,9 +166,7 @@ export async function triggerTruthLoop(
     // Send Google Chat notification if variance is significant (>10%)
     if (Math.abs(variance) > 0.10) {
       try {
-        const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-          ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-          : "https://scan2plan.io";
+        const baseUrl = process.env.APP_URL || "http://localhost:5000";
         await notifyTruthLoopVariance(
           { id: projectId, name: project.name },
           variance,
@@ -201,25 +199,25 @@ export async function triggerTruthLoop(
 
 export async function getMarketingPosts(status?: string) {
   let query = db.select().from(marketingPosts);
-  
+
   if (status) {
     query = query.where(eq(marketingPosts.status, status)) as any;
   }
-  
+
   return await query;
 }
 
 export async function updatePostStatus(postId: number, status: string) {
   const updateData: any = { status };
-  
+
   if (status === "posted") {
     updateData.postedAt = new Date();
   }
-  
+
   const [updated] = await db.update(marketingPosts)
     .set(updateData)
     .where(eq(marketingPosts.id, postId))
     .returning();
-  
+
   return updated;
 }

@@ -1,76 +1,85 @@
 // Google Workspace Integration Clients
-// Uses Replit Connectors for OAuth token management
+// Uses Service Account or OAuth credentials for authentication
 
 import { google } from 'googleapis';
+import { log } from "./lib/logger";
 
-// Shared token fetching logic
-async function getAccessToken(connectorName: string): Promise<string> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY 
-    ? 'repl ' + process.env.REPL_IDENTITY 
-    : process.env.WEB_REPL_RENEWAL 
-    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
-    : null;
-
-  if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
-  }
-
-  const response = await fetch(
-    `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=${connectorName}`,
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
-      }
+/**
+ * Create Google auth client using Service Account or access token
+ * 
+ * Supports two authentication methods:
+ * 1. Service Account (recommended for server-to-server): Set GOOGLE_SERVICE_ACCOUNT_JSON
+ * 2. Direct access token: Set GOOGLE_ACCESS_TOKEN (for testing/development)
+ */
+async function getGoogleAuth() {
+  // Option 1: Service Account JSON (recommended)
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    try {
+      const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+      const auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: [
+          'https://www.googleapis.com/auth/gmail.send',
+          'https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/gmail.compose',
+          'https://www.googleapis.com/auth/gmail.labels',
+          'https://www.googleapis.com/auth/calendar',
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/drive',
+          'https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/spreadsheets',
+        ],
+      });
+      return auth;
+    } catch (error) {
+      log(`ERROR: Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON - ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format');
     }
-  );
-
-  const data = await response.json();
-  const connectionSettings = data.items?.[0];
-
-  const accessToken = connectionSettings?.settings?.access_token || 
-                      connectionSettings?.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error(`${connectorName} not connected`);
   }
 
-  return accessToken;
+  // Option 2: Direct access token (for development/testing)
+  if (process.env.GOOGLE_ACCESS_TOKEN) {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: process.env.GOOGLE_ACCESS_TOKEN });
+    return oauth2Client;
+  }
+
+  throw new Error('Google API credentials not configured. Set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_ACCESS_TOKEN in .env');
 }
 
-// Gmail Client (google-mail integration)
+// Gmail Client
 // Permissions: gmail.send, gmail.labels, gmail.readonly, gmail.compose
-// WARNING: Never cache this client - access tokens expire
 export async function getGmailClient() {
-  const accessToken = await getAccessToken('google-mail');
-  
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-
-  return google.gmail({ version: 'v1', auth: oauth2Client });
+  const auth = await getGoogleAuth();
+  return google.gmail({ version: 'v1', auth });
 }
 
-// Google Calendar Client (google-calendar integration)
+// Google Calendar Client
 // Permissions: calendar.events, calendar.readonly, calendar.freebusy
-// WARNING: Never cache this client - access tokens expire
 export async function getCalendarClient() {
-  const accessToken = await getAccessToken('google-calendar');
-  
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
-
-  return google.calendar({ version: 'v3', auth: oauth2Client });
+  const auth = await getGoogleAuth();
+  return google.calendar({ version: 'v3', auth });
 }
 
-// Google Drive Client (google-drive integration)
+// Google Drive Client
 // Permissions: drive.file, drive.appdata, docs, spreadsheets
-// WARNING: Never cache this client - access tokens expire
 export async function getDriveClient() {
-  const accessToken = await getAccessToken('google-drive');
-  
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({ access_token: accessToken });
+  const auth = await getGoogleAuth();
+  return google.drive({ version: 'v3', auth });
+}
 
-  return google.drive({ version: 'v3', auth: oauth2Client });
+// Google Sheets Client
+export async function getSheetsClient() {
+  const auth = await getGoogleAuth();
+  return google.sheets({ version: 'v4', auth });
+}
+
+// Check if Google APIs are configured
+export async function isGoogleConfigured(): Promise<boolean> {
+  try {
+    await getGoogleAuth();
+    return true;
+  } catch {
+    return false;
+  }
 }

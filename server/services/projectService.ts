@@ -9,10 +9,10 @@ export const projectService = {
     if (!actualSqft || !estimatedSqft) {
       return { variance: null, auditComplete: false };
     }
-    
+
     const variance = ((actualSqft - estimatedSqft) / estimatedSqft) * 100;
     const auditComplete = Math.abs(variance) <= 10;
-    
+
     return {
       variance: variance.toFixed(2),
       auditComplete,
@@ -23,7 +23,7 @@ export const projectService = {
     if (!sqftVariance || Math.abs(Number(sqftVariance)) <= 10) {
       return null;
     }
-    
+
     return {
       message: `Square Foot Audit Required: Variance of ${sqftVariance}% exceeds 10% tolerance. Billing adjustment approval required before Modeling.`,
       estimatedSqft,
@@ -34,7 +34,7 @@ export const projectService = {
 
   async buildSyncScopeData(lead: any): Promise<Record<string, any>> {
     const updateData: Record<string, any> = {};
-    
+
     if (lead.value != null) updateData.quotedPrice = lead.value.toString();
     if (lead.grossMarginPercent != null) updateData.quotedMargin = lead.grossMarginPercent.toString();
     if (lead.cpqAreas && Array.isArray(lead.cpqAreas) && lead.cpqAreas.length > 0) {
@@ -54,18 +54,18 @@ export const projectService = {
     if (lead.projectAddress) updateData.projectAddress = lead.projectAddress;
     if (lead.dispatchLocation) updateData.dispatchLocation = lead.dispatchLocation;
     if (lead.distance) updateData.distance = Number(lead.distance);
-    
+
     return updateData;
   },
 
   getAppBaseUrl(): string {
-    if (process.env.REPLIT_DEV_DOMAIN) {
-      return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    // Use APP_URL for configurable base URL
+    if (process.env.APP_URL) {
+      return process.env.APP_URL;
     }
-    if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-      return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-    }
-    return "https://scan2plan-os.replit.app";
+    // Fallback to localhost
+    const port = process.env.PORT || '5000';
+    return `http://localhost:${port}`;
   },
 
   buildMissionBriefUrl(projectId: number): string {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import { createWebhookVerification } from "./webhookSecurity";
-import { verifyWebhookSignature } from "../lib/replitConnector";
+import { verifyWebhookSignature } from "../lib/appUtils";
 import { logSecurityEvent } from "./securityLogger";
 
 // Mock the security logger

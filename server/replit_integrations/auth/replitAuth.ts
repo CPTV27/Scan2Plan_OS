@@ -1,27 +1,20 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
-
 import passport from "passport";
 import { log } from "../../lib/logger";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
-import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
 
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
+/**
+ * Local Auth System (Replit-independent)
+ * 
+ * Supports two modes:
+ * 1. DEV MODE (AUTH_DEV_MODE=true): Auto-login bypass for local development
+ * 2. PRODUCTION: Session-based auth with password verification
+ */
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week max age
-  const idleTimeout = 30 * 60 * 1000; // 30 minutes idle timeout
 
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
@@ -31,51 +24,20 @@ export function getSession() {
     tableName: "sessions",
   });
 
-  // Detect production environment - check multiple indicators
-  const isDeployment = process.env.REPLIT_DEPLOYMENT === '1';
   const isProduction = process.env.NODE_ENV === 'production';
-  const hasReplitAppDomain = (process.env.REPLIT_DOMAINS || '').includes('.replit.app');
-
-  // Use secure cookies in any production-like environment
-  const useSecureCookies = isDeployment || isProduction || hasReplitAppDomain;
-
-  log(`Session config: isDeployment=${isDeployment}, isProduction=${isProduction}, hasReplitAppDomain=${hasReplitAppDomain}, useSecureCookies=${useSecureCookies}`);
 
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || 'dev-session-secret-change-in-production',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
-    rolling: true, // Reset session expiry on each request (session rotation)
+    rolling: true,
     cookie: {
       httpOnly: true,
-      // Secure must be true for https in production
-      // Use explicit boolean instead of 'auto' for reliability
-      secure: useSecureCookies,
-      // Must be 'lax' to allow OAuth redirects from Replit's auth server
+      secure: isProduction,
       sameSite: 'lax',
       maxAge: sessionTtl,
     },
-  });
-}
-
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-}
-
-async function upsertUser(claims: any) {
-  await authStorage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
   });
 }
 
@@ -85,79 +47,132 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
-
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
-  };
-
-  // Keep track of registered strategies
-  const registeredStrategies = new Set<string>();
-
-  // Helper function to ensure strategy exists for a domain
-  const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
-        },
-        verify
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
-    }
-  };
-
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", (req, res, next) => {
-    log(`Login initiated - hostname: ${req.hostname}, protocol: ${req.protocol}, secure: ${req.secure}`);
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
-  });
+  const isDevMode = process.env.AUTH_DEV_MODE === 'true';
 
-  app.get("/api/callback", (req, res, next) => {
-    log(`Callback received - hostname: ${req.hostname}, sessionID: ${req.sessionID}, hasSession: ${!!req.session}`);
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
-    })(req, res, (err: any) => {
-      if (err) {
-        log(`ERROR: Callback authentication failed - ${err.message || err}`);
-        return next(err);
+  // Login route
+  app.get("/api/login", async (req, res) => {
+    if (isDevMode) {
+      // Dev mode: auto-login with dev user
+      const devEmail = process.env.DEV_USER_EMAIL || 'admin@scan2plan.io';
+      const devUser = await authStorage.getUserByEmail(devEmail);
+
+      if (!devUser) {
+        // Create dev user if doesn't exist
+        const newUser = await authStorage.upsertUser({
+          id: 'dev-user-local',
+          email: devEmail,
+          firstName: 'Dev',
+          lastName: 'Admin',
+          profileImageUrl: null,
+          role: 'ceo',
+        });
+
+        const sessionUser = {
+          claims: {
+            sub: newUser.id,
+            email: newUser.email,
+            first_name: newUser.firstName,
+            last_name: newUser.lastName,
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 86400 * 7, // 7 days
+        };
+
+        req.login(sessionUser, (err) => {
+          if (err) {
+            log(`ERROR: Dev login failed - ${err.message}`);
+            return res.redirect('/?error=login_failed');
+          }
+          (req.session as any).passwordVerified = true;
+          res.redirect('/');
+        });
+      } else {
+        const sessionUser = {
+          claims: {
+            sub: devUser.id,
+            email: devUser.email,
+            first_name: devUser.firstName,
+            last_name: devUser.lastName,
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+        };
+
+        req.login(sessionUser, (err) => {
+          if (err) {
+            log(`ERROR: Dev login failed - ${err.message}`);
+            return res.redirect('/?error=login_failed');
+          }
+          (req.session as any).passwordVerified = true;
+          res.redirect('/');
+        });
       }
-      log(`Callback successful - user: ${(req as any).user?.claims?.email || 'unknown'}, sessionID: ${req.sessionID}`);
-      next();
-    });
+    } else {
+      // Production: redirect to login page (handled by frontend)
+      res.redirect('/login');
+    }
   });
 
+  // Callback route (not needed for local auth, but keep for compatibility)
+  app.get("/api/callback", (req, res) => {
+    res.redirect('/');
+  });
+
+  // Logout route
   app.get("/api/logout", (req, res) => {
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      req.session.destroy(() => {
+        res.redirect('/');
+      });
     });
   });
 
-  // Test-only authentication bypass (only in development/test environment)
+  // Email/password login (for production use)
+  app.post("/api/auth/login", async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
+    const user = await authStorage.getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Check lockout
+    if (await authStorage.isUserLockedOut(user.id)) {
+      return res.status(429).json({ message: "Account temporarily locked. Try again later." });
+    }
+
+    const isValid = await authStorage.verifyPassword(user.id, password);
+    await authStorage.recordLoginAttempt(user.id, isValid, req.ip || undefined);
+
+    if (!isValid) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const sessionUser = {
+      claims: {
+        sub: user.id,
+        email: user.email,
+        first_name: user.firstName,
+        last_name: user.lastName,
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 86400 * 7,
+    };
+
+    req.login(sessionUser, (err) => {
+      if (err) {
+        return res.status(500).json({ message: "Login failed" });
+      }
+      (req.session as any).passwordVerified = true;
+      res.json({ success: true, user: { email: user.email, firstName: user.firstName } });
+    });
+  });
+
+  // Dev mode: test login endpoint (kept for playwright tests)
   if (process.env.NODE_ENV !== 'production') {
     app.post("/api/test-login", async (req, res) => {
       const requestedRole = req.body.role;
@@ -183,12 +198,9 @@ export async function setupAuth(app: Express) {
           first_name: "Playwright",
           last_name: requestedRole === "field" ? "Field" : "Admin",
         },
-        access_token: `test-access-token-${requestedRole}`,
-        refresh_token: `test-refresh-token-${requestedRole}`,
-        expires_at: Math.floor(Date.now() / 1000) + 3600 * 24, // 24 hours
+        expires_at: Math.floor(Date.now() / 1000) + 3600 * 24,
       };
 
-      // Upsert test user in database
       await authStorage.upsertUser({
         id: testUser.claims.sub,
         email: testUser.claims.email,
@@ -198,12 +210,10 @@ export async function setupAuth(app: Express) {
         role: dbRole as any,
       });
 
-      // Log in the test user
       req.login(testUser, (err) => {
         if (err) {
           return res.status(500).json({ message: "Login failed", error: err.message });
         }
-        // Set password as verified for test user
         (req.session as any).passwordVerified = true;
         req.session.save((saveErr) => {
           if (saveErr) {
@@ -216,88 +226,55 @@ export async function setupAuth(app: Express) {
   }
 }
 
-// Allowed email domain for access
-const ALLOWED_EMAIL_DOMAIN = "scan2plan.io";
+// Email domain allowed check (configurable)
+const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN || "scan2plan.io";
+const DISABLE_EMAIL_RESTRICTION = process.env.DISABLE_EMAIL_RESTRICTION === 'true';
 
 function isEmailDomainAllowed(email: string | undefined | null): boolean {
+  if (DISABLE_EMAIL_RESTRICTION) return true;
   if (!email) return false;
   const domain = email.split("@")[1]?.toLowerCase();
-  return domain === ALLOWED_EMAIL_DOMAIN;
+  return domain === ALLOWED_EMAIL_DOMAIN.toLowerCase();
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
+  const isDevMode = process.env.AUTH_DEV_MODE === 'true';
 
-  // Debug logging for auth issues
   if (!req.isAuthenticated()) {
-    log("DEBUG: [Auth Debug] req.isAuthenticated() returned false");
+    if (isDevMode) {
+      log("DEBUG: [Auth] Not authenticated in dev mode, auto-login required");
+    }
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   if (!user) {
-    log("DEBUG: [Auth Debug] No user object on request");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   if (!user.expires_at) {
-    log(`DEBUG: [Auth Debug] User exists but no expires_at. User keys: ${Object.keys(user).join(", ")}`);
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // SECURITY: Enforce email domain restriction server-side
+  // Email domain restriction (can be disabled for local dev)
   const userEmail = user.claims?.email;
   if (!isEmailDomainAllowed(userEmail)) {
     log(`SECURITY: Access denied for non-allowed email domain: ${userEmail}`);
     return res.status(403).json({
-      message: "Access denied. This application is restricted to @scan2plan.io email addresses only.",
+      message: `Access denied. This application is restricted to @${ALLOWED_EMAIL_DOMAIN} email addresses only.`,
       code: "DOMAIN_NOT_ALLOWED"
     });
   }
 
-  // NOTE: Secondary password verification disabled.
-  // Replit OAuth + @scan2plan.io domain restriction is sufficient for internal tool.
-  // Original code preserved below for reference if needed in future.
-  /*
-  // SECURITY: Check if password has been verified this session
-  // Skip this check for password-related endpoints
-  const passwordEndpoints = ['/api/auth/session-status', '/api/auth/password-status', '/api/auth/set-password', '/api/auth/verify-password'];
-  const isPasswordEndpoint = passwordEndpoints.some(ep => req.path === ep);
-
-  if (!isPasswordEndpoint) {
-    const session = req.session as any;
-    if (!session?.passwordVerified) {
-      return res.status(403).json({
-        message: "Password verification required",
-        code: "PASSWORD_NOT_VERIFIED"
-      });
-    }
-  }
-  */
-
   const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    return next();
+  if (now > user.expires_at) {
+    return res.status(401).json({ message: "Session expired" });
   }
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
+  return next();
 };
 
 // Role-based authorization middleware
-// Usage: requireRole("ceo", "sales") - allows ceo OR sales roles
 import type { UserRole } from "@shared/models/auth";
 
 export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
@@ -309,14 +286,12 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
     }
 
     try {
-      // Fetch user from database to get their role
       const dbUser = await authStorage.getUser(sessionUser.claims.sub);
 
       if (!dbUser) {
         return res.status(401).json({ message: "User not found" });
       }
 
-      // Check if user's role is in the allowed roles
       if (!allowedRoles.includes(dbUser.role as UserRole)) {
         return res.status(403).json({
           message: "Access denied. Insufficient permissions.",
@@ -325,7 +300,6 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
         });
       }
 
-      // Attach user with role to request for downstream use
       (req as any).dbUser = dbUser;
       next();
     } catch (error) {
@@ -335,39 +309,24 @@ export function requireRole(...allowedRoles: UserRole[]): RequestHandler {
   };
 }
 
-// =============================================
-// EMAIL-BASED ADMIN ACCESS CONTROL
-// COO and dev team have full access to sensitive features
-// CEO has reduced access (view-only on some features)
-// =============================================
-
+// Admin email access control
 const ADMIN_EMAILS = [
-  "chase@scan2plan.io",   // COO - full access
-  "elijah@scan2plan.io",  // Dev - full access
+  "chase@scan2plan.io",
+  "elijah@scan2plan.io",
 ];
 
-const CEO_EMAIL = "v@scan2plan.io";  // CEO - reduced access
+const CEO_EMAIL = "v@scan2plan.io";
 
-/**
- * Check if user has full admin access (COO/dev team)
- */
 export function isAdminEmail(email: string | undefined | null): boolean {
   if (!email) return false;
   return ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
-/**
- * Check if user is CEO (reduced access)
- */
 export function isCeoEmail(email: string | undefined | null): boolean {
   if (!email) return false;
   return email.toLowerCase() === CEO_EMAIL;
 }
 
-/**
- * Middleware: Require full admin access (COO/dev only)
- * Use this for features that could break things if misconfigured
- */
 export const requireAdmin: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
   const email = user?.claims?.email;
@@ -382,15 +341,10 @@ export const requireAdmin: RequestHandler = async (req, res, next) => {
   next();
 };
 
-/**
- * Middleware: Allow CEO with view-only indicator
- * Use this when CEO can view but should be warned about edits
- */
 export const allowCeoViewOnly: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
   const email = user?.claims?.email;
 
-  // Attach access level to request
   (req as any).accessLevel = isAdminEmail(email) ? "admin" : (isCeoEmail(email) ? "view-only" : "none");
 
   if (!isAdminEmail(email) && !isCeoEmail(email)) {
@@ -402,4 +356,3 @@ export const allowCeoViewOnly: RequestHandler = async (req, res, next) => {
 
   next();
 };
-
