@@ -538,6 +538,291 @@ function createTaskWithAsana(taskData) {
 }
 
 // ============================================================================
+// MULTI-PROJECT SETUP - RUN THIS TO CREATE ALL PROJECTS
+// ============================================================================
+
+/**
+ * SuperChase project structure - mirrors Google Sheet tabs
+ */
+const SC_PROJECTS = {
+  'Tasks': {
+    name: 'SC: Tasks',
+    sections: ['To Do', 'In Progress', 'Done'],
+    sheetTab: 'Tasks'
+  },
+  'Projects': {
+    name: 'SC: Projects',
+    sections: ['Active', 'On Hold', 'Completed'],
+    sheetTab: 'Projects'
+  },
+  'Leads': {
+    name: 'SC: Leads',
+    sections: ['New', 'Contacted', 'Qualified', 'Won', 'Lost'],
+    sheetTab: 'Leads'
+  },
+  'Contracts': {
+    name: 'SC: Contracts',
+    sections: ['Draft', 'Sent', 'Signed'],
+    sheetTab: 'Contracts'
+  },
+  'Expenses': {
+    name: 'SC: Expenses',
+    sections: ['Pending', 'Approved', 'Paid'],
+    sheetTab: 'Expenses'
+  }
+};
+
+/**
+ * MAIN SETUP FUNCTION - Creates all SuperChase projects in Asana
+ * Run this once to set up your complete project structure
+ */
+function setupAllAsanaProjects() {
+  Logger.log('=== SUPERCHASE ASANA SETUP ===');
+
+  // Initialize credentials
+  setAsanaCredentials(
+    '2/1211216881488767/1212853076925160:b41b0208bf5921d0ed414a0513e322e7',
+    '1211216881488780'
+  );
+
+  // Get team ID (needed for project creation)
+  const config = getAsanaConfig();
+  const teams = asanaRequest('/workspaces/' + config.WORKSPACE_ID + '/teams');
+  const teamId = teams && teams.length > 0 ? teams[0].gid : null;
+
+  if (teamId) {
+    Logger.log('Using team: ' + teams[0].name);
+  }
+
+  const projectIds = {};
+
+  // Create each project
+  for (const key in SC_PROJECTS) {
+    const proj = SC_PROJECTS[key];
+    Logger.log('\nCreating project: ' + proj.name);
+
+    // Check if exists
+    const existing = findProjectByName(proj.name);
+    if (existing) {
+      Logger.log('  Found existing: ' + existing.gid);
+      projectIds[key] = existing.gid;
+      continue;
+    }
+
+    // Create new project
+    const payload = {
+      name: proj.name,
+      default_view: 'list',
+      public: false
+    };
+
+    if (teamId) {
+      payload.team = teamId;
+    } else {
+      payload.workspace = config.WORKSPACE_ID;
+    }
+
+    const newProject = asanaRequest('/projects', 'POST', payload);
+
+    if (newProject) {
+      Logger.log('  Created: ' + newProject.gid);
+      projectIds[key] = newProject.gid;
+
+      // Create sections
+      Logger.log('  Creating sections: ' + proj.sections.join(', '));
+      proj.sections.forEach(sectionName => {
+        asanaRequest('/projects/' + newProject.gid + '/sections', 'POST', { name: sectionName });
+        Utilities.sleep(100);
+      });
+    } else {
+      Logger.log('  FAILED to create project');
+    }
+
+    Utilities.sleep(200);
+  }
+
+  // Store all project IDs
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('SC_PROJECT_IDS', JSON.stringify(projectIds));
+
+  // Set default Tasks project as main
+  if (projectIds['Tasks']) {
+    props.setProperty('ASANA_PROJECT_ID', projectIds['Tasks']);
+  }
+
+  Logger.log('\n=== SETUP COMPLETE ===');
+  Logger.log('Project IDs: ' + JSON.stringify(projectIds));
+
+  // Set up sync trigger
+  setupAsanaSyncTrigger();
+
+  return projectIds;
+}
+
+/**
+ * Find project by name
+ */
+function findProjectByName(name) {
+  const projects = getAsanaProjects();
+  if (!projects) return null;
+  return projects.find(p => p.name === name);
+}
+
+/**
+ * Get project ID for a specific type
+ */
+function getProjectId(type) {
+  const props = PropertiesService.getScriptProperties();
+  const ids = JSON.parse(props.getProperty('SC_PROJECT_IDS') || '{}');
+  return ids[type] || props.getProperty('ASANA_PROJECT_ID');
+}
+
+/**
+ * Create task in specific project type
+ */
+function createTaskInProject(type, taskData) {
+  const projectId = getProjectId(type);
+  if (!projectId) {
+    Logger.log('No project ID for type: ' + type);
+    return null;
+  }
+
+  const config = getAsanaConfig();
+  const payload = {
+    name: taskData.name || taskData.description,
+    notes: buildTaskNotes(taskData),
+    workspace: config.WORKSPACE_ID,
+    projects: [projectId]
+  };
+
+  if (taskData.dueDate) {
+    payload.due_on = formatDateForAsana(taskData.dueDate);
+  }
+
+  const result = asanaRequest('/tasks', 'POST', payload);
+  if (result) {
+    Logger.log('Created task in ' + type + ': ' + result.gid);
+  }
+  return result;
+}
+
+/**
+ * Sync all Sheet tabs to their corresponding Asana projects
+ */
+function syncAllSheetsToAsana() {
+  Logger.log('=== SYNCING ALL SHEETS TO ASANA ===');
+
+  const ss = SpreadsheetApp.openById(getConfig().SPREADSHEET_ID);
+  const results = {};
+
+  for (const key in SC_PROJECTS) {
+    const proj = SC_PROJECTS[key];
+    const sheet = ss.getSheetByName(proj.sheetTab);
+
+    if (!sheet || sheet.getLastRow() <= 1) {
+      Logger.log(proj.sheetTab + ': No data');
+      results[key] = { synced: 0, skipped: 0 };
+      continue;
+    }
+
+    const synced = syncSheetToProject(sheet, key);
+    results[key] = synced;
+    Logger.log(proj.sheetTab + ': ' + synced.synced + ' synced, ' + synced.skipped + ' skipped');
+  }
+
+  Logger.log('=== SYNC COMPLETE ===');
+  return results;
+}
+
+/**
+ * Sync a specific sheet to its Asana project
+ */
+function syncSheetToProject(sheet, projectType) {
+  const projectId = getProjectId(projectType);
+  if (!projectId) return { synced: 0, skipped: 0, error: 'No project ID' };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { synced: 0, skipped: 0 };
+
+  const headers = data[0];
+
+  // Find or create Asana ID column
+  let asanaCol = headers.indexOf('Asana ID');
+  if (asanaCol === -1) {
+    asanaCol = headers.length;
+    sheet.getRange(1, asanaCol + 1).setValue('Asana ID');
+  }
+
+  // Find name/description column (usually index 1 or 2)
+  const nameCol = headers.indexOf('Name') !== -1 ? headers.indexOf('Name') :
+                  headers.indexOf('Description') !== -1 ? headers.indexOf('Description') : 2;
+
+  let synced = 0;
+  let skipped = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    // Skip if already has Asana ID
+    if (data[i][asanaCol]) {
+      skipped++;
+      continue;
+    }
+
+    const name = data[i][nameCol];
+    if (!name) continue;
+
+    // Build notes from row data
+    let notes = '';
+    headers.forEach((h, idx) => {
+      if (idx !== nameCol && idx !== asanaCol && data[i][idx]) {
+        notes += h + ': ' + data[i][idx] + '\n';
+      }
+    });
+    notes += '\n---\nSource: SuperChase ' + projectType;
+
+    const config = getAsanaConfig();
+    const result = asanaRequest('/tasks', 'POST', {
+      name: name,
+      notes: notes,
+      workspace: config.WORKSPACE_ID,
+      projects: [projectId]
+    });
+
+    if (result) {
+      sheet.getRange(i + 1, asanaCol + 1).setValue(result.gid);
+      synced++;
+    }
+
+    Utilities.sleep(200);
+  }
+
+  return { synced: synced, skipped: skipped };
+}
+
+/**
+ * Quick status check of all projects
+ */
+function checkAsanaStatus() {
+  Logger.log('=== ASANA STATUS CHECK ===');
+
+  const props = PropertiesService.getScriptProperties();
+  const ids = JSON.parse(props.getProperty('SC_PROJECT_IDS') || '{}');
+
+  if (Object.keys(ids).length === 0) {
+    Logger.log('No projects set up. Run setupAllAsanaProjects() first.');
+    return;
+  }
+
+  for (const key in ids) {
+    const projectId = ids[key];
+    const tasks = asanaRequest('/projects/' + projectId + '/tasks?limit=100');
+    const count = tasks ? tasks.length : 0;
+    Logger.log(key + ': ' + count + ' tasks (ID: ' + projectId + ')');
+  }
+
+  Logger.log('=== END STATUS ===');
+}
+
+// ============================================================================
 // TEST FUNCTIONS
 // ============================================================================
 
