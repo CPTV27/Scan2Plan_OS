@@ -1,35 +1,60 @@
 # SuperChase - Hotel Setup Checklist
 
-Everything you need to do when you get to your hotel. Estimated time: 15-20 minutes.
+Everything you need to do when you get to your hotel. Estimated time: 20-25 minutes.
 
 ---
 
-## Priority 1: Get Voice Working (5 min)
+## Overall Status: 65-70% Complete
 
-### ElevenLabs Conversational AI
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Email Triage | ✅ Working | 5-min triggers active |
+| Gemini Analysis | ✅ Working | Cost-efficient |
+| Sheets Database | ✅ Working | Base tabs ready |
+| Asana Sync | ⏳ Code Ready | Needs verification |
+| ElevenLabs Agent | ✅ Published | Needs share link |
+| Learning System | ⏳ Code Ready | Needs tabs created |
+| Multi-Agent | 📋 Designed | Future phase |
+
+---
+
+## Priority 1: ElevenLabs Voice Link (5 min)
 
 Your agent is published but you need the share link.
 
 1. Go to: https://elevenlabs.io/app/conversational-ai
 2. Click on your agent (SuperChase / Support agent)
 3. Click **Widget** tab
-4. Copy the **Public URL** or **Embed code**
-5. Test on your phone
-
-**If no public link:**
-- Click the **"..."** menu next to Publish
-- Look for "Share" or "Make Public"
-- Or click **Security** tab and enable public access
+4. Look for **Public URL** or click **"..."** menu → Share
+5. If needed, click **Security** tab and enable public access
+6. Copy link and test on your phone
 
 ---
 
-## Priority 2: Learning System Sheets (5 min)
+## Priority 2: Verify Asana Connection (2 min)
 
-### Option A: Quick Script (recommended)
+Run these in Apps Script to confirm Asana is working:
 
-1. Open Apps Script: https://script.google.com
-2. Open your SuperChaseCC project
-3. Paste this and run it:
+```javascript
+// Test 1: Connection check
+testAsanaConnection()
+// Should show: "Connected as: Chase Pierson (chase@...)"
+
+// Test 2: Project status
+checkAsanaStatus()
+// Should show task counts for all 5 SC projects
+```
+
+**If not set up yet, run:**
+```javascript
+setupAllAsanaProjects()
+```
+
+---
+
+## Priority 3: Create Learning Tabs (3 min)
+
+Run this in Apps Script:
 
 ```javascript
 function setupLearningTabs() {
@@ -56,59 +81,79 @@ function setupLearningTabs() {
     sn.getRange('A1:E1').setFontWeight('bold');
   }
 
-  Logger.log('Done!');
+  Logger.log('Learning tabs created!');
 }
 ```
 
-### Option B: Manual
+---
 
-1. Open your Sheet: https://docs.google.com/spreadsheets/d/1mBfl_0f6MQ0RjezYmwt4bT6m2sMESzwWdxnmFzrRTY4
-2. Add tab "Feedback" with columns: ID, Timestamp, Request, Response, Rating, Notes
-3. Add tab "Patterns" with columns: ID, Request_Type, Approach, Outcome, Score, Last_Used, Notes
-4. Add tab "Sessions" with columns: Date, Summary, Outcome, Wins, Lessons
+## Priority 4: Test Email Triage (3 min)
+
+1. Send yourself a test email with subject "Test from SuperChase"
+2. Wait 5 minutes OR run `processNewEmails()` in Apps Script
+3. Check the **Email Log** tab in your Sheet
+4. Verify analysis appears with category, priority, decision
 
 ---
 
-## Priority 3: Push Learning Files to GitHub (2 min)
-
-```bash
-cd ~/Scan2Plan_OS
-git add superchase/CLAUDE.md superchase/LEARNINGS.md superchase/SHEETS_SETUP.md superchase/HOTEL_TODO.md
-git commit -m "Add learning system for SuperChase"
-git push origin claude/ai-email-triage-system-2loD0
-```
-
----
-
-## Priority 4: Verify Everything Works (5 min)
-
-### Test Checklist
+## Priority 5: Final Verification Checklist
 
 - [ ] ElevenLabs voice agent responds on phone
-- [ ] Google Sheets has Feedback, Patterns, Sessions tabs
-- [ ] Asana sync still working (check SC: Tasks)
-- [ ] Can access SuperChase context via CLAUDE.md
+- [ ] Asana shows 5 SC projects with tasks
+- [ ] Sheets has Feedback, Patterns, Sessions tabs
+- [ ] Email triage logging to Email Log tab
+- [ ] Can talk to SuperChase hands-free
 
 ---
 
 ## What's Already Done
 
-✅ ElevenLabs agent created and published (agent_6601kfc80k2qftha80gdxca6ym0m)
+✅ ElevenLabs agent created and published
 ✅ System prompt configured with SuperChase personality
-✅ Voice set (George)
+✅ Voice set to George
 ✅ CLAUDE.md created with full context
-✅ LEARNINGS.md created with today's session documented
+✅ LEARNINGS.md with today's session documented
 ✅ self_improvement.json config exists
-✅ Asana projects syncing to Sheets
+✅ Asana sync code complete (5 projects configured)
+✅ Email triage running on 5-min triggers
 ✅ Web voice interface at superchase.vercel.app (backup)
+✅ Learning system code complete
 
 ---
 
-## What I Can't Do (Needs You)
+## What Needs You
 
-❌ Get ElevenLabs public share link (requires your login)
-❌ Run Apps Script to create Sheets tabs (requires your auth)
-❌ Push to GitHub from cloud instance (signing restriction)
+| Task | Why | Time |
+|------|-----|------|
+| ElevenLabs share link | Requires your login | 2 min |
+| Run Asana verification | Requires your auth | 2 min |
+| Run setupLearningTabs() | Requires your auth | 2 min |
+| Test email triage | Verify it's working | 3 min |
+
+---
+
+## Future Work (Not Urgent)
+
+| Component | What's Needed | Phase |
+|-----------|---------------|-------|
+| Multi-Agent System | Create Claude Project + MCP | Phase 2 |
+| MCP Integrations | Google Sheets, Asana, Drive | Phase 2 |
+| Local Folder Sync | Set up folder structure | Phase 2 |
+| Calendar Integration | Google Calendar API | Phase 3 |
+| Proactive Monitoring | Scheduled checks | Phase 3 |
+
+---
+
+## Quick Reference
+
+| Resource | Value |
+|----------|-------|
+| Sheets ID | `1mBfl_0f6MQ0RjezYmwt4bT6m2sMESzwWdxnmFzrRTY4` |
+| Asana Workspace | `1211216881488780` |
+| ElevenLabs Agent | `agent_6601kfc80k2qftha80gdxca6ym0m` |
+| Voice ID | `JBFqnCBsd6RMkjVDRZzb` (George) |
+| Vercel URL | https://superchase.vercel.app |
+| Apps Script | https://script.google.com (SuperChaseCC project) |
 
 ---
 
@@ -116,17 +161,17 @@ git push origin claude/ai-email-triage-system-2loD0
 
 | File | Purpose |
 |------|---------|
-| `superchase/CLAUDE.md` | Main AI context and instructions |
-| `superchase/LEARNINGS.md` | Session-by-session learning log |
-| `superchase/SHEETS_SETUP.md` | Instructions for Sheets tabs |
-| `superchase/HOTEL_TODO.md` | This checklist |
+| `CLAUDE.md` | Main AI context and learning instructions |
+| `LEARNINGS.md` | Session-by-session learning log |
+| `SHEETS_SETUP.md` | Detailed Sheets tab instructions |
+| `HOTEL_TODO.md` | This checklist |
 
 ---
 
-## Quick Reference
+## Monthly Cost Estimate
 
-- **Sheets ID**: `1mBfl_0f6MQ0RjezYmwt4bT6m2sMESzwWdxnmFzrRTY4`
-- **Asana Token**: `2/1209628858878583/1209636557792729:d3e3...`
-- **ElevenLabs Agent**: `agent_6601kfc80k2qftha80gdxca6ym0m`
-- **Voice ID**: `JBFqnCBsd6RMkjVDRZzb` (George)
-- **Vercel URL**: https://superchase.vercel.app
+| Service | Usage | Cost |
+|---------|-------|------|
+| Gemini 2.0 Flash | ~1000 emails | ~$0.50 |
+| ElevenLabs Voice | ~10 min | ~$0.80 |
+| **Total** | Light usage | **~$1.30/mo** |
