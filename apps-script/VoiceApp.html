@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperChase Voice</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 10px; }
+        #status { color: #94a3b8; margin-bottom: 30px; }
+        #status.ready { color: #10b981; }
+        #mic {
+            width: 140px; height: 140px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            font-size: 3.5rem;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(99,102,241,0.4);
+        }
+        #mic:active { transform: scale(0.95); }
+        #mic.listening { background: linear-gradient(135deg, #f59e0b, #d97706); animation: pulse 1s infinite; }
+        #mic.speaking { background: linear-gradient(135deg, #10b981, #059669); }
+        #mic.thinking { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        @keyframes pulse { 0%,100%{box-shadow:0 10px 40px rgba(245,158,11,0.4)} 50%{box-shadow:0 10px 60px rgba(245,158,11,0.6)} }
+        #output {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            max-width: 90%;
+            min-height: 80px;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+        .btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 18px;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>SuperChase Voice</h1>
+    <div id="status">Loading...</div>
+    <button id="mic">🎤</button>
+    <div id="output">Tap the microphone and speak</div>
+    <div class="btns">
+        <button class="btn" onclick="ask('What tasks do I have?')">Tasks</button>
+        <button class="btn" onclick="ask('Project status')">Projects</button>
+        <button class="btn" onclick="ask('Any leads to follow up?')">Leads</button>
+        <button class="btn" onclick="ask('Give me a status report')">Status</button>
+    </div>
+
+<script>
+const ELEVEN_KEY = 'sk_96f976dbf7db9272ce178cb180f4d83cd1def2f1dfbb71f2';
+const VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb';
+
+let recognition, audio;
+let listening = false, speaking = false;
+
+const mic = document.getElementById('mic');
+const status = document.getElementById('status');
+const output = document.getElementById('output');
+
+function init() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { status.textContent = 'Use Chrome for voice'; return; }
+
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = e => {
+        const text = e.results[0][0].transcript;
+        process(text);
+    };
+    recognition.onend = () => { if(listening) stopListen(); };
+    recognition.onerror = () => stopListen();
+
+    status.textContent = 'Ready - tap to talk';
+    status.className = 'ready';
+}
+
+function startListen() {
+    if (speaking && audio) { audio.pause(); speaking = false; }
+    listening = true;
+    mic.className = 'listening';
+    status.textContent = 'Listening...';
+    output.textContent = '🎤 Listening...';
+    try { recognition.start(); } catch(e) {}
+}
+
+function stopListen() {
+    listening = false;
+    mic.className = '';
+    status.textContent = 'Ready - tap to talk';
+    try { recognition.stop(); } catch(e) {}
+}
+
+function ask(text) { process(text); }
+
+async function process(text) {
+    stopListen();
+    output.textContent = 'You: "' + text + '"';
+    mic.className = 'thinking';
+    status.textContent = 'Thinking...';
+
+    // Get response from Apps Script backend
+    google.script.run
+        .withSuccessHandler(response => {
+            output.textContent = response;
+            speak(response);
+        })
+        .withFailureHandler(err => {
+            const fallback = getLocal(text);
+            output.textContent = fallback;
+            speak(fallback);
+        })
+        .getAIResponse(text);
+}
+
+function getLocal(t) {
+    t = t.toLowerCase();
+    if (t.includes('task')) return "Your SC: Tasks project has items across To Do, In Progress, and Done.";
+    if (t.includes('project')) return "SC: Projects tracks your larger initiatives.";
+    if (t.includes('lead')) return "Your SC: Leads pipeline has prospects in various stages.";
+    if (t.includes('contract')) return "SC: Contracts tracks draft, sent, and signed contracts.";
+    if (t.includes('status')) return "All 5 SuperChase projects are syncing. What area should I focus on?";
+    if (t.includes('hello') || t.includes('hi')) return "Hey Chase! What can I help with?";
+    return "I can help with tasks, projects, leads, contracts, or expenses.";
+}
+
+async function speak(text) {
+    speaking = true;
+    mic.className = 'speaking';
+    status.textContent = 'Speaking...';
+
+    try {
+        const res = await fetch('https://api.elevenlabs.io/v1/text-to-speech/' + VOICE_ID, {
+            method: 'POST',
+            headers: {
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json',
+                'xi-api-key': ELEVEN_KEY
+            },
+            body: JSON.stringify({
+                text: text,
+                model_id: 'eleven_turbo_v2_5',
+                voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+            })
+        });
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        audio = new Audio(url);
+        audio.onended = () => {
+            speaking = false;
+            mic.className = '';
+            status.textContent = 'Ready - tap to talk';
+        };
+        audio.play();
+    } catch(e) {
+        speaking = false;
+        mic.className = '';
+        status.textContent = 'Ready - tap to talk';
+    }
+}
+
+mic.onclick = () => {
+    if (speaking) { audio?.pause(); speaking = false; mic.className = ''; status.textContent = 'Ready'; }
+    else if (listening) stopListen();
+    else startListen();
+};
+
+init();
+</script>
+</body>
+</html>
