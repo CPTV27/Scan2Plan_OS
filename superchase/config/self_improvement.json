@@ -1,0 +1,126 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-01-18",
+
+  "feedback_loop": {
+    "enabled": true,
+    "storage": "Google Sheets - Feedback Tab",
+    "auto_apply_safe_fixes": true,
+    "queue_risky_fixes": true
+  },
+
+  "failure_classification": {
+    "BAD_RETRIEVAL": {
+      "description": "Assistant couldn't find the right information",
+      "auto_fix": "Adjust search parameters (Top-K, query expansion)",
+      "risk_level": "low"
+    },
+    "BAD_CONTEXT": {
+      "description": "Assistant misunderstood the situation",
+      "auto_fix": "Add clarifying context to subagent prompt",
+      "risk_level": "low"
+    },
+    "WRONG_PRIORITY": {
+      "description": "Task was mis-prioritized",
+      "auto_fix": "Update priority classification rules",
+      "risk_level": "low"
+    },
+    "EXECUTION_ERROR": {
+      "description": "Implementation failed or had bugs",
+      "auto_fix": "Log pattern, add to Reviewer checklist",
+      "risk_level": "medium"
+    },
+    "PERMISSION_ISSUE": {
+      "description": "Agent tried to do something outside scope",
+      "auto_fix": "Reinforce permission boundaries in prompt",
+      "risk_level": "medium"
+    },
+    "DATA_CORRUPTION": {
+      "description": "Data was modified incorrectly",
+      "auto_fix": "REQUIRES HUMAN APPROVAL - restore from backup",
+      "risk_level": "high"
+    }
+  },
+
+  "auto_accept_rules": {
+    "always_auto": [
+      "create_task",
+      "update_task_status",
+      "read_data",
+      "generate_draft",
+      "log_activity",
+      "send_calendar_invite_confirmed",
+      "file_email_to_label",
+      "sync_to_asana"
+    ],
+    "always_ask": [
+      "send_email",
+      "send_message",
+      "delete_data",
+      "archive_project",
+      "financial_commitment",
+      "new_api_access",
+      "schema_change",
+      "share_externally"
+    ],
+    "context_dependent": [
+      "update_contact_info",
+      "reschedule_meeting",
+      "assign_to_team_member"
+    ]
+  },
+
+  "learning_patterns": {
+    "storage_location": "Google Sheets - Patterns Tab",
+    "pattern_schema": {
+      "id": "string",
+      "request_type": "string",
+      "approach_taken": "string",
+      "outcome": "success|partial|failure",
+      "feedback": "thumbs_up|thumbs_down|none",
+      "timestamp": "datetime",
+      "notes": "string"
+    },
+    "reinforcement_threshold": 3,
+    "deprecation_threshold": -3
+  },
+
+  "eval_generation": {
+    "enabled": true,
+    "tests_per_document": 5,
+    "test_types": [
+      "factual_retrieval",
+      "inference",
+      "action_planning",
+      "edge_case"
+    ]
+  },
+
+  "subagent_runtime_config": {
+    "Researcher": {
+      "max_search_queries": 3,
+      "preferred_sources": ["internal_docs", "trusted_web"],
+      "confidence_threshold": 0.7
+    },
+    "Implementer": {
+      "require_review_for": ["destructive_ops", "external_calls"],
+      "max_retries": 2,
+      "auto_backup": true
+    },
+    "Reviewer": {
+      "strictness": "balanced",
+      "block_on": ["security_issues", "data_loss_risk"],
+      "warn_on": ["style_issues", "missing_tests"]
+    },
+    "Communicator": {
+      "max_draft_length": 200,
+      "default_tone": "professional_friendly",
+      "require_approval": true
+    },
+    "Strategist": {
+      "analysis_depth": "thorough",
+      "time_horizon_weeks": 12,
+      "risk_tolerance": "moderate"
+    }
+  }
+}
