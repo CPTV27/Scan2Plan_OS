@@ -19,10 +19,11 @@ SuperChase is Chase Pierson's AI-powered personal assistant system for managing 
 | Component | Status | Location |
 |-----------|--------|----------|
 | Database | ✅ Active | Google Sheets `1mBfl_0f6MQ0RjezYmwt4bT6m2sMESzwWdxnmFzrRTY4` |
-| Task UI | ✅ Ready | Asana - run `setupAllAsanaProjects()` in Apps Script |
+| Task UI | ✅ Active | Asana - 5 SC projects created |
 | Automation | ✅ Deployed | Apps Script (Code.gs + AsanaSync.gs) |
 | Local Folders | 📋 Create | `~/SuperChase/` - sync with Google Drive |
 | Email Triage | ✅ Active | Runs via Apps Script triggers |
+| Master Context Doc | ✅ Created | [Google Doc](https://docs.google.com/open?id=1Sjlh1_aD9BgUPeUc5K_b_H1hKJBkGPlaXgeIPHW_bsM) |
 
 ---
 
@@ -38,13 +39,13 @@ Asana Workspace ID: 1211216881488780
 
 ## ASANA PROJECTS
 
-| Project | Purpose | Sections |
-|---------|---------|----------|
-| SC: Tasks | Daily tasks | To Do, In Progress, Done |
-| SC: Projects | Project tracking | Active, On Hold, Completed |
-| SC: Leads | Sales pipeline | New, Contacted, Qualified, Won, Lost |
-| SC: Contracts | Contract management | Draft, Sent, Signed |
-| SC: Expenses | Expense tracking | Pending, Approved, Paid |
+| Project | Purpose | Sections | Project ID |
+|---------|---------|----------|------------|
+| SC: Tasks | Daily tasks | To Do, In Progress, Done | `1212853758026097` |
+| SC: Projects | Project tracking | Active, On Hold, Completed | `1212801154266018` |
+| SC: Leads | Sales pipeline | New, Contacted, Qualified, Won, Lost | `1212801154275730` |
+| SC: Contracts | Contract management | Draft, Sent, Signed | `1212853758537191` |
+| SC: Expenses | Expense tracking | Pending, Approved, Paid | `1212853755253572` |
 
 ---
 
