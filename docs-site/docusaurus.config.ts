@@ -24,6 +24,19 @@ const config: Config = {
     locales: ['en'],
   },
 
+  themes: [
+    [
+      '@easyops-cn/docusaurus-search-local',
+      {
+        hashed: true,
+        language: ['en'],
+        highlightSearchTermsOnTargetPage: true,
+        explicitSearchResultPath: true,
+        docsRouteBasePath: '/docs',
+      },
+    ],
+  ],
+
   presets: [
     [
       'classic',
@@ -114,7 +127,6 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
       additionalLanguages: ['bash', 'typescript', 'json'],
     },
-    algolia: undefined, // Remove if you don't use Algolia search
   } satisfies Preset.ThemeConfig,
 };
 
